@@ -1,0 +1,65 @@
+{
+  "app": {
+    "name": "NeuroPlant AI"
+  },
+  "nav": {
+    "home": "Home",
+    "detect": "Scan Crop",
+    "doctor": "Crop Doctor",
+    "marketplace": "Marketplace",
+    "login": "Log in",
+    "register": "Sign up",
+    "menu": "Menu"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "submit": "Submit",
+    "back": "Back",
+    "cancel": "Cancel"
+  },
+  "landing": {
+    "badge": "AI-powered agriculture for India",
+    "title": "Healthy crops, higher yields, for every Indian farmer",
+    "subtitle": "Scan a leaf, talk to an AI assistant in your own language, and get treatments, weather, prices and markets — online and offline.",
+    "ctaScan": "Scan a leaf",
+    "ctaAssistant": "Ask the AI assistant",
+    "feature1Title": "AI disease detection",
+    "feature1Body": "Photograph a leaf and get the disease, severity and treatment in seconds.",
+    "feature2Title": "Speaks 12 languages",
+    "feature2Body": "Voice-first support in Hindi and 11 more Indian languages.",
+    "feature3Title": "Works offline",
+    "feature3Body": "Keep scanning in the field — results sync when you're back online."
+  },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Log in to your farm account",
+    "registerTitle": "Create your account",
+    "registerSubtitle": "Join farmers, experts and sellers",
+    "phone": "Phone number",
+    "name": "Full name",
+    "email": "Email (optional)",
+    "password": "Password",
+    "otpCode": "6-digit OTP",
+    "sendOtp": "Send OTP",
+    "verifyOtp": "Verify & log in",
+    "login": "Log in",
+    "register": "Sign up",
+    "role": "I am a",
+    "roles": {
+      "farmer": "Farmer",
+      "customer": "Customer",
+      "expert": "Expert",
+      "seller": "Seller"
+    },
+    "haveAccount": "Already have an account?",
+    "noAccount": "New here?",
+    "mfaCode": "Authenticator code",
+    "mfaVerify": "Verify code"
+  },
+  "footer": {
+    "tagline": "The AI-powered agriculture platform for India.",
+    "rights": "All rights reserved."
+  }
+}
