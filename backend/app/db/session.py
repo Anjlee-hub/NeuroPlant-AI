@@ -7,6 +7,7 @@ can still emit Postgres-specific constructs via server_defaults/spiegelungen.
 """
 
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -46,6 +47,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency yielding a database session."""
     async with async_session_factory() as session:
         yield session
+
+
+def ensure_aware(dt: datetime) -> datetime:
+    """SQLite stores naive UTC; PostgreSQL returns aware. Normalize before
+    comparing DB-read timestamps against ``datetime.now(UTC)``."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
 
 
 async def ping_db() -> bool:

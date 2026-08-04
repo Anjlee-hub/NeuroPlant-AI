@@ -8,14 +8,25 @@ Run (containerized):
 """
 
 from contextlib import asynccontextmanager
+from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.services.auth import (
+    AuthError,
+    InvalidCredentialsError,
+    InvalidMfaError,
+    MfaNotEnabledError,
+    UserExistsError,
+    UserNotFoundError,
+)
+from app.services.otp import OtpError
 
 settings = get_settings()
 logger = get_logger("app.main")
@@ -60,3 +71,26 @@ async def root() -> dict[str, str]:
         "docs": "/docs",
         "health": "/health",
     }
+
+
+# ── Domain exception → HTTP mapping ─────────────────────────────────────
+# Service-layer errors are mapped here (not in routers) so business logic
+# stays HTTP-free. Handlers are registered per class; FastAPI picks the most
+# specific match via MRO, so the base ``AuthError`` handler is the fallback.
+
+
+def _error_handler(status_code: int):
+    async def handler(_: Request, exc: Any) -> JSONResponse:
+        return JSONResponse(status_code=status_code, content={"error": {"message": str(exc)}})
+
+    return handler
+
+
+# Auth (409/401/404/400) and OTP (400).
+app.add_exception_handler(UserExistsError, _error_handler(409))
+app.add_exception_handler(MfaNotEnabledError, _error_handler(409))
+app.add_exception_handler(InvalidCredentialsError, _error_handler(401))
+app.add_exception_handler(UserNotFoundError, _error_handler(404))
+app.add_exception_handler(InvalidMfaError, _error_handler(400))
+app.add_exception_handler(OtpError, _error_handler(400))
+app.add_exception_handler(AuthError, _error_handler(400))
