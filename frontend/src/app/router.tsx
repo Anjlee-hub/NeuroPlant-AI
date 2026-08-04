@@ -5,6 +5,7 @@ import { RootLayout } from "@/components/layout/root-layout";
 import { ComingSoonPage } from "@/pages/coming-soon";
 import { HomePage } from "@/pages/home";
 import { LoginPage } from "@/pages/login";
+import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
 import { RegisterPage } from "@/pages/register";
 
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: "login", element: <LoginPage /> },
+      { path: "login/mfa", element: <MfaVerifyPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "detect", element: <ComingSoonPage navKey="detect" /> },
       { path: "doctor", element: <ComingSoonPage navKey="doctor" /> },

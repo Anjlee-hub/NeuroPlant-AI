@@ -30,6 +30,12 @@ export class ApiError extends Error {
   }
 }
 
+/** Extract a human-readable message from any thrown value. */
+export function errorMessage(err: unknown): string {
+  if (err instanceof ApiError || err instanceof Error) return err.message;
+  return "Request failed";
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_KEY);
 }
