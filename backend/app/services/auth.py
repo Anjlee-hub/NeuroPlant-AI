@@ -255,9 +255,7 @@ async def confirm_mfa_challenge(
     if mfa.backup_codes_hash:
         for i, code_hash in enumerate(mfa.backup_codes_hash):
             if hash_token(code) == code_hash:
-                mfa.backup_codes_hash = [
-                    c for j, c in enumerate(mfa.backup_codes_hash) if j != i
-                ]
+                mfa.backup_codes_hash = [c for j, c in enumerate(mfa.backup_codes_hash) if j != i]
                 await db.commit()
                 await _record_login(
                     db, user_id, device, success=True, method="mfa_backup", mfa_used=True
