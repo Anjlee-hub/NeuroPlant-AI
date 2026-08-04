@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     # ── Rate limiting ───────────────────────────────────────────────────
     rate_limit_enabled: bool = False  # degraded in native dev; enabled in prod
 
+    # ── AI serving ──────────────────────────────────────────────────────
+    # Path to the trained disease-model artifact (.keras). When the path is
+    # missing the detection service falls back to the deterministic rule
+    # baseline (provider="baseline").
+    disease_model_path: str = "models/disease"
+    disease_model_version: str = "baseline-v1"
+
     # ── Storage (S3 / R2 / MinIO) ───────────────────────────────────────
     storage_provider: str = "local"  # local | s3
     s3_endpoint_url: str | None = None

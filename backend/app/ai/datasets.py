@@ -26,6 +26,7 @@ class DiseaseCatalog:
     label_map: dict[str, int]  # disease name → class index
     class_count: int
     disease_ids: dict[str, int] = field(default_factory=dict)  # name → disease.id
+    disease_crops: dict[str, int] = field(default_factory=dict)  # name → crop.id
 
 
 class DatasetLoader(Protocol):
@@ -36,16 +37,19 @@ def build_label_map(diseases: list[Disease]) -> DiseaseCatalog:
     """Build a deterministic class index over catalog diseases (first-seen order)."""
     label_map: dict[str, int] = {}
     disease_ids: dict[str, int] = {}
+    disease_crops: dict[str, int] = {}
     for disease in diseases:
         if disease.name not in label_map:
             # First-seen order keeps indices dense (0..n-1) even with dupes.
             label_map[disease.name] = len(label_map)
         disease_ids[disease.name] = disease.id  # last row's id wins for lookup
+        disease_crops[disease.name] = disease.crop_id  # last row's crop wins
     return DiseaseCatalog(
         version=DATASET_VERSION,
         label_map=label_map,
         class_count=len(label_map),
         disease_ids=disease_ids,
+        disease_crops=disease_crops,
     )
 
 

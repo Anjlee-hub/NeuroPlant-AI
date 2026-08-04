@@ -88,3 +88,9 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = ["celery.*"]
 ignore_missing_imports = true
+
+# TensorFlow is an optional (M2+) dependency imported lazily inside the
+# classifier; never force mypy to resolve it for the base install.
+[[tool.mypy.overrides]]
+module = ["tensorflow"]
+ignore_missing_imports = true

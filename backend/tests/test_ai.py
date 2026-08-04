@@ -46,11 +46,12 @@ def test_registry_can_be_replaced():
 
 
 class _Disease:
-    """Duck-typed Disease (id/name) for pure label-map tests."""
+    """Duck-typed Disease (id/name/crop_id) for pure label-map tests."""
 
-    def __init__(self, id: int, name: str) -> None:
+    def __init__(self, id: int, name: str, crop_id: int = 0) -> None:
         self.id = id
         self.name = name
+        self.crop_id = crop_id
 
 
 def test_build_label_map_is_deterministic_and_dedupes():
