@@ -1,0 +1,9 @@
+# Heavy / platform-specific ML dependencies — NOT part of the base install.
+# Install when running the AI stack (serving or training):
+#   pip install -r requirements-ml.txt
+#
+# Base deps already include numpy (needed by all of the above).
+tensorflow>=2.16
+keras>=3.3
+tf-keras>=2.16
+opencv-python-headless>=4.10
