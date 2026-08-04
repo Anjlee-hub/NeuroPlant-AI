@@ -5,6 +5,7 @@ import { RootLayout } from "@/components/layout/root-layout";
 import { ComingSoonPage } from "@/pages/coming-soon";
 import { HomePage } from "@/pages/home";
 import { LoginPage } from "@/pages/login";
+import { MfaSetupPage } from "@/pages/mfa-setup";
 import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
 import { RegisterPage } from "@/pages/register";
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "login", element: <LoginPage /> },
       { path: "login/mfa", element: <MfaVerifyPage /> },
       { path: "register", element: <RegisterPage /> },
+      { path: "settings/mfa", element: <MfaSetupPage /> },
       { path: "detect", element: <ComingSoonPage navKey="detect" /> },
       { path: "doctor", element: <ComingSoonPage navKey="doctor" /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" /> },

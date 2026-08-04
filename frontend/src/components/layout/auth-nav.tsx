@@ -1,4 +1,4 @@
-import { LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, ShieldCheck, User as UserIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -29,6 +29,18 @@ export function AuthNav({ onNavigate, className }: AuthNavProps) {
           <UserIcon className="size-4 text-muted-foreground" />
           {user.name}
         </span>
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          aria-label={t("auth.security")}
+          onClick={onNavigate}
+        >
+          <Link to="/settings/mfa">
+            <ShieldCheck />
+            {t("auth.security")}
+          </Link>
+        </Button>
         <Button
           variant="ghost"
           size="sm"
