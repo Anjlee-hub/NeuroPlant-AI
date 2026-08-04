@@ -4,6 +4,7 @@ Import every model module here so ``Base.metadata`` is fully populated for
 Alembic autogenerate and test ``create_all``.
 """
 
+from app.models.audit import AuditLog
 from app.models.catalog import Crop, Disease
 from app.models.scan import Scan
 from app.models.user import (
@@ -19,6 +20,7 @@ from app.models.user import (
 )
 
 __all__ = [
+    "AuditLog",
     "Crop",
     "Disease",
     "Scan",

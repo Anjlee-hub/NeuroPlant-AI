@@ -9,9 +9,11 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from app.models.audit import AuditLog
 from app.models.user import User
 from app.schemas.scan import ScanCreate
 from app.services.scans import ScanNotFoundError, ScanService
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 
@@ -210,3 +212,93 @@ async def test_list_paginates(db):
     assert total == 5
     assert len(page1) == 2 and len(page2) == 2
     assert page1[0].id != page2[0].id  # no overlap
+
+
+# ── Task 4.3 filters (confidence / severity / sync status) ──────────────
+
+
+async def test_list_filters_by_confidence_range(db):
+    user = await _user(db)
+    await _seed_history(db, user.id)  # confidences 0.92, 0.8, 0.75, 0.88, 0.97
+    rows, total = await ScanService(db).list_scans(user.id, confidence_min=0.85)
+    assert total == 3  # 0.92, 0.88, 0.97
+    rows, total = await ScanService(db).list_scans(user.id, confidence_max=0.8)
+    assert total == 2  # 0.80, 0.75
+    assert all(r.confidence <= 0.8 for r in rows)
+
+
+async def test_list_filters_by_severity(db):
+    user = await _user(db)
+    await ScanService(db).create(_payload(user.id, _client_id(25), severity="low"))
+    await ScanService(db).create(_payload(user.id, _client_id(26), severity="severe"))
+    rows, total = await ScanService(db).list_scans(user.id, severity="severe")
+    assert total == 1
+    assert rows[0].severity == "severe"
+
+
+async def test_list_filters_by_sync_status(db):
+    user = await _user(db)
+    svc = ScanService(db)
+    await svc.create(_payload(user.id, _client_id(27)))  # default synced
+    pending = await svc.create(_payload(user.id, _client_id(28)))
+    pending.sync_status = "pending"  # ScanCreate has no sync_status; set directly
+    await db.commit()
+    rows, total = await svc.list_scans(user.id, sync_status="pending")
+    assert total == 1
+    assert rows[0].sync_status == "pending"
+
+
+# ── Soft delete + audit ─────────────────────────────────────────────────
+
+
+async def test_soft_delete_hides_from_history_and_lookup(db):
+    user = await _user(db)
+    svc = ScanService(db)
+    scan = await svc.create(_payload(user.id, _client_id(29)))
+    await svc.delete_for_user(scan.id, user.id)
+
+    with pytest.raises(ScanNotFoundError):
+        await svc.get_for_user(scan.id, user.id)
+    rows, total = await svc.list_scans(user.id)
+    assert total == 0
+    # A deleted scan must never resurface via the offline idempotency lookup.
+    assert await svc.find_by_client_id(scan.client_scan_id, user.id) is None
+
+
+async def test_soft_delete_writes_audit_log(db):
+    user = await _user(db)
+    svc = ScanService(db)
+    scan = await svc.create(_payload(user.id, _client_id(30)))
+    await svc.delete_for_user(scan.id, user.id)
+
+    entry = await db.scalar(select(AuditLog).where(AuditLog.resource_id == str(scan.id)))
+    assert entry is not None
+    assert entry.action == "scan.delete"
+    assert entry.resource_type == "scan"
+    assert entry.actor_id == user.id
+    assert entry.details["client_scan_id"] == scan.client_scan_id
+
+
+# ── Admin access ────────────────────────────────────────────────────────
+
+
+async def test_admin_flag_reads_any_scan(db):
+    owner = await _user(db, "+919000000001")
+    other = await _user(db, "+919000000002")
+    svc = ScanService(db)
+    scan = await svc.create(_payload(owner.id, _client_id(31)))
+
+    assert (await svc.get_for_user(scan.id, other.id, admin=True)).id == scan.id
+    with pytest.raises(ScanNotFoundError):
+        await svc.get_for_user(scan.id, other.id)  # non-admin blocked
+
+
+async def test_admin_lists_all_users_scans(db):
+    u1 = await _user(db, "+919000000001")
+    u2 = await _user(db, "+919000000002")
+    svc = ScanService(db)
+    await svc.create(_payload(u1.id, _client_id(32)))
+    await svc.create(_payload(u2.id, _client_id(33)))
+    rows, total = await svc.list_scans(None)
+    assert total == 2
+    assert {r.user_id for r in rows} == {u1.id, u2.id}

@@ -32,7 +32,11 @@ from app.models.base import TimestampMixin
 
 class Scan(Base, TimestampMixin):
     __tablename__ = "scans"
-    __table_args__ = (Index("ix_scans_user_created", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_scans_user_created", "user_id", "created_at"),
+        # Covers the common history query: own rows, not soft-deleted, by recency.
+        Index("ix_scans_user_deleted_created", "user_id", "deleted_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # Offline idempotency key — client-generated, globally unique.
@@ -79,6 +83,10 @@ class Scan(Base, TimestampMixin):
     sync_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Soft delete (Task 4.3): NULL = live, set = deleted. History/detail/sync
+    # queries filter on it so a deleted scan never resurfaces.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @property
     def rankings(self) -> list[dict]:

@@ -12,8 +12,10 @@ from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.logging import get_logger
+from app.models.audit import AuditLog
 from app.models.scan import Scan
 from app.schemas.scan import ScanCreate
 
@@ -38,6 +40,11 @@ def _naive_utc(dt: datetime) -> datetime:
     return dt.astimezone(UTC).replace(tzinfo=None)
 
 
+def _now_naive_utc() -> datetime:
+    """Current wall-clock as naive-UTC (soft-delete marker)."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class ScanService:
     """All Scan persistence/querying behind one dependency-injectable class."""
 
@@ -46,10 +53,17 @@ class ScanService:
 
     # ── Read ──────────────────────────────────────────────────────────
 
-    async def get_for_user(self, scan_id: int, user_id: int) -> Scan:
-        """Ownership-guarded detail lookup."""
+    async def get_for_user(self, scan_id: int, user_id: int, *, admin: bool = False) -> Scan:
+        """Ownership-guarded detail lookup (``admin`` bypasses the owner check).
+
+        Missing rows and other users' rows raise the *same* error so a 404 never
+        reveals whether a scan exists (ID-enumeration guard). Soft-deleted rows
+        are treated as missing.
+        """
         row = await self.db.get(Scan, scan_id)
-        if row is None or row.user_id != user_id:
+        if row is None or row.deleted_at is not None:
+            raise ScanNotFoundError(f"scan {scan_id} not found for user {user_id}")
+        if not admin and row.user_id != user_id:
             raise ScanNotFoundError(f"scan {scan_id} not found for user {user_id}")
         return row
 
@@ -59,12 +73,13 @@ class ScanService:
             select(Scan).where(
                 Scan.client_scan_id == client_scan_id,
                 Scan.user_id == user_id,
+                Scan.deleted_at.is_(None),
             )
         )
 
     async def list_scans(
         self,
-        user_id: int,
+        user_id: int | None,
         *,
         crop_id: int | None = None,
         disease: str | None = None,
@@ -72,13 +87,25 @@ class ScanService:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         search: str | None = None,
+        confidence_min: float | None = None,
+        confidence_max: float | None = None,
+        severity: str | None = None,
+        sync_status: str | None = None,
         sort: str = "created_at",
         order: str = "desc",
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[Scan], int]:
-        """Paginated, filtered history. Returns ``(rows, total_count)``."""
-        conditions = [Scan.user_id == user_id]
+        """Paginated, filtered history. Returns ``(rows, total_count)``.
+
+        ``user_id=None`` (admin) lists every live scan; otherwise only the given
+        user's. All soft-deleted rows are excluded. A single SELECT + COUNT is
+        used (Scan's JSON lists are columns, not relationships) so there are no
+        N+1 queries.
+        """
+        conditions: list[ColumnElement[bool]] = [Scan.deleted_at.is_(None)]
+        if user_id is not None:
+            conditions.append(Scan.user_id == user_id)
         if crop_id is not None:
             conditions.append(Scan.crop_id == crop_id)
         if disease:
@@ -92,6 +119,14 @@ class ScanService:
         if search:
             like = f"%{search}%"
             conditions.append(Scan.disease_name.ilike(like) | Scan.provider.ilike(like))
+        if confidence_min is not None:
+            conditions.append(Scan.confidence >= confidence_min)
+        if confidence_max is not None:
+            conditions.append(Scan.confidence <= confidence_max)
+        if severity:
+            conditions.append(Scan.severity == severity)
+        if sync_status:
+            conditions.append(Scan.sync_status == sync_status)
 
         where = and_(*conditions)
         total = await self.db.scalar(select(func.count()).select_from(Scan).where(where)) or 0
@@ -147,9 +182,26 @@ class ScanService:
         )
         return scan
 
-    async def delete_for_user(self, scan_id: int, user_id: int) -> None:
-        """Ownership-guarded delete (raises :class:`ScanNotFoundError`)."""
-        scan = await self.get_for_user(scan_id, user_id)
-        await self.db.delete(scan)
+    async def delete_for_user(self, scan_id: int, user_id: int, *, admin: bool = False) -> None:
+        """Soft-delete a scan, audit-logging the actor (raises if no access).
+
+        The row is marked ``deleted_at`` in the same transaction as the audit
+        entry, so history/sync can never resurrect a deleted scan.
+        """
+        scan = await self.get_for_user(scan_id, user_id, admin=admin)
+        scan.deleted_at = _now_naive_utc()
+        self.db.add(scan)
+        self.db.add(
+            AuditLog(
+                actor_id=user_id,
+                action="scan.delete",
+                resource_type="scan",
+                resource_id=str(scan.id),
+                details={
+                    "client_scan_id": scan.client_scan_id,
+                    "disease_name": scan.disease_name,
+                },
+            )
+        )
         await self.db.commit()
-        logger.info("scan_deleted", scan_id=scan_id, user_id=user_id)
+        logger.info("scan_soft_deleted", scan_id=scan_id, actor_user_id=user_id)

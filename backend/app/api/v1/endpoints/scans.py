@@ -9,6 +9,7 @@ already-known ``client_scan_id``).
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import (
@@ -17,6 +18,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Response,
     UploadFile,
     status,
@@ -31,11 +33,13 @@ from app.api.v1.deps import (
 )
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.models.base import UserRole
 from app.models.scan import Scan
 from app.models.user import User
-from app.schemas.scan import CLIENT_SCAN_ID_PATTERN, PART_TYPES, ScanOut
+from app.schemas.scan import CLIENT_SCAN_ID_PATTERN, PART_TYPES, ScanListOut, ScanOut
 from app.services.detection import DetectionService
 from app.services.scan_pipeline import ScanPipelineService
+from app.services.scans import ScanService
 from app.services.storage import get_storage_service
 
 router = APIRouter(prefix="/scans", tags=["scans"])
@@ -106,3 +110,101 @@ async def create_scan(
     if not created:
         response.status_code = status.HTTP_200_OK
     return scan
+
+
+# ── History ──────────────────────────────────────────────────────────────
+
+
+@router.get("", response_model=ScanListOut)
+async def list_my_scans(
+    user: CurrentUser,
+    db: Db,
+    page: Annotated[int, Query(ge=1, description="1-based page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Rows per page")] = 20,
+    sort: Annotated[
+        str,
+        Query(pattern="^(created_at|confidence|disease_name)$"),
+    ] = "created_at",
+    order: Annotated[str, Query(pattern="^(asc|desc)$")] = "desc",
+    search: Annotated[str | None, Query(description="Free-text over disease/provider")] = None,
+    crop_id: Annotated[int | None, Query(description="Filter by crop id")] = None,
+    disease: Annotated[str | None, Query(description="Partial disease-name match")] = None,
+    part_type: Annotated[str | None, Query(pattern="^(leaf|fruit|stem|plant|whole)$")] = None,
+    date_from: Annotated[
+        datetime | None, Query(description="Inclusive lower bound (ISO-8601)")
+    ] = None,
+    date_to: Annotated[
+        datetime | None, Query(description="Inclusive upper bound (ISO-8601)")
+    ] = None,
+    confidence_min: Annotated[float | None, Query(ge=0.0, le=1.0)] = None,
+    confidence_max: Annotated[float | None, Query(ge=0.0, le=1.0)] = None,
+    severity: Annotated[str | None, Query(pattern="^(low|moderate|severe)$")] = None,
+    sync_status: Annotated[
+        str | None, Query(description="Sync/offline state (synced|pending|failed)")
+    ] = None,
+    owner_id: Annotated[int | None, Query(description="Admin-only: narrow to one user")] = None,
+) -> ScanListOut:
+    """Paginated, filterable, searchable scan history.
+
+    Regular users see only their own scans (``owner_id`` is ignored for them);
+    admins see every live scan and may narrow by ``owner_id``. Soft-deleted
+    scans never appear.
+    """
+    if (
+        confidence_min is not None
+        and confidence_max is not None
+        and confidence_min > confidence_max
+    ):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "invalid_confidence_range",
+                "message": "confidence_min must not exceed confidence_max",
+            },
+        )
+
+    target_user = owner_id if user.role == UserRole.ADMIN else user.id
+    rows, total = await ScanService(db).list_scans(
+        target_user,
+        crop_id=crop_id,
+        disease=disease,
+        part_type=part_type,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        confidence_min=confidence_min,
+        confidence_max=confidence_max,
+        severity=severity,
+        sync_status=sync_status,
+        sort=sort,
+        order=order,
+        page=page,
+        page_size=page_size,
+    )
+    return ScanListOut(
+        items=rows,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=page * page_size < total,
+    )
+
+
+@router.get("/{scan_id}", response_model=ScanOut)
+async def get_scan(scan_id: int, user: CurrentUser, db: Db) -> Scan:
+    """Complete details for one scan.
+
+    Returns ``404`` for a missing, soft-deleted, or other-user's scan — the
+    response is identical in every case so no scan's existence is revealed.
+    """
+    return await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
+
+
+@router.delete("/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_scan(scan_id: int, user: CurrentUser, db: Db) -> None:
+    """Soft-delete a scan (kept for audit; excluded from history/sync).
+
+    ``204`` on success; ``404`` when the scan is missing, already deleted, or
+    owned by someone else; ``401`` when unauthenticated.
+    """
+    await ScanService(db).delete_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
