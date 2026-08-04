@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     disease_model_path: str = "models/disease"
     disease_model_version: str = "baseline-v1"
 
+    # ── Image preprocessing (OpenCV pipeline) ───────────────────────────
+    # Upload ceiling; dimension guards (decompression-bomb protection);
+    # model input size; re-encode quality for stored/augmented images.
+    preprocess_max_bytes: int = 15 * 1024 * 1024
+    preprocess_max_dimension: int = 8000
+    preprocess_min_dimension: int = 16
+    preprocess_target_size: int = 224
+    preprocess_jpeg_quality: int = 92
+
     # ── Storage (S3 / R2 / MinIO) ───────────────────────────────────────
     storage_provider: str = "local"  # local | s3
     s3_endpoint_url: str | None = None

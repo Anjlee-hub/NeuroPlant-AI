@@ -75,11 +75,17 @@ class _FakePreprocessor:
     def validate(self, image):
         return image
 
+    def prepare(self, image):
+        return image
+
     def preprocess(self, image):
         return None
 
     def augment(self, image):
         return [image]
+
+    def sanitize(self, image):
+        return image
 
 
 def test_preprocessor_registry_roundtrip():

@@ -94,3 +94,8 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["tensorflow"]
 ignore_missing_imports = true
+
+# OpenCV is an optional M2+ dependency imported lazily in the preprocessor.
+[[tool.mypy.overrides]]
+module = ["cv2"]
+ignore_missing_imports = true
