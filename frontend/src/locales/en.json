@@ -2,6 +2,11 @@
   "app": {
     "name": "NeuroPlant AI"
   },
+  "languages": {
+    "label": "Language",
+    "en": "English",
+    "hi": "हिन्दी"
+  },
   "nav": {
     "home": "Home",
     "detect": "Scan Crop",
@@ -17,7 +22,12 @@
     "retry": "Retry",
     "submit": "Submit",
     "back": "Back",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "comingSoon": "Coming soon",
+    "backHome": "Back to home",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The page you're looking for doesn't exist yet.",
+    "pageErrorBody": "Something went wrong while rendering this page."
   },
   "landing": {
     "badge": "AI-powered agriculture for India",
