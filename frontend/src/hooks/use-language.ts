@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import i18n, { type Language, SUPPORTED_LANGUAGES } from "@/i18n";
@@ -14,10 +14,14 @@ export function useLanguage() {
   const { i18n: client } = useTranslation();
   const language = (client.resolvedLanguage as Language) || "en";
 
+  // Keep <html lang> in sync on mount and on every change.
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
   const setLanguage = useCallback(
     (lang: Language) => {
       void i18n.changeLanguage(lang);
-      document.documentElement.lang = lang;
       localStorage.setItem(STORAGE_KEY, lang);
     },
     [],

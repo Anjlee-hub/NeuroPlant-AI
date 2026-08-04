@@ -27,7 +27,8 @@
     "backHome": "Back to home",
     "notFoundTitle": "Page not found",
     "notFoundBody": "The page you're looking for doesn't exist yet.",
-    "pageErrorBody": "Something went wrong while rendering this page."
+    "pageErrorBody": "Something went wrong while rendering this page.",
+    "offline": "You're offline — changes will sync when you're back online."
   },
   "landing": {
     "badge": "AI-powered agriculture for India",

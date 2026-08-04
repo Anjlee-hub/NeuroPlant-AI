@@ -2,10 +2,11 @@ import { Outlet } from "react-router-dom";
 
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
+import { OfflineIndicator } from "@/components/offline-indicator";
 
 /**
  * App shell. Sticky header + scrollable main + footer; routes render into
- * <Outlet />. The offline indicator mounts here once the PWA layer lands.
+ * <Outlet />. The offline indicator floats above the footer when offline.
  */
 export function RootLayout() {
   return (
@@ -15,6 +16,7 @@ export function RootLayout() {
         <Outlet />
       </main>
       <Footer />
+      <OfflineIndicator />
     </div>
   );
 }
