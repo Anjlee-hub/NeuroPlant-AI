@@ -1,0 +1,36 @@
+# NeuroPlant AI — API image
+# Build contexts must be the repo ROOT so backend/ is reachable:
+#   docker build -f docker/Dockerfile.api --target api .
+#
+# Two targets share the same base:
+#   api     → uvicorn (FastAPI web service)
+#   worker  → celery worker
+
+FROM python:3.13-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Create non-root user.
+RUN adduser --disabled-password --gecos "" appuser
+
+# Install Python deps first (layer caching).
+COPY backend/pyproject.toml backend/README.md ./
+COPY backend/app ./app
+RUN pip install --no-cache-dir .
+
+# ── API target ──────────────────────────────────────────────────────────
+FROM base AS api
+USER appuser
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# ── Worker target ───────────────────────────────────────────────────────
+FROM base AS worker
+USER appuser
+CMD ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]

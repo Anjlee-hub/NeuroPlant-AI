@@ -1,0 +1,109 @@
+# NeuroPlant AI — local containerized stack.
+#
+#   cd docker
+#   docker compose up --build
+#
+# Services: db (Postgres) · redis · minio (S3) · api (FastAPI) · worker
+# (Celery) · web (nginx serving the frontend + reverse-proxying /api, /ws).
+#
+# Note: native dev without Docker uses SQLite + Celery eager — see README.
+
+name: neuroplant
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neuroplant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neuroplant}
+      POSTGRES_DB: ${POSTGRES_DB:-neuroplant}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neuroplant}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-neuroplant}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-neuroplant-minio}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+      target: api
+    env_file: .env.example
+    environment: &backend-env
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-neuroplant}:${POSTGRES_PASSWORD:-neuroplant}@db:5432/${POSTGRES_DB:-neuroplant}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      STORAGE_PROVIDER: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-neuroplant}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-neuroplant}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-neuroplant-minio}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+      target: worker
+    env_file: .env.example
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  miniodata:

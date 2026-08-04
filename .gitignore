@@ -1,0 +1,66 @@
+# ── Python ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.pyd
+.python-version
+
+# ── Node / Frontend ─────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Environment / Secrets ───────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.dockerignore
+*.pem
+*.key
+*.p12
+service-account*.json
+
+# ── Data / Runtime ──────────────────────────────────────────────────────
+*.sqlite3
+*.db
+*.log
+logs/
+tmp/
+data/
+minio-data/
+pgdata/
+
+# ── AI artifacts (large / generated) ────────────────────────────────────
+ai/datasets/*
+!ai/datasets/README.md
+ai/models/*
+!ai/models/README.md
+ai/models/*.tflite
+ai/models/*.h5
+ai/models/*.keras
+ai/models/*.savedmodel/
+*.onnx
+
+# ── IDE / OS ────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
