@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink } from "react-router-dom";
 
+import { AuthNav } from "@/components/layout/auth-nav";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -81,14 +82,7 @@ export function Header() {
           <LanguageSwitcher />
           <ThemeToggle />
 
-          <div className="hidden items-center gap-2 md:flex">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/login">{t("nav.login")}</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link to="/register">{t("nav.register")}</Link>
-            </Button>
-          </div>
+          <AuthNav className="hidden md:flex" />
 
           <Button
             variant="ghost"
@@ -125,16 +119,10 @@ export function Header() {
             ))}
           </ul>
           <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
-            <Button asChild variant="outline">
-              <Link to="/login" onClick={() => setMobileOpen(false)}>
-                {t("nav.login")}
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link to="/register" onClick={() => setMobileOpen(false)}>
-                {t("nav.register")}
-              </Link>
-            </Button>
+            <AuthNav
+              onNavigate={() => setMobileOpen(false)}
+              className="flex-col"
+            />
           </div>
         </nav>
       )}

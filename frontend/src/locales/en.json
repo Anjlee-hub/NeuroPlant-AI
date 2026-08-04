@@ -57,6 +57,7 @@
     "verifyOtp": "Verify & log in",
     "login": "Log in",
     "register": "Sign up",
+    "logout": "Log out",
     "role": "I am a",
     "roles": {
       "farmer": "Farmer",
