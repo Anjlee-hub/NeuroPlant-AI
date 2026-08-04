@@ -70,6 +70,8 @@ class Settings(BaseSettings):
 
     # ── Storage (S3 / R2 / MinIO) ───────────────────────────────────────
     storage_provider: str = "local"  # local | s3
+    # Where the local provider keeps user media (relative to the run dir).
+    storage_local_dir: str = "storage"
     s3_endpoint_url: str | None = None
     s3_bucket: str = "neuroplant"
     s3_access_key: str | None = None

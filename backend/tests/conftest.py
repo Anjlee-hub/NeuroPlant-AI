@@ -15,10 +15,11 @@ os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("DEBUG", "true")
 
 import pytest_asyncio
-from app.db.session import Base, engine
+from app.db.session import Base, async_session_factory, engine
 from app.main import app  # noqa: F401  (import populates app + metadata)
 from app.models import *  # noqa: F401,F403  (register every model on Base.metadata)
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -28,6 +29,13 @@ async def _reset_db():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
+
+
+@pytest_asyncio.fixture
+async def db() -> AsyncSession:
+    """Direct async session for service-level tests."""
+    async with async_session_factory() as session:
+        yield session
 
 
 @pytest_asyncio.fixture

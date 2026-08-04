@@ -5,6 +5,7 @@ Alembic autogenerate and test ``create_all``.
 """
 
 from app.models.catalog import Crop, Disease
+from app.models.scan import Scan
 from app.models.user import (
     MFA,
     Device,
@@ -20,6 +21,7 @@ from app.models.user import (
 __all__ = [
     "Crop",
     "Disease",
+    "Scan",
     "User",
     "FarmerProfile",
     "ExpertProfile",
