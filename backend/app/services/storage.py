@@ -35,6 +35,10 @@ class StorageService(Protocol):
         """Write ``data`` and return the relative storage key."""
         ...
 
+    def read(self, key: str) -> bytes:
+        """Return the stored blob at ``key``; raise FileNotFoundError when absent."""
+        ...
+
     def delete(self, key: str) -> None:
         """Remove the blob at ``key`` (missing keys are a no-op)."""
         ...
@@ -61,6 +65,10 @@ class LocalStorageService:
         target.write_bytes(data)
         logger.debug("storage_saved", key=key, bytes=len(data))
         return key
+
+    def read(self, key: str) -> bytes:
+        """Return the stored blob at ``key`` (FileNotFoundError when absent)."""
+        return (self.base_dir / key).read_bytes()
 
     def delete(self, key: str) -> None:
         path = self.base_dir / key

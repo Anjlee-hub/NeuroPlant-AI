@@ -41,6 +41,18 @@ def test_delete_removes_file_and_missing_is_noop(tmp_path):
     svc.delete(key)  # must not raise
 
 
+def test_read_returns_stored_bytes(tmp_path):
+    svc = LocalStorageService(tmp_path)
+    key = svc.save(b"payload-bytes", "image/jpeg", 7)
+    assert svc.read(key) == b"payload-bytes"
+
+
+def test_read_missing_key_raises(tmp_path):
+    svc = LocalStorageService(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        svc.read("7/missing.jpg")
+
+
 def test_url_returns_media_path(tmp_path):
     svc = LocalStorageService(tmp_path)
     assert svc.url("1/abc.jpg") == "/media/1/abc.jpg"
