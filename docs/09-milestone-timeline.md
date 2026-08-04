@@ -23,6 +23,10 @@ engineer**; parallelizable work (docs, seeders, tests) can compress the tail.
 
 **Total ≈ 27–29 weeks.**
 
+> **Status — 2026-08-04:** M0 complete (committed `6aec860`). **M1 implemented
+> and awaiting approval** (`v0.1.0-m1`, tag + report in
+> `docs/m1-completion-report.md`). M2 starts only after approval.
+
 ## Gantt
 
 ```mermaid

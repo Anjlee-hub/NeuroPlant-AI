@@ -4,7 +4,10 @@
 
 An all-in-one, offline-first, voice-first, 12-language platform for Indian agriculture: AI disease detection with explainability, treatment recommendations, a continuous AI Crop Doctor, a personal AI farming assistant, soil health, a smart crop calendar, crop-yield prediction, weather & disease-risk intelligence, crowd-sourced outbreak heatmaps, price dashboards, a financially-instrumented marketplace, agri-store, community, expert consultation, analytics, and admin tooling.
 
-> **Status:** Milestone 0 (scaffold + documentation pack) complete. Each milestone ships and stops for approval — see `docs/09-milestone-timeline.md`.
+> **Status:** Milestone 0 (scaffold + documentation pack) complete. **Milestone 1
+> (auth, landing, database, PWA shell) implemented and awaiting approval** — see
+> [`docs/m1-completion-report.md`](docs/m1-completion-report.md). Each milestone
+> ships and stops for approval — see `docs/09-milestone-timeline.md`.
 
 ---
 
@@ -29,15 +32,36 @@ neuroplant-ai/
 cd backend
 python -m venv .venv && source .venv/bin/activate   # or .venv\Scripts\activate on Windows
 pip install -e ".[dev]"
+alembic upgrade head                                  # create/apply the schema (SQLite by default)
 uvicorn app.main:app --reload                        # → http://localhost:8000/docs
 
 # Frontend (Node 20+)
 cd frontend
-npm install
+npm install --include=dev                             # see NODE_ENV note below
 npm run dev                                          # → http://localhost:5173
 ```
 
+> **Windows note:** the shell exports `NODE_ENV=production` globally, which makes
+> plain `npm install` skip devDependencies. Use `npm install --include=dev`
+> (or `NODE_ENV= npm install`) for a full dev setup.
+
 Local dev uses a **SQLite fallback** + **Celery eager mode** so the full stack runs with zero external services. Production and the containerized stack use **PostgreSQL + Redis + MinIO/S3** — see `docker/docker-compose.yml` and `docs/06-deployment.md`.
+
+## Quality gates
+
+```bash
+# Backend
+cd backend && .venv/Scripts/python.exe -m pytest     # 27 tests
+.venv/Scripts/python.exe -m ruff check .
+.venv/Scripts/python.exe -m ruff format --check .
+.venv/Scripts/python.exe -m mypy app
+
+# Frontend
+cd frontend && npm test                              # Vitest + Testing Library
+npm run lint                                         # ESLint (flat config)
+npm run typecheck                                    # tsc -b --noEmit
+npm run build                                        # tsc -b && vite build (PWA)
+```
 
 ## Documentation Pack
 
