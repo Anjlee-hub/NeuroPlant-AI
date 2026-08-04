@@ -4,9 +4,9 @@
 
 FROM node:22-alpine AS build
 WORKDIR /app
-# If a package-lock.json is committed, use `npm ci` for reproducible builds.
-COPY frontend/package.json ./
-RUN npm install
+# package-lock.json is committed — `npm ci` for reproducible, locked installs.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
