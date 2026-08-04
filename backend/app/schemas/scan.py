@@ -78,6 +78,7 @@ class ScanOut(BaseModel):
     inference_time_ms: float
     processing_time_ms: float
     image_path: str
+    processed_image_path: str | None = None  # padded model-input image (Task 5)
     media_items: list
     sync_status: str
     rankings: list[RankingOut] = Field(default_factory=list)

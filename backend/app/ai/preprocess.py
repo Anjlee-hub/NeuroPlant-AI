@@ -62,6 +62,14 @@ class Preprocessor(Protocol):
         """Return EXIF-stripped, re-encoded bytes safe for storage."""
         ...
 
+    def encode_jpeg(self, rgb: np.ndarray) -> ImageData:
+        """Re-encode an RGB uint8 array as a clean JPEG (storable, EXIF-free).
+
+        Used by the scan pipeline to persist the padded model-input image for
+        explainability (Task 5 Grad-CAM overlay target).
+        """
+        ...
+
 
 _PREPROCESSORS: dict[str, Preprocessor] = {}
 

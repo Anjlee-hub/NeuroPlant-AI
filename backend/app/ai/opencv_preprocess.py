@@ -237,17 +237,18 @@ class OpenCVPreprocessor:
             variant = self._random_brightness_contrast(variant, rng)
             variant = self._random_color_jitter(variant, rng)
             variant = self._random_noise(variant, rng)
-            variants.append(self._encode_jpeg(variant))
+            variants.append(self.encode_jpeg(variant))
         return variants
 
-    def _encode_jpeg(self, rgb: np.ndarray) -> ImageData:
+    def encode_jpeg(self, rgb: np.ndarray) -> ImageData:
+        """Re-encode an RGB uint8 array as a clean JPEG (storage-safe)."""
         ok, buf = self._cv2.imencode(
             ".jpg",
             rgb[:, :, ::-1],  # cv2 wants BGR
             [self._cv2.IMWRITE_JPEG_QUALITY, self._jpeg_quality],
         )
         if not ok:
-            raise ImageValidationError("failed to encode augmented image")
+            raise ImageValidationError("failed to encode image as JPEG")
         return ImageData(
             image_bytes=buf.tobytes(),
             content_type="image/jpeg",

@@ -10,10 +10,12 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.rate_limit import get_scan_limiter
 from app.core.security import TokenError, decode_access_token
 from app.db.session import get_db
 from app.models.user import User
 from app.services.auth import DeviceInfo
+from app.services.detection import DetectionService
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -58,3 +60,38 @@ def get_device_info(request: Request) -> DeviceInfo:
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("User-Agent"),
     )
+
+
+async def get_detection_service(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> DetectionService:
+    """Build the detection stack once per process (cached on ``app.state``).
+
+    The expensive work (label catalog + classifier registration) is lazy inside
+    :meth:`DetectionService.build`; caching it on the app state avoids rebuilding
+    for every upload. Tests reset the cache between cases for isolation.
+    """
+    cached = getattr(request.app.state, "detection_service", None)
+    if cached is None:
+        cached = await DetectionService.build(db)
+        request.app.state.detection_service = cached
+    return cached
+
+
+async def scan_upload_rate_limit(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> None:
+    """Dependency: one scan-upload slot per user+IP per minute (when enabled).
+
+    Keyed by user id plus client IP so a shared account on one network shares a
+    single budget without letting any one client bypass the quota.
+    """
+    limiter = get_scan_limiter()
+    client_ip = request.client.host if request.client else "?"
+    if not limiter.allow(f"scan:{user.id}:{client_ip}"):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many scan uploads, please try again shortly",
+        )

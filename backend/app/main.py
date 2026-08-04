@@ -27,6 +27,7 @@ from app.services.auth import (
     UserNotFoundError,
 )
 from app.services.otp import OtpError
+from app.services.scan_pipeline import ScanPipelineError
 
 settings = get_settings()
 logger = get_logger("app.main")
@@ -94,3 +95,16 @@ app.add_exception_handler(UserNotFoundError, _error_handler(404))
 app.add_exception_handler(InvalidMfaError, _error_handler(400))
 app.add_exception_handler(OtpError, _error_handler(400))
 app.add_exception_handler(AuthError, _error_handler(400))
+
+# Scan pipeline — typed errors carry their own status_code + machine code.
+
+
+def _pipeline_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, ScanPipelineError)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": exc.code, "message": str(exc)}},
+    )
+
+
+app.add_exception_handler(ScanPipelineError, _pipeline_error_handler)
