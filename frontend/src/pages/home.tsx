@@ -20,7 +20,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -135,7 +134,9 @@ export function HomePage() {
                   <span className="mb-2 flex size-11 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
                     <feature.icon className="size-5" />
                   </span>
-                  <CardTitle className="text-lg">{feature.title}</CardTitle>
+                  <h3 className="text-lg font-semibold leading-none tracking-tight">
+                    {feature.title}
+                  </h3>
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-base">
