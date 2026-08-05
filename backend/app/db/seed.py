@@ -1,8 +1,10 @@
-"""Catalog seeder (M1).
+"""Catalog seeder (M1) + recommendation seeder (M3, Task 1).
 
-Loads the bootstrap crops + diseases from ``seed_data`` into the database.
-Idempotent: an existing crop (matched by name) is skipped, so the script can be
-re-run after schema changes without duplicating rows.
+Loads the bootstrap crops + diseases from ``seed_data`` into the database, then
+builds the versioned treatment-recommendation catalog from
+``recommendation_seed_data``. Both are idempotent: an existing crop (matched by
+name) or a catalog row (matched by version/disease) is skipped, so the script
+can be re-run after schema changes without duplicating rows.
 
 Usage:
     python -m app.db.seed
@@ -10,13 +12,21 @@ Usage:
 
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.db.recommendation_seed_data import (
+    RECOMMENDATION_VERSION,
+    RECOMMENDATIONS,
+    ChemicalSeed,
+    OrganicSeed,
+    RemedySeed,
+)
 from app.db.seed_data import CROPS
 from app.db.session import async_session_factory
 from app.models.catalog import Crop, Disease
+from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 
 logger = get_logger("db.seed")
 
@@ -75,10 +85,201 @@ async def seed_catalog(db: AsyncSession) -> dict[str, int]:
     return {"crops": added_crops, "diseases": added_diseases}
 
 
+# ── Recommendation catalog (M3, Task 1) ─────────────────────────────────
+
+
+def _remedy_dict(seed: RemedySeed) -> dict:
+    """RemedySeed -> HomemadeRemedyOut-shaped dict."""
+    return {
+        "title": seed.title,
+        "category": seed.category,
+        "ingredients": list(seed.ingredients),
+        "instructions": seed.instructions,
+        "frequency": seed.frequency,
+    }
+
+
+def _organic_dict(seed: OrganicSeed) -> dict:
+    """OrganicSeed -> OrganicRemedyOut-shaped dict."""
+    return {
+        "title": seed.title,
+        "category": seed.category,
+        "application": seed.application,
+        "frequency": seed.frequency,
+    }
+
+
+def _chemical_dict(seed: ChemicalSeed) -> dict:
+    """ChemicalSeed -> ChemicalRecommendationOut-shaped dict."""
+    return {
+        "category": seed.category,
+        "product": seed.product,
+        "dosage": seed.dosage,
+        "application_interval": seed.application_interval,
+        "safety_precautions": list(seed.safety),
+    }
+
+
+def _fallback_plan(disease: Disease) -> dict:
+    """Structured plan derived from an un-curated ``Disease`` row.
+
+    Keeps every catalog disease self-contained: the flat M1 treatment lists are
+    wrapped in the same structured shapes the engine returns, with conservative
+    dose/interval placeholders. Curated seeds always override this — it only
+    runs when a disease was added to the catalog but not yet to
+    ``RECOMMENDATIONS``.
+    """
+    return {
+        "homemade_remedies": [
+            {
+                "title": text,
+                "category": "homemade-spray",
+                "ingredients": [],
+                "instructions": text,
+                "frequency": "as directed",
+            }
+            for text in (disease.homemade_remedies or [])
+        ],
+        "organic_remedies": [
+            {
+                "title": text,
+                "category": "bio-fungicide",
+                "application": text,
+                "frequency": "as directed",
+            }
+            for text in (
+                list(disease.organic_treatments or []) + list(disease.biological_controls or [])
+            )
+        ],
+        "chemical_recommendations": [
+            {
+                "category": "fungicide",
+                "product": text,
+                "dosage": "as per label",
+                "application_interval": "as directed",
+                "safety_precautions": list(ChemicalSeed.safety),
+            }
+            for text in (disease.chemical_treatments or [])
+        ],
+    }
+
+
+async def seed_recommendations(db: AsyncSession) -> dict[str, int]:
+    """Build the active treatment catalog.
+
+    Exactly one ``RecommendationCatalog`` is active at a time; activating a new
+    version deactivates the previous one (atomic from the API's point of view).
+    Returns ``{"catalog": 1, "plans": n}`` (created-plan count).
+    """
+    # Ensure the catalog for the current version exists and is the only active one.
+    catalog = await db.scalar(
+        select(RecommendationCatalog).where(RecommendationCatalog.version == RECOMMENDATION_VERSION)
+    )
+    if catalog is None:
+        catalog = RecommendationCatalog(
+            version=RECOMMENDATION_VERSION,
+            description="Curated treatment plans for every catalog disease.",
+            is_active=True,
+        )
+        await db.execute(update(RecommendationCatalog).values(is_active=False))
+        db.add(catalog)
+        await db.flush()
+    elif not catalog.is_active:
+        await db.execute(update(RecommendationCatalog).values(is_active=False))
+        catalog.is_active = True
+        await db.flush()
+
+    created = 0
+    existing = {
+        row.disease_id
+        for row in await db.scalars(
+            select(DiseaseRecommendation).where(DiseaseRecommendation.catalog_id == catalog.id)
+        )
+    }
+
+    for crop_seed in CROPS:
+        crop = await db.scalar(select(Crop).where(Crop.name == crop_seed.name))
+        if crop is None:
+            continue
+        for disease_seed in crop_seed.diseases:
+            disease = await db.scalar(
+                select(Disease).where(
+                    Disease.crop_id == crop.id,
+                    Disease.name == disease_seed.name,
+                )
+            )
+            if disease is None or disease.id in existing:
+                continue
+
+            plan = _fallback_plan(disease)
+            curated = RECOMMENDATIONS.get((crop.common_name or crop.name, disease.name))
+            if curated is not None:
+                plan.update(
+                    {
+                        "overview": curated.overview,
+                        "cause": curated.cause or disease.causes,
+                        "symptoms": list(curated.symptoms) or list(disease.symptoms or []),
+                        "severity": curated.severity,
+                        "spread_mechanism": curated.spread_mechanism,
+                        "homemade_remedies": [_remedy_dict(r) for r in curated.homemade],
+                        "organic_remedies": [_organic_dict(o) for o in curated.organic],
+                        "chemical_recommendations": [_chemical_dict(c) for c in curated.chemical],
+                        "fertilizer": curated.fertilizer,
+                        "watering": curated.watering,
+                        "sunlight": curated.sunlight,
+                        "temperature": curated.temperature,
+                        "humidity": curated.humidity,
+                        "prevention_tips": list(curated.prevention_tips)
+                        or list(disease.prevention_tips or []),
+                        "recovery_timeline": curated.recovery_timeline or disease.recovery_time,
+                        "isolation": curated.isolation,
+                        "monitoring_advice": list(curated.monitoring_advice),
+                    }
+                )
+
+            db.add(
+                DiseaseRecommendation(
+                    catalog_id=catalog.id,
+                    disease_id=disease.id,
+                    overview=plan.get("overview"),
+                    cause=plan.get("cause"),
+                    symptoms=plan.get("symptoms"),
+                    severity=plan.get("severity"),
+                    spread_mechanism=plan.get("spread_mechanism"),
+                    homemade_remedies=plan.get("homemade_remedies"),
+                    organic_remedies=plan.get("organic_remedies"),
+                    chemical_recommendations=plan.get("chemical_recommendations"),
+                    fertilizer=plan.get("fertilizer"),
+                    watering=plan.get("watering"),
+                    sunlight=plan.get("sunlight"),
+                    temperature=plan.get("temperature"),
+                    humidity=plan.get("humidity"),
+                    prevention_tips=plan.get("prevention_tips"),
+                    recovery_timeline=plan.get("recovery_timeline"),
+                    isolation=plan.get("isolation"),
+                    monitoring_advice=plan.get("monitoring_advice"),
+                )
+            )
+            created += 1
+
+    await db.commit()
+    logger.info(
+        "recommendations_seeded",
+        version=RECOMMENDATION_VERSION,
+        catalog_id=catalog.id,
+        plans=created,
+    )
+    return {"catalog": 1, "plans": created}
+
+
 async def _run() -> None:
     async with async_session_factory() as db:
         summary = await seed_catalog(db)
-    print(f"Seeded: {summary['crops']} crops, {summary['diseases']} diseases")
+        recs = await seed_recommendations(db)
+    print(
+        f"Seeded: {summary['crops']} crops, {summary['diseases']} diseases; "
+        f"{recs['plans']} recommendation plans"
+    )
 
 
 if __name__ == "__main__":

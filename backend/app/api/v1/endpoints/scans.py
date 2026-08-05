@@ -38,6 +38,7 @@ from app.db.session import get_db
 from app.models.base import UserRole
 from app.models.scan import Scan
 from app.models.user import User
+from app.schemas.recommendation import DiseaseRecommendationOut
 from app.schemas.scan import (
     CLIENT_SCAN_ID_PATTERN,
     PART_TYPES,
@@ -51,6 +52,7 @@ from app.schemas.scan import (
 )
 from app.services.detection import DetectionService
 from app.services.explain import ExplainService
+from app.services.recommendations import RecommendationService
 from app.services.scan_pipeline import ScanPipelineError, ScanPipelineService
 from app.services.scans import ScanService
 from app.services.storage import get_storage_service
@@ -309,6 +311,18 @@ async def explain_scan(scan_id: int, user: CurrentUser, db: Db) -> ScanExplainOu
     """
     scan = await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
     return await ExplainService(db, get_storage_service()).build(scan)
+
+
+@router.get("/{scan_id}/recommendations", response_model=DiseaseRecommendationOut)
+async def scan_recommendations(scan_id: int, user: CurrentUser, db: Db) -> DiseaseRecommendationOut:
+    """Full treatment plan for the disease this scan predicted (M3, Task 1).
+
+    Same ownership guard as detail (``404`` for missing / soft-deleted /
+    other-user's scans), then ``404`` when the predicted disease has no plan in
+    the active catalog. Reads the seeded catalog only — no hardcoded advice.
+    """
+    scan = await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
+    return await RecommendationService(db).for_scan(scan)
 
 
 @router.delete("/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -28,6 +28,10 @@ from app.services.auth import (
     UserNotFoundError,
 )
 from app.services.otp import OtpError
+from app.services.recommendations import (
+    CatalogUnavailableError,
+    RecommendationNotFoundError,
+)
 from app.services.scan_pipeline import ScanPipelineError
 from app.services.scans import ScanNotFoundError
 from app.services.storage import local_storage_root
@@ -109,6 +113,11 @@ app.add_exception_handler(AuthError, _error_handler(400))
 
 # Scans — 404 for missing / other-owned / soft-deleted rows (enumeration guard).
 app.add_exception_handler(ScanNotFoundError, _error_handler(404))
+
+# Recommendations (M3) — 404 when a disease has no plan in the active catalog;
+# 503 when the catalog itself was never seeded (run `python -m app.db.seed`).
+app.add_exception_handler(RecommendationNotFoundError, _error_handler(404))
+app.add_exception_handler(CatalogUnavailableError, _error_handler(503))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 
