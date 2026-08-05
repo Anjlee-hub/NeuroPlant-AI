@@ -69,8 +69,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Dev-only: forward API calls to the FastAPI backend.
+      // Dev-only: forward API calls and user media to the FastAPI backend.
       "/api": "http://localhost:8000",
+      "/media": "http://localhost:8000",
     },
   },
   build: {

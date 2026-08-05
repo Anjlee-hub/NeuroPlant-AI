@@ -10,6 +10,7 @@ function renderHome() {
       { path: "/", element: <HomePage /> },
       { path: "/detect", element: <div>detect-page</div> },
       { path: "/register", element: <div>register-page</div> },
+      { path: "/assistant", element: <div>assistant-page</div> },
     ],
     { initialEntries: ["/"] },
   );
@@ -32,7 +33,7 @@ describe("HomePage", () => {
     );
     expect(
       screen.getByRole("link", { name: "Ask the AI assistant" }),
-    ).toHaveAttribute("href", "/register");
+    ).toHaveAttribute("href", "/assistant");
   });
 
   it("renders the feature cards with a proper heading hierarchy", () => {

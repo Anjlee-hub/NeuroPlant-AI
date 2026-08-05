@@ -25,10 +25,18 @@ export function AuthNav({ onNavigate, className }: AuthNavProps) {
   if (user) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground">
-          <UserIcon className="size-4 text-muted-foreground" />
-          {user.name}
-        </span>
+        <Button
+          asChild
+          variant="secondary"
+          size="sm"
+          aria-label={t("profile.title")}
+          onClick={onNavigate}
+        >
+          <Link to="/profile">
+            <UserIcon className="size-4 text-muted-foreground" />
+            {user.name}
+          </Link>
+        </Button>
         <Button
           asChild
           variant="ghost"

@@ -81,6 +81,16 @@ class LocalStorageService:
         return f"/media/{key}"
 
 
+def local_storage_root() -> Path:
+    """Absolute root the local provider writes to (and ``/media`` serves).
+
+    Resolving to an absolute path means the writer (:class:`LocalStorageService`)
+    and the HTTP static mount in ``app.main`` always agree, no matter the
+    process cwd.
+    """
+    return Path(get_settings().storage_local_dir).resolve()
+
+
 def get_storage_service() -> StorageService:
     """Compose the configured storage provider (local today; S3 in M11)."""
     settings = get_settings()
@@ -90,4 +100,4 @@ def get_storage_service() -> StorageService:
         raise NotImplementedError(
             "S3 storage provider is not wired yet; keep storage_provider=local"
         )
-    return LocalStorageService(Path(settings.storage_local_dir))
+    return LocalStorageService(local_storage_root())

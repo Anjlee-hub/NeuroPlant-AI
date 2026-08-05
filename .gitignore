@@ -44,6 +44,7 @@ service-account*.json
 logs/
 tmp/
 data/
+storage/
 minio-data/
 pgdata/
 

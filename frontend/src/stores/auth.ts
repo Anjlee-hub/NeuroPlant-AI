@@ -19,6 +19,8 @@ interface AuthState {
   logout: () => Promise<void>;
   /** Restore a stored session on app boot. */
   hydrate: () => Promise<void>;
+  /** Merge fresh profile fields (e.g. after editing the profile). */
+  updateUser: (patch: Partial<User>) => void;
 }
 
 async function loadUser(): Promise<User> {
@@ -111,5 +113,9 @@ export const useAuth = create<AuthState>((set, get) => ({
     } finally {
       set({ loading: false });
     }
+  },
+
+  updateUser: (patch) => {
+    set((state) => (state.user ? { user: { ...state.user, ...patch } } : {}));
   },
 }));

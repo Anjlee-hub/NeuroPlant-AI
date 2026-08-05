@@ -33,5 +33,17 @@ class IntersectionObserverStub implements IntersectionObserver {
 
 vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
 
+// jsdom ships no createObjectURL/revokeObjectURL — the Scan Crop preview and
+// the offline queue thumbnail rely on them. Returning a stable blob URL keeps
+// the object-URL lifecycle exercises safe under jsdom.
+Object.defineProperty(URL, "createObjectURL", {
+  writable: true,
+  value: vi.fn(() => "blob:test-preview"),
+});
+Object.defineProperty(URL, "revokeObjectURL", {
+  writable: true,
+  value: vi.fn(),
+});
+
 // Boot i18next once so components render translated text (not raw keys).
 import "@/i18n";

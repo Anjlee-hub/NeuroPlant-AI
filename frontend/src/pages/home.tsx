@@ -109,7 +109,7 @@ export function HomePage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link to="/register">
+                <Link to="/assistant">
                   <MessageCircle />
                   {t("landing.ctaAssistant")}
                 </Link>

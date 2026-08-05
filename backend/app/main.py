@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.health import router as health_router
 from app.api.v1.router import api_router
@@ -29,6 +30,7 @@ from app.services.auth import (
 from app.services.otp import OtpError
 from app.services.scan_pipeline import ScanPipelineError
 from app.services.scans import ScanNotFoundError
+from app.services.storage import local_storage_root
 
 settings = get_settings()
 logger = get_logger("app.main")
@@ -64,6 +66,14 @@ app.include_router(health_router)
 
 # Versioned domain routers.
 app.include_router(api_router, prefix=settings.api_prefix)
+
+# ── Media serving (local dev images + heatmaps) ─────────────────────────
+if settings.storage_provider == "local":
+    app.mount(
+        "/media",
+        StaticFiles(directory=local_storage_root(), check_dir=False),
+        name="media",
+    )
 
 
 @app.get("/", include_in_schema=False)

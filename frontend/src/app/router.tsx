@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
+import { MessageCircle, Stethoscope, Store } from "lucide-react";
 
 import { ErrorBoundary } from "@/app/error-boundary";
 import { RootLayout } from "@/components/layout/root-layout";
@@ -9,13 +10,15 @@ import { MfaSetupPage } from "@/pages/mfa-setup";
 import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
 import { OfflineQueuePage } from "@/pages/offline-queue";
+import { ProfilePage } from "@/pages/profile";
 import { RegisterPage } from "@/pages/register";
+import { ScanCropPage } from "@/pages/scan-crop";
 import { ScanDetailPage } from "@/pages/scan-detail";
 import { ScanHistoryPage } from "@/pages/scan-history";
 
 /**
- * Route tree. M1 ships the shell + auth entry points; feature routes
- * (detect, doctor, marketplace) are stubs that land with their milestones.
+ * Route tree. Every nav destination resolves to a live page or an honest
+ * "planned for Milestone X" page — there are no dead links (M2.1).
  */
 export const router = createBrowserRouter([
   {
@@ -28,12 +31,14 @@ export const router = createBrowserRouter([
       { path: "login/mfa", element: <MfaVerifyPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "settings/mfa", element: <MfaSetupPage /> },
+      { path: "profile", element: <ProfilePage /> },
       { path: "scans", element: <ScanHistoryPage /> },
       { path: "scans/:scanId", element: <ScanDetailPage /> },
       { path: "offline", element: <OfflineQueuePage /> },
-      { path: "detect", element: <ComingSoonPage navKey="detect" /> },
-      { path: "doctor", element: <ComingSoonPage navKey="doctor" /> },
-      { path: "marketplace", element: <ComingSoonPage navKey="marketplace" /> },
+      { path: "detect", element: <ScanCropPage /> },
+      { path: "doctor", element: <ComingSoonPage navKey="doctor" milestone="3" icon={Stethoscope} /> },
+      { path: "marketplace", element: <ComingSoonPage navKey="marketplace" milestone="6" icon={Store} /> },
+      { path: "assistant", element: <ComingSoonPage navKey="assistant" milestone="4" icon={MessageCircle} /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
