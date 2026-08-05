@@ -46,6 +46,7 @@ class ScanCreate(BaseModel):
     processing_time_ms: float = Field(default=0.0, ge=0.0)
     ai_metadata: dict | None = None
     device_id: str | None = None
+    synced_at: datetime | None = None  # stamped by the sync endpoint (Task 6)
 
 
 class RankingOut(BaseModel):
@@ -303,3 +304,56 @@ class ScanListOut(BaseModel):
     page: int
     page_size: int
     has_next: bool
+
+
+# ── Offline sync (Task 6) ────────────────────────────────────────────────
+
+
+class SyncImageIn(BaseModel):
+    """One image from the offline queue, base64-encoded."""
+
+    data: str = Field(description="Raw image bytes, base64-encoded (JPEG/PNG/WebP)")
+    content_type: str = Field(description="Declared MIME type, e.g. image/jpeg")
+    filename: str | None = Field(default=None, description="Original filename, if known")
+
+
+class ScanSyncItemIn(BaseModel):
+    """One queued offline scan to reconcile with the server.
+
+    Mirrors the multipart ``POST /scans`` fields but transports images as
+    base64 so the whole offline queue uploads in a single JSON batch.
+    Idempotency is per ``client_scan_id`` — re-sending an already-synced id
+    returns the existing authoritative row instead of duplicating it.
+    """
+
+    client_scan_id: str = Field(pattern=CLIENT_SCAN_ID_PATTERN)
+    images: list[SyncImageIn] = Field(min_length=1)
+    crop_id: int | None = None
+    part_type: str | None = Field(default=None, pattern="^(leaf|fruit|stem|plant|whole)$")
+    device_id: str | None = None
+
+
+class SyncErrorOut(BaseModel):
+    """Machine-readable per-item failure for the sync response."""
+
+    code: str
+    message: str
+
+
+class ScanSyncResultOut(BaseModel):
+    """Per-item outcome of the sync batch."""
+
+    client_scan_id: str
+    status: str = Field(description="created | replayed | failed")
+    scan: ScanOut | None = Field(default=None, description="Authoritative row on success")
+    error: SyncErrorOut | None = Field(default=None, description="Present when the item failed")
+
+
+class ScanSyncOut(BaseModel):
+    """POST /scans/sync — batch reconciliation of the offline queue."""
+
+    results: list[ScanSyncResultOut]
+    total: int = Field(description="Items submitted")
+    created: int = Field(description="New rows persisted")
+    replayed: int = Field(description="Already-synced ids returned unchanged")
+    failed: int = Field(description="Items that errored (retryable)")
