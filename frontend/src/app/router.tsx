@@ -9,6 +9,7 @@ import { MfaSetupPage } from "@/pages/mfa-setup";
 import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
 import { RegisterPage } from "@/pages/register";
+import { ScanDetailPage } from "@/pages/scan-detail";
 import { ScanHistoryPage } from "@/pages/scan-history";
 
 /**
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
       { path: "register", element: <RegisterPage /> },
       { path: "settings/mfa", element: <MfaSetupPage /> },
       { path: "scans", element: <ScanHistoryPage /> },
+      { path: "scans/:scanId", element: <ScanDetailPage /> },
       { path: "detect", element: <ComingSoonPage navKey="detect" /> },
       { path: "doctor", element: <ComingSoonPage navKey="doctor" /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" /> },

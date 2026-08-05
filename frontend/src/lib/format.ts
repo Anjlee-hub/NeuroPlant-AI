@@ -8,6 +8,12 @@ export function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+/** Milliseconds -> `32ms` or `1.2s` (keeps sub-second pipeline times readable). */
+export function formatMs(value: number): string {
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}s`;
+  return `${Math.round(value)}ms`;
+}
+
 /** ISO timestamp -> short localized date + time. */
 export function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);

@@ -9,9 +9,10 @@ import type {
 } from "@/types/auth";
 import type {
   CropOption,
+  Scan,
+  ScanExplain,
   ScanList,
   ScanListParams,
-  Scan,
 } from "@/types/scan";
 
 /**
@@ -144,5 +145,7 @@ export const api = {
     return request<ScanList>(`/scans${query ? `?${query}` : ""}`, { auth: true });
   },
   getScan: (scanId: number) => request<Scan>(`/scans/${scanId}`, { auth: true }),
+  getScanExplain: (scanId: number) =>
+    request<ScanExplain>(`/scans/${scanId}/explain`, { auth: true }),
   listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
 };

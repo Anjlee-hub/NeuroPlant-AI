@@ -87,3 +87,55 @@ export interface CropOption {
   name: string;
   common_name: string | null;
 }
+
+// ── Explainability (GET /scans/{id}/explain) ─────────────────────────────
+
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+export interface ExplainDisease {
+  id: number | null;
+  name: string;
+  crop_id: number | null;
+  severity: ScanSeverity | null;
+  stage: string | null;
+  symptoms: string[];
+}
+
+export interface ExplainConfidence {
+  top: number;
+  level: ConfidenceLevel;
+  advice: string;
+}
+
+export interface ExplainHeatmap {
+  provider: string;
+  class_name: string;
+  time_ms: number;
+}
+
+export interface ExplainTiming {
+  preprocessing_time_ms: number;
+  inference_time_ms: number;
+  processing_time_ms: number;
+  heatmap_time_ms: number | null;
+}
+
+export interface ExplainModel {
+  provider: string;
+  model_name: string | null;
+  model_version: string | null;
+  dataset_version: string | null;
+}
+
+export interface ScanExplain {
+  scan_id: number;
+  disease: ExplainDisease;
+  confidence: ExplainConfidence;
+  top5: ScanRanking[];
+  heatmap: ExplainHeatmap | null;
+  heatmap_url: string | null;
+  overlay_url: string | null;
+  explanation: string;
+  timing: ExplainTiming;
+  model: ExplainModel;
+}
