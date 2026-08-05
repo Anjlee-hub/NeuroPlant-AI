@@ -29,6 +29,19 @@ export interface KvEntry {
   updatedAt: number;
 }
 
+/**
+ * A scan that finished syncing. Successful entries are removed from
+ * `syncQueue` as soon as the server acknowledges them, so this store keeps a
+ * short-lived "recently synced" record for the queue screen. Cleared by the
+ * user (Clear completed) or when the list grows — it is not authoritative.
+ */
+export interface CompletedSync {
+  id?: number;
+  clientScanId: string;
+  diseaseName: string;
+  syncedAt: number;
+}
+
 interface NeuroplantDB extends DBSchema {
   syncQueue: {
     key: number;
@@ -39,23 +52,36 @@ interface NeuroplantDB extends DBSchema {
     key: string;
     value: KvEntry;
   };
+  completedQueue: {
+    key: number;
+    value: CompletedSync;
+  };
 }
 
 const DB_NAME = "neuroplant";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<NeuroplantDB>> | null = null;
 
 function getDb(): Promise<IDBPDatabase<NeuroplantDB>> {
   if (!dbPromise) {
     dbPromise = openDB<NeuroplantDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        const queue = db.createObjectStore("syncQueue", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        queue.createIndex("by-created", "createdAt");
-        db.createObjectStore("kv", { keyPath: "key" });
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const queue = db.createObjectStore("syncQueue", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          queue.createIndex("by-created", "createdAt");
+          db.createObjectStore("kv", { keyPath: "key" });
+        }
+        if (oldVersion < 2) {
+          // Recently-synced scan records shown on the offline queue screen.
+          db.createObjectStore("completedQueue", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+        }
       },
     });
   }
@@ -105,6 +131,48 @@ export async function markSyncFailed(
   }
   await tx.done;
   return entry?.attempts ?? 0;
+}
+
+/* ---------- Recently-synced queue ---------- */
+
+/** Cap on kept completion records — the queue screen only needs a short list. */
+const MAX_COMPLETED = 100;
+
+/** Record a scan that just synced successfully. Resolves with its id. */
+export async function addCompletedSync(
+  record: Omit<CompletedSync, "id">,
+): Promise<number> {
+  const db = await getDb();
+  const id = await db.add("completedQueue", record);
+  const all = await db.getAll("completedQueue");
+  if (all.length > MAX_COMPLETED) {
+    // Trim the oldest beyond the cap (all is id-ordered, so the head is oldest).
+    const tx = db.transaction("completedQueue", "readwrite");
+    for (const stale of all.slice(0, all.length - MAX_COMPLETED)) {
+      if (stale.id !== undefined) await tx.store.delete(stale.id);
+    }
+    await tx.done;
+  }
+  return id;
+}
+
+/** Recently-synced scans, newest first. */
+export async function completedSyncs(): Promise<CompletedSync[]> {
+  const db = await getDb();
+  const all = await db.getAll("completedQueue");
+  return all.sort((a, b) => b.syncedAt - a.syncedAt);
+}
+
+/** Dismiss a single completed record. */
+export async function removeCompletedSync(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete("completedQueue", id);
+}
+
+/** Empty the recently-synced list. */
+export async function clearCompletedSyncs(): Promise<void> {
+  const db = await getDb();
+  await db.clear("completedQueue");
 }
 
 /* ---------- Key/value cache ---------- */

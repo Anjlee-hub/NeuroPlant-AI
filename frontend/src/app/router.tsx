@@ -8,6 +8,7 @@ import { LoginPage } from "@/pages/login";
 import { MfaSetupPage } from "@/pages/mfa-setup";
 import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
+import { OfflineQueuePage } from "@/pages/offline-queue";
 import { RegisterPage } from "@/pages/register";
 import { ScanDetailPage } from "@/pages/scan-detail";
 import { ScanHistoryPage } from "@/pages/scan-history";
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: "settings/mfa", element: <MfaSetupPage /> },
       { path: "scans", element: <ScanHistoryPage /> },
       { path: "scans/:scanId", element: <ScanDetailPage /> },
+      { path: "offline", element: <OfflineQueuePage /> },
       { path: "detect", element: <ComingSoonPage navKey="detect" /> },
       { path: "doctor", element: <ComingSoonPage navKey="doctor" /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" /> },

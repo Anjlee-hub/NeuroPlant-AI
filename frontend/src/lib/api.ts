@@ -13,6 +13,8 @@ import type {
   ScanExplain,
   ScanList,
   ScanListParams,
+  ScanSyncItem,
+  ScanSyncOut,
 } from "@/types/scan";
 
 /**
@@ -148,4 +150,9 @@ export const api = {
   getScanExplain: (scanId: number) =>
     request<ScanExplain>(`/scans/${scanId}/explain`, { auth: true }),
   listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
+  // Offline reconciliation: upload the queued scans in one JSON batch. The
+  // server owns idempotency (created/replayed per client_scan_id) — this
+  // just transports the queue.
+  syncScans: (items: ScanSyncItem[]) =>
+    request<ScanSyncOut>("/scans/sync", { method: "POST", body: items, auth: true }),
 };

@@ -17,7 +17,8 @@ import {
 
 export type SyncHandler = (entry: SyncEntry) => Promise<void>;
 
-const MAX_ATTEMPTS = 5;
+/** Retry budget before a persistently-failing entry is dropped. */
+export const MAX_ATTEMPTS = 5;
 
 const handlers = new Map<string, SyncHandler>();
 
@@ -47,13 +48,28 @@ async function replay(entry: SyncEntry): Promise<boolean> {
   }
 }
 
-/** Drain the queue in insertion order. Safe to call repeatedly. */
-export async function processSyncQueue(): Promise<void> {
+/**
+ * Drain the queue in insertion order. Safe to call repeatedly.
+ * `onProgress` fires after each entry (count of entries already processed)
+ * so the offline queue screen can render a progress bar.
+ */
+export async function processSyncQueue(
+  onProgress?: (done: number) => void,
+): Promise<void> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
   const queue = await pendingSync();
+  let done = 0;
   for (const entry of queue) {
     await replay(entry);
+    done += 1;
+    onProgress?.(done);
   }
+}
+
+/** Replay one queued entry by id — backs the queue screen's Retry action. */
+export async function replayEntry(id: number): Promise<void> {
+  const entry = (await pendingSync()).find((e) => e.id === id);
+  if (entry) await replay(entry);
 }
 
 /** Convenience for offline-capable flows: enqueue (no-op when online). */

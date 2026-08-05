@@ -139,3 +139,43 @@ export interface ScanExplain {
   timing: ExplainTiming;
   model: ExplainModel;
 }
+
+// ── Offline sync (POST /scans/sync) ──────────────────────────────────────
+// Mirrors `SyncImageIn` / `ScanSyncItemIn` / `ScanSyncResultOut` /
+// `ScanSyncOut` in backend/app/schemas/scan.py.
+
+export interface SyncImageIn {
+  data: string;
+  content_type: string;
+  filename?: string | null;
+}
+
+export interface ScanSyncItem {
+  client_scan_id: string;
+  images: SyncImageIn[];
+  crop_id?: number | null;
+  part_type?: ScanPartType | null;
+  device_id?: string | null;
+}
+
+export type ScanSyncStatusOut = "created" | "replayed" | "failed";
+
+export interface SyncErrorOut {
+  code: string;
+  message: string;
+}
+
+export interface ScanSyncResult {
+  client_scan_id: string;
+  status: ScanSyncStatusOut;
+  scan: Scan | null;
+  error: SyncErrorOut | null;
+}
+
+export interface ScanSyncOut {
+  results: ScanSyncResult[];
+  total: number;
+  created: number;
+  replayed: number;
+  failed: number;
+}
