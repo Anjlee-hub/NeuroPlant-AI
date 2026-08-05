@@ -328,6 +328,25 @@ class ScanSyncItemIn(BaseModel):
     returns the existing authoritative row instead of duplicating it.
     """
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "client_scan_id": "e8d4f9a2-3c1b-4e6a-9d5f-2b7a8c0d1e3f",
+                    "images": [
+                        {
+                            "data": "<base64-encoded JPEG bytes>",
+                            "content_type": "image/jpeg",
+                            "filename": "leaf.jpg",
+                        }
+                    ],
+                    "part_type": "leaf",
+                    "device_id": "farm-phone-1",
+                }
+            ]
+        },
+    )
+
     client_scan_id: str = Field(pattern=CLIENT_SCAN_ID_PATTERN)
     images: list[SyncImageIn] = Field(min_length=1)
     crop_id: int | None = None
@@ -353,6 +372,49 @@ class ScanSyncResultOut(BaseModel):
 
 class ScanSyncOut(BaseModel):
     """POST /scans/sync — batch reconciliation of the offline queue."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "total": 2,
+                    "created": 1,
+                    "replayed": 1,
+                    "failed": 0,
+                    "results": [
+                        {
+                            "client_scan_id": "e8d4f9a2-3c1b-4e6a-9d5f-2b7a8c0d1e3f",
+                            "status": "created",
+                            "scan": {
+                                "id": 42,
+                                "disease_name": "Late Blight",
+                                "confidence": 0.92,
+                                "provider": "baseline",
+                                "model_version": "baseline-v1",
+                                "sync_status": "synced",
+                                "synced_at": "2026-08-04T09:14:52",
+                            },
+                            "error": None,
+                        },
+                        {
+                            "client_scan_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            "status": "replayed",
+                            "scan": {
+                                "id": 41,
+                                "disease_name": "Early Blight",
+                                "confidence": 0.61,
+                                "provider": "baseline",
+                                "model_version": "baseline-v1",
+                                "sync_status": "synced",
+                                "synced_at": "2026-08-04T09:10:12",
+                            },
+                            "error": None,
+                        },
+                    ],
+                }
+            ]
+        },
+    )
 
     results: list[ScanSyncResultOut]
     total: int = Field(description="Items submitted")

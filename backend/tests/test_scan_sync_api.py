@@ -293,3 +293,52 @@ async def test_sync_malformed_item_rejected(client, db):
     for payload in bad_payloads:
         resp = await client.post("/api/v1/scans/sync", json=payload, headers=headers)
         assert resp.status_code == 422, payload
+
+
+# ── Full offline workflow (Task 6.4) ─────────────────────────────────────
+
+
+async def test_sync_offline_queue_drain_and_retry(client, db):
+    """Client drains its offline queue: partial failure → repair → replay.
+
+    Mirrors the PWA IndexedDB drain: a first batch partially fails, the broken
+    item is repaired and retried under the same ``client_scan_id`` (created),
+    and re-syncing the whole queue replays every item with its existing
+    authoritative row (no re-inference).
+    """
+    await seed_catalog(db)
+    headers = await _auth_headers(client, "+919000000120")
+    ok_1, ok_2, bad_id = _client_id(21), _client_id(22), _client_id(23)
+    bad = {"client_scan_id": bad_id, "images": [{"data": "!broken!", "content_type": "image/jpeg"}]}
+
+    # First drain: two items land, one fails without blocking the batch.
+    first = await client.post(
+        "/api/v1/scans/sync", json=[_item(ok_1), _item(ok_2), bad], headers=headers
+    )
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["created"] == 2
+    assert body["failed"] == 1
+    created_ids = {
+        r["client_scan_id"]: r["scan"]["id"] for r in body["results"] if r["status"] == "created"
+    }
+
+    # Repair the failed item and retry under the same id — now it lands.
+    retried = await client.post("/api/v1/scans/sync", json=[_item(bad_id)], headers=headers)
+    retry_body = retried.json()
+    assert retry_body["created"] == 1
+    assert retry_body["results"][0]["status"] == "created"
+    retry_id = retry_body["results"][0]["scan"]["id"]
+
+    # Full re-sync of the queue: every item replays to its existing row.
+    drain = await client.post(
+        "/api/v1/scans/sync",
+        json=[_item(ok_1), _item(ok_2), _item(bad_id)],
+        headers=headers,
+    )
+    drain_body = drain.json()
+    assert drain_body["created"] == 0
+    assert drain_body["replayed"] == 3
+    assert drain_body["failed"] == 0
+    replay_ids = {r["scan"]["id"] for r in drain_body["results"]}
+    assert replay_ids == {created_ids[ok_1], created_ids[ok_2], retry_id}
