@@ -36,8 +36,15 @@ from app.db.session import get_db
 from app.models.base import UserRole
 from app.models.scan import Scan
 from app.models.user import User
-from app.schemas.scan import CLIENT_SCAN_ID_PATTERN, PART_TYPES, ScanListOut, ScanOut
+from app.schemas.scan import (
+    CLIENT_SCAN_ID_PATTERN,
+    PART_TYPES,
+    ScanExplainOut,
+    ScanListOut,
+    ScanOut,
+)
 from app.services.detection import DetectionService
+from app.services.explain import ExplainService
 from app.services.scan_pipeline import ScanPipelineService
 from app.services.scans import ScanService
 from app.services.storage import get_storage_service
@@ -198,6 +205,19 @@ async def get_scan(scan_id: int, user: CurrentUser, db: Db) -> Scan:
     response is identical in every case so no scan's existence is revealed.
     """
     return await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
+
+
+@router.get("/{scan_id}/explain", response_model=ScanExplainOut)
+async def explain_scan(scan_id: int, user: CurrentUser, db: Db) -> ScanExplainOut:
+    """Grad-CAM heatmap + overlay, plain-language explanation, top-5 + metadata.
+
+    Same ownership guard as detail: ``404`` for missing / soft-deleted /
+    other-user's scans. Reads only what was captured at prediction time
+    (Task 5.2) — no re-inference. A scan without a heatmap still explains the
+    diagnosis, with the heatmap fields ``None``.
+    """
+    scan = await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
+    return await ExplainService(db, get_storage_service()).build(scan)
 
 
 @router.delete("/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)

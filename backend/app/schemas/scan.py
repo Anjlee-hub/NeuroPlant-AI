@@ -57,6 +57,61 @@ class RankingOut(BaseModel):
     crop_id: int | None = None
 
 
+class ExplainDiseaseOut(BaseModel):
+    """The predicted disease plus catalog detail for the explain payload."""
+
+    id: int | None = None
+    name: str
+    crop_id: int | None = None
+    severity: str | None = None
+    stage: str | None = None
+    symptoms: list[str] = Field(default_factory=list)
+
+
+class ExplainConfidenceOut(BaseModel):
+    """Top confidence, its band, and expert advice (Task 5.3 low-confidence path)."""
+
+    top: float = Field(ge=0.0, le=1.0)
+    level: str  # high | medium | low
+    advice: str
+
+
+class ExplainHeatmapOut(BaseModel):
+    """How / when the Grad-CAM heatmap was produced (Task 5.2 provenance)."""
+
+    provider: str
+    class_name: str
+    time_ms: float = Field(ge=0.0)
+
+
+class ExplainModelOut(BaseModel):
+    """Serving model provenance for the stored prediction."""
+
+    provider: str
+    model_name: str | None = None
+    model_version: str | None = None
+    dataset_version: str | None = None
+
+
+class ScanExplainOut(BaseModel):
+    """GET /scans/{id}/explain — the explainability payload.
+
+    Heatmap + overlay (as storage URLs), a plain-language explanation, the full
+    ranked top-5 with per-candidate confidence, and the metadata behind the
+    diagnosis (confidence band + expert advice, Grad-CAM provenance, model).
+    """
+
+    scan_id: int
+    disease: ExplainDiseaseOut
+    confidence: ExplainConfidenceOut
+    top5: list[RankingOut] = Field(default_factory=list)
+    heatmap: ExplainHeatmapOut | None = None
+    heatmap_url: str | None = None
+    overlay_url: str | None = None
+    explanation: str
+    model: ExplainModelOut
+
+
 class ScanOut(BaseModel):
     """A persisted scan as returned by the API (complete detail record)."""
 

@@ -19,6 +19,7 @@ os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("STORAGE_LOCAL_DIR", "./.test-storage")
 
 import pytest_asyncio
+from app.ai.opencv_preprocess import register_default_preprocessor
 from app.db.session import Base, async_session_factory, engine
 from app.main import app  # noqa: F401  (import populates app + metadata)
 from app.models import *  # noqa: F401,F403  (register every model on Base.metadata)
@@ -38,6 +39,10 @@ async def _reset_db():
     # Drop any cached detection stack so the next request rebuilds against the
     # freshly seeded catalog (isolation between tests).
     app.state.detection_service = None
+    # The preprocessor registry is module-global; some tests swap the default
+    # for a fake and never restore it, so pin it back to the real provider
+    # before every test (otherwise later tests silently run with the fake).
+    register_default_preprocessor()
     yield
     shutil.rmtree(_STORAGE_DIR, ignore_errors=True)
 
