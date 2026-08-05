@@ -8,6 +8,7 @@ DB-dependent integration (catalog load + registry wiring through the API) is
 deferred to Task 4's ``POST /scans`` tests.
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -228,7 +229,13 @@ def test_predict_falls_back_to_classifier_model_info():
 
 async def test_predict_async_matches_sync():
     svc = _service()
-    assert await svc.predict_async(_IMAGE) == svc.predict(_IMAGE)
+    async_result = await svc.predict_async(_IMAGE)
+    sync_result = svc.predict(_IMAGE)
+    # Normalize the measured latency out of the comparison: the fake classifier
+    # is sub-millisecond, so the two runs can round to different values.
+    assert replace(async_result, inference_time_ms=0.0) == replace(
+        sync_result, inference_time_ms=0.0
+    )
 
 
 # ── Explainability (Task 5.2) ───────────────────────────────────────────
