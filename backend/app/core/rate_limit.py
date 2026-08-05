@@ -83,6 +83,7 @@ class RateLimiter:
 
 
 _scan_limiter: RateLimiter | None = None
+_sync_limiter: RateLimiter | None = None
 
 
 def get_scan_limiter() -> RateLimiter:
@@ -96,3 +97,16 @@ def get_scan_limiter() -> RateLimiter:
             enabled=settings.rate_limit_enabled,
         )
     return _scan_limiter
+
+
+def get_scan_sync_limiter() -> RateLimiter:
+    """Process-wide offline-sync limiter (own budget from live uploads)."""
+    global _sync_limiter
+    if _sync_limiter is None:
+        settings = get_settings()
+        _sync_limiter = RateLimiter(
+            capacity=settings.rate_limit_scan_sync_per_minute,
+            refill_per_sec=settings.rate_limit_scan_sync_per_minute / 60.0,
+            enabled=settings.rate_limit_enabled,
+        )
+    return _sync_limiter

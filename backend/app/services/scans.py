@@ -77,6 +77,24 @@ class ScanService:
             )
         )
 
+    async def find_by_client_ids(self, client_scan_ids: list[str], user_id: int) -> dict[str, Scan]:
+        """Batch idempotency lookup (Task 6) — one query for a whole sync batch.
+
+        Returns ``{client_scan_id: Scan}`` for every live row owned by
+        ``user_id``, so the sync endpoint can short-circuit replays without a
+        per-item query. Empty input is a cheap no-op (no ``IN ()``).
+        """
+        if not client_scan_ids:
+            return {}
+        rows = await self.db.scalars(
+            select(Scan).where(
+                Scan.client_scan_id.in_(client_scan_ids),
+                Scan.user_id == user_id,
+                Scan.deleted_at.is_(None),
+            )
+        )
+        return {row.client_scan_id: row for row in rows}
+
     async def list_scans(
         self,
         user_id: int | None,

@@ -53,10 +53,13 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = False  # degraded in native dev; enabled in prod
     # Per-user scan-upload quota (token-bucket refill, in-process until Redis).
     rate_limit_scan_per_minute: int = 10
+    # Per-user offline-sync quota — a separate budget from live uploads.
+    rate_limit_scan_sync_per_minute: int = 10
 
     # ── Scan uploads ─────────────────────────────────────────────────────
     scan_max_images: int = 5  # max images per POST /scans
     scan_inference_timeout_seconds: float = 30.0  # hard ceiling on one predict
+    scan_sync_max_items: int = 50  # max scans per POST /scans/sync batch
 
     # ── AI serving ──────────────────────────────────────────────────────
     # Path to the trained disease-model artifact (.keras). When the path is

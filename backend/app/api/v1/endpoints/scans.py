@@ -1,9 +1,10 @@
 """Scan endpoints — upload photos and run AI disease detection (M2, Task 4.2).
 
-``POST /scans`` accepts multipart form data (one or more images + form fields).
-The pipeline service does the real work; this module only maps the multipart
-payload and the HTTP status semantics (201 created, 200 idempotent replay of an
-already-known ``client_scan_id``).
+``POST /scans`` accepts multipart form data (one or more images + form fields)
+and ``POST /scans/sync`` accepts a JSON batch of base64 offline scans (Task 6).
+Both delegate to the shared pipeline service; this module only maps the raw
+payloads and the HTTP status semantics (201 created / 200 idempotent replay for
+uploads; per-item ``created | replayed | failed`` results for sync).
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from app.ai.preprocess import get_preprocessor
 from app.api.v1.deps import (
     get_current_user,
     get_detection_service,
+    scan_sync_rate_limit,
     scan_upload_rate_limit,
 )
 from app.core.config import get_settings
@@ -42,10 +44,14 @@ from app.schemas.scan import (
     ScanExplainOut,
     ScanListOut,
     ScanOut,
+    ScanSyncItemIn,
+    ScanSyncOut,
+    ScanSyncResultOut,
+    SyncErrorOut,
 )
 from app.services.detection import DetectionService
 from app.services.explain import ExplainService
-from app.services.scan_pipeline import ScanPipelineService
+from app.services.scan_pipeline import ScanPipelineError, ScanPipelineService
 from app.services.scans import ScanService
 from app.services.storage import get_storage_service
 
@@ -117,6 +123,91 @@ async def create_scan(
     if not created:
         response.status_code = status.HTTP_200_OK
     return scan
+
+
+@router.post("/sync", response_model=ScanSyncOut, status_code=status.HTTP_200_OK)
+async def sync_offline_scans(
+    payload: list[ScanSyncItemIn],
+    user: CurrentUser,
+    db: Db,
+    detection: Detection,
+    _rate: None = Depends(scan_sync_rate_limit),
+) -> ScanSyncOut:
+    """Reconcile a batch of queued offline scans (Task 6).
+
+    Accepts a JSON array of :class:`ScanSyncItemIn`; each item is processed
+    independently through the exact same pipeline as a live upload, so one
+    item's failure never blocks the rest. Idempotency is per
+    ``client_scan_id`` — already-persisted ids come back ``replayed`` with
+    their existing authoritative row, new ids ``created``, and failures
+    ``failed`` with a machine-readable error. Each item commits in its own
+    transaction, so a batch is never half-applied.
+    """
+    if not payload:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "empty_batch", "message": "sync batch must not be empty"},
+        )
+    settings = get_settings()
+    if len(payload) > settings.scan_sync_max_items:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "code": "batch_too_large",
+                "message": f"sync batch exceeds the limit of {settings.scan_sync_max_items} items",
+            },
+        )
+
+    pipeline = ScanPipelineService(
+        db,
+        detection,
+        get_storage_service(),
+        get_preprocessor("default"),
+        max_images=settings.scan_max_images,
+        timeout_seconds=settings.scan_inference_timeout_seconds,
+    )
+    scans = ScanService(db)
+    # One batch-wide idempotency query; replays are short-circuited here so
+    # already-synced items never re-enter the detection pipeline.
+    existing = await scans.find_by_client_ids([item.client_scan_id for item in payload], user.id)
+
+    results: list[ScanSyncResultOut] = []
+    created = replayed = failed = 0
+    for item in payload:
+        prior = existing.get(item.client_scan_id)
+        if prior is not None:
+            replayed += 1
+            results.append(
+                ScanSyncResultOut(client_scan_id=item.client_scan_id, status="replayed", scan=prior)
+            )
+            continue
+        try:
+            scan, is_created = await pipeline.process_sync_item(user_id=user.id, item=item)
+        except ScanPipelineError as exc:
+            failed += 1
+            results.append(
+                ScanSyncResultOut(
+                    client_scan_id=item.client_scan_id,
+                    status="failed",
+                    error=SyncErrorOut(code=exc.code, message=str(exc)),
+                )
+            )
+            continue
+        if is_created:
+            created += 1
+        else:
+            replayed += 1
+        results.append(
+            ScanSyncResultOut(
+                client_scan_id=item.client_scan_id,
+                status="created" if is_created else "replayed",
+                scan=scan,
+            )
+        )
+
+    return ScanSyncOut(
+        results=results, total=len(payload), created=created, replayed=replayed, failed=failed
+    )
 
 
 # ── History ──────────────────────────────────────────────────────────────

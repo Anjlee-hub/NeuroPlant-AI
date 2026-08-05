@@ -236,6 +236,7 @@ class ScanOut(BaseModel):
                         }
                     ],
                     "sync_status": "synced",
+                    "synced_at": "2026-08-04T09:14:52",
                     "rankings": [
                         {"disease_name": "Late Blight", "confidence": 0.92, "disease_id": 15}
                     ],
@@ -266,6 +267,7 @@ class ScanOut(BaseModel):
     heatmap_path: str | None = None  # Grad-CAM overlay (Task 5.2)
     media_items: list
     sync_status: str
+    synced_at: datetime | None = None  # stamped when the sync path accepted the row
     rankings: list[RankingOut] = Field(default_factory=list)
     # Full explainability payload (top-k candidates, symptoms, model config).
     ai_metadata: dict | None = None

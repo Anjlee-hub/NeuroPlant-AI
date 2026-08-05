@@ -10,7 +10,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.rate_limit import get_scan_limiter
+from app.core.rate_limit import get_scan_limiter, get_scan_sync_limiter
 from app.core.security import TokenError, decode_access_token
 from app.db.session import get_db
 from app.models.user import User
@@ -94,4 +94,23 @@ async def scan_upload_rate_limit(
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many scan uploads, please try again shortly",
+        )
+
+
+async def scan_sync_rate_limit(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> None:
+    """Dependency: one sync-batch slot per user+IP per minute (when enabled).
+
+    Offline drain is a burst-heavy operation, so it gets its own budget
+    (``rate_limit_scan_sync_per_minute``) rather than competing with live
+    uploads for ``scan`` tokens.
+    """
+    limiter = get_scan_sync_limiter()
+    client_ip = request.client.host if request.client else "?"
+    if not limiter.allow(f"scan-sync:{user.id}:{client_ip}"):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many scan syncs, please try again shortly",
         )
