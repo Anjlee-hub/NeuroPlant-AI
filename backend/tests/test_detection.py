@@ -10,6 +10,7 @@ deferred to Task 4's ``POST /scans`` tests.
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 from app.ai.classifiers import (
     BASELINE_CONFIDENCE,
@@ -18,6 +19,7 @@ from app.ai.classifiers import (
     build_disease_classifier,
 )
 from app.ai.datasets import DATASET_VERSION, DiseaseCatalog, build_label_map
+from app.ai.gradcam import HeatmapResult
 from app.ai.types import (
     ClassifierPrediction,
     ImageData,
@@ -26,7 +28,11 @@ from app.ai.types import (
     ModelUnavailableError,
     PredictedDisease,
 )
-from app.services.detection import DetectionService, ScanResult
+from app.services.detection import (
+    DetectionService,
+    ScanResult,
+    confidence_level,
+)
 
 _IMAGE = ImageData(image_bytes=b"fake-jpeg-bytes", content_type="image/jpeg")
 
@@ -75,6 +81,12 @@ def test_rule_baseline_empty_catalog_raises():
         clf.predict(_IMAGE)
 
 
+def test_rule_baseline_exposes_saliency_explainer():
+    clf = RuleBaselineClassifier(_catalog())
+    assert clf.explainer is not None
+    assert clf.explainer.provider_name == "baseline"
+
+
 # ── LocalTensorFlowClassifier (lazy load, graceful failure) ─────────────
 
 
@@ -100,6 +112,12 @@ def test_local_tf_provider_metadata():
     assert clf.model_info.provider == "local_tf"
     assert clf.model_info.name == "effnet"
     assert clf.model_info.version == "v2"
+
+
+def test_local_tf_explainer_unavailable_without_artifact():
+    clf = LocalTensorFlowClassifier(_catalog(), "models/nope-missing.keras")
+    with pytest.raises(ModelUnavailableError):
+        _ = clf.explainer  # lazily loads → artifact missing → explicit failure
 
 
 # ── build_disease_classifier factory ────────────────────────────────────
@@ -132,9 +150,18 @@ def test_factory_prefers_tf_when_artifact_present(monkeypatch):
 # ── DetectionService (enrichment, timing, provenance, rankings) ─────────
 
 
+class _FakeExplainer:
+    capability = "disease"
+    provider_name = "local_tf"
+
+    def heatmap(self, _image, class_name=None):  # noqa: ARG002
+        return HeatmapResult(heatmap=np.zeros((4, 4), dtype=np.float32), time_ms=2.0)
+
+
 class _FakeClassifier:
     capability = "disease"
     model_info = ModelInfo(name="fake-cnn", capability="disease", provider="local_tf", version="9")
+    explainer = _FakeExplainer()
 
     def __init__(
         self,
@@ -155,6 +182,10 @@ class _FakeClassifier:
 class _NoModelClassifier(_FakeClassifier):
     def predict(self, image: ImageData) -> ClassifierPrediction:
         return ClassifierPrediction(top=self._top, rankings=self._rankings, model=None)
+
+
+class _NoExplainerClassifier(_FakeClassifier):
+    explainer = None
 
 
 def _service() -> DetectionService:
@@ -198,3 +229,41 @@ def test_predict_falls_back_to_classifier_model_info():
 async def test_predict_async_matches_sync():
     svc = _service()
     assert await svc.predict_async(_IMAGE) == svc.predict(_IMAGE)
+
+
+# ── Explainability (Task 5.2) ───────────────────────────────────────────
+
+
+def test_generate_heatmap_returns_heatmap_result():
+    svc = _service()
+    result = svc.generate_heatmap(_IMAGE, "Late Blight")
+    assert isinstance(result, HeatmapResult)
+    assert result.heatmap.shape == (4, 4)
+    assert result.time_ms == 2.0
+    assert svc.explainer is not None
+    assert svc.explainer.provider_name == "local_tf"
+
+
+async def test_generate_heatmap_async_matches_sync():
+    svc = _service()
+    async_result = await svc.generate_heatmap_async(_IMAGE, "Late Blight")
+    sync_result = svc.generate_heatmap(_IMAGE, "Late Blight")
+    # Compare fields directly — dataclass __eq__ trips on the numpy array.
+    assert async_result.time_ms == sync_result.time_ms
+    assert np.array_equal(async_result.heatmap, sync_result.heatmap)
+
+
+def test_generate_heatmap_raises_without_explainer():
+    top = PredictedDisease(disease_name="Late Blight", confidence=0.92)
+    svc = DetectionService(_NoExplainerClassifier(top), _catalog())
+    assert svc.explainer is None
+    with pytest.raises(InferenceError, match="no explainability"):
+        svc.generate_heatmap(_IMAGE, "Late Blight")
+
+
+def test_confidence_level_bands():
+    assert confidence_level(0.92) == "high"
+    assert confidence_level(0.85) == "high"
+    assert confidence_level(0.7) == "medium"
+    assert confidence_level(0.6) == "medium"
+    assert confidence_level(0.5) == "low"

@@ -10,7 +10,9 @@ import asyncio
 import uuid
 from io import BytesIO
 
+import numpy as np
 import pytest
+from app.ai.gradcam import HeatmapResult
 from app.ai.opencv_preprocess import OpenCVPreprocessor
 from app.ai.types import InferenceError, PredictedDisease
 from app.services.detection import ScanResult
@@ -68,12 +70,28 @@ def _fixed_result() -> ScanResult:
     )
 
 
-class _StubDetection:
-    """Deterministic detector for pipeline tests (fail / slow switches)."""
+class _StubHeatmap:
+    """Deterministic heatmap provider (Task 5.2) for pipeline tests."""
 
-    def __init__(self, *, fail: bool = False, slow: bool = False) -> None:
+    provider_name = "baseline"
+
+    def heatmap(self, _image, class_name=None):  # noqa: ARG002
+        return HeatmapResult(heatmap=np.zeros((8, 8), dtype=np.float32), time_ms=3.5)
+
+
+class _StubDetection:
+    """Deterministic detector for pipeline tests.
+
+    Switches: ``fail`` (predict raises), ``slow`` (predict sleeps past the
+    timeout), ``heatmap_fail`` (explainer unavailable → heatmap raises).
+    """
+
+    def __init__(
+        self, *, fail: bool = False, slow: bool = False, heatmap_fail: bool = False
+    ) -> None:
         self._fail = fail
         self._slow = slow
+        self.explainer = None if heatmap_fail else _StubHeatmap()
 
     async def predict_async(self, _image):  # noqa: ARG002
         if self._fail:
@@ -81,6 +99,14 @@ class _StubDetection:
         if self._slow:
             await asyncio.sleep(1.0)
         return _fixed_result()
+
+    def generate_heatmap(self, image, class_name):  # noqa: ARG002
+        if self.explainer is None:
+            raise InferenceError("no explainability provider is available")
+        return self.explainer.heatmap(image, class_name)
+
+    async def generate_heatmap_async(self, image, class_name):
+        return self.generate_heatmap(image, class_name)
 
 
 class _FailingStorage:
@@ -133,6 +159,14 @@ async def test_upload_persists_scan_and_images(db, tmp_path):
     assert scan.processed_image_path
     assert (tmp_path / scan.image_path).exists()
     assert (tmp_path / scan.processed_image_path).exists()
+    # Task 5.2 — Grad-CAM heatmap generated + persisted during prediction.
+    assert scan.heatmap_path
+    assert (tmp_path / scan.heatmap_path).exists()
+    meta = scan.ai_metadata
+    assert meta["grad_cam"]["provider"] == "baseline"
+    assert meta["grad_cam"]["time_ms"] == 3.5
+    assert meta["grad_cam"]["overlay_path"] == scan.heatmap_path
+    assert (tmp_path / meta["grad_cam"]["heatmap_path"]).exists()
     assert len(scan.media_items) == 1
     item = scan.media_items[0]
     assert item["source_type"] == "upload"
@@ -150,6 +184,42 @@ async def test_multiple_images_all_stored(db, tmp_path):
     )
     assert len(scan.media_items) == 2
     assert scan.media_items[0]["path"] != scan.media_items[1]["path"]
+
+
+# ── Explainability (Task 5.2) ────────────────────────────────────────────
+
+
+async def test_scan_stores_top5_confidence_and_model_metadata(db, tmp_path):
+    svc = _service(db, tmp_path)
+    scan, _ = await svc.process_upload(
+        user_id=1, files=[_upload(_jpeg_bytes())], client_scan_id=_client_id(12)
+    )
+    meta = scan.ai_metadata
+    assert meta["top5"][0] == {
+        "disease_name": "Late Blight",
+        "confidence": 0.92,
+        "disease_id": 1,
+        "crop_id": 101,
+    }
+    assert [c["disease_name"] for c in meta["top5"]] == ["Late Blight", "Powdery Mildew"]
+    assert meta["confidence"] == {"top": 0.92, "level": "high"}
+    assert meta["model"] == {
+        "provider": "baseline",
+        "model_name": "rule-baseline",
+        "model_version": "baseline-v1",
+        "dataset_version": "v1",
+    }
+
+
+async def test_heatmap_failure_degrades_gracefully(db, tmp_path):
+    svc = _service(db, tmp_path, detection=_StubDetection(heatmap_fail=True))
+    scan, created = await svc.process_upload(
+        user_id=1, files=[_upload(_jpeg_bytes())], client_scan_id=_client_id(13)
+    )
+    assert created is True
+    assert scan.disease_name == "Late Blight"  # diagnosis still stands
+    assert scan.heatmap_path is None
+    assert scan.ai_metadata["grad_cam"] is None
 
 
 # ── Idempotency ──────────────────────────────────────────────────────────

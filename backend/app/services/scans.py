@@ -153,6 +153,7 @@ class ScanService:
             image_path=payload.image_path,
             media_items=payload.media_items,
             processed_image_path=payload.processed_image_path,
+            heatmap_path=payload.heatmap_path,
             crop_id=payload.crop_id,
             part_type=payload.part_type,
             disease_id=payload.disease_id,

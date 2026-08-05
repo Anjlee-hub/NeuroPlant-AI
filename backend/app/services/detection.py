@@ -8,9 +8,14 @@ to. It decorates raw classifier output with everything a scan row needs:
 - measured inference time (ms)
 - ranked candidates
 
-Classification itself is CPU-bound and blocking, so the async
-:meth:`predict_async` wrapper offloads it to a worker thread to keep the event
-loop responsive (used by the scan endpoint).
+Explainability (Task 5.2) rides the same seam: the classifier exposes a
+Grad-CAM provider and :meth:`generate_heatmap` turns a prediction's top class
+into a normalized heatmap, also offloaded to a worker thread by
+:meth:`generate_heatmap_async`.
+
+Classification and heatmap generation are CPU-bound and blocking, so the async
+wrappers offload them to worker threads to keep the event loop responsive (used
+by the scan endpoint).
 """
 
 from __future__ import annotations
@@ -23,11 +28,33 @@ from starlette.concurrency import run_in_threadpool
 
 from app.ai.classifiers import build_disease_classifier
 from app.ai.datasets import DiseaseCatalog, load_catalog
+from app.ai.gradcam import HeatmapResult
 from app.ai.registry import registry
-from app.ai.types import DiseaseClassifier, ImageData, PredictedDisease
+from app.ai.types import (
+    DiseaseClassifier,
+    ExplainabilityProvider,
+    ImageData,
+    InferenceError,
+    PredictedDisease,
+)
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Confidence bands for the stored confidence metadata (Task 5.2). The low
+# boundary aligns with the serving fallback threshold (top-1 < 0.6 → cloud) in
+# docs/08-ai-pipeline.md.
+CONFIDENCE_LEVEL_HIGH = 0.85
+CONFIDENCE_LEVEL_LOW = 0.60
+
+
+def confidence_level(confidence: float) -> str:
+    """Label a confidence as ``high`` / ``medium`` / ``low``."""
+    if confidence >= CONFIDENCE_LEVEL_HIGH:
+        return "high"
+    if confidence >= CONFIDENCE_LEVEL_LOW:
+        return "medium"
+    return "low"
 
 
 @dataclass(frozen=True)
@@ -79,6 +106,9 @@ class DetectionService:
             model=info.name,
             version=info.version,
             dataset_version=catalog.version,
+            explainer=(
+                classifier.explainer.provider_name if classifier.explainer is not None else None
+            ),
         )
         return cls(classifier, catalog)
 
@@ -116,3 +146,23 @@ class DetectionService:
     async def predict_async(self, image: ImageData) -> ScanResult:
         """Event-loop-friendly wrapper; run in a thread, await the result."""
         return await run_in_threadpool(self.predict, image)
+
+    @property
+    def explainer(self) -> ExplainabilityProvider | None:
+        """Grad-CAM provider backing this stack, if the classifier has one."""
+        return self.classifier.explainer
+
+    def generate_heatmap(self, image: ImageData, class_name: str) -> HeatmapResult:
+        """Produce a normalized heatmap for ``class_name`` over ``image``.
+
+        Raises :class:`InferenceError` when the serving classifier has no
+        explainability path (e.g. a model artifact that failed to load).
+        """
+        explainer = self.classifier.explainer
+        if explainer is None:
+            raise InferenceError("no explainability provider is available for this classifier")
+        return explainer.heatmap(image, class_name)
+
+    async def generate_heatmap_async(self, image: ImageData, class_name: str) -> HeatmapResult:
+        """Event-loop-friendly wrapper; run in a thread, await the result."""
+        return await run_in_threadpool(self.generate_heatmap, image, class_name)

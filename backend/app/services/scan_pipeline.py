@@ -16,16 +16,23 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import numpy as np
 from fastapi import UploadFile
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.gradcam import (
+    HeatmapResult,
+    apply_heatmap_overlay,
+    encode_heatmap_png,
+    encode_rgb_png,
+)
 from app.ai.preprocess import ImageValidationError, Preprocessor
 from app.ai.types import ImageData, InferenceError
 from app.core.logging import get_logger
 from app.models.scan import Scan
 from app.schemas.scan import ScanCreate
-from app.services.detection import DetectionService, ScanResult
+from app.services.detection import DetectionService, ScanResult, confidence_level
 from app.services.scans import ScanService
 from app.services.storage import StorageService
 
@@ -90,7 +97,7 @@ class UploadedImage:
 
 
 def _rankings(result: ScanResult) -> list[dict]:
-    """Serialize top-k candidates into the ``ai_metadata.rankings`` shape."""
+    """Serialize alternate candidates into the ``ai_metadata.rankings`` shape."""
     return [
         {
             "disease_name": rank.disease_name,
@@ -100,6 +107,24 @@ def _rankings(result: ScanResult) -> list[dict]:
         }
         for rank in result.rankings
     ]
+
+
+def _top5(result: ScanResult) -> list[dict]:
+    """Serialize the ordered top-5 candidates (top-1 + alternates, Task 5.2).
+
+    Stored as ``ai_metadata.top5`` so consumers have the full ranked set with
+    per-candidate confidence without re-deriving it from the scan row.
+    """
+    candidates: list[dict] = [
+        {
+            "disease_name": result.disease_name,
+            "confidence": result.confidence,
+            "disease_id": result.disease_id,
+            "crop_id": result.crop_id,
+        }
+    ]
+    candidates.extend(_rankings(result))
+    return candidates[:5]
 
 
 class ScanPipelineService:
@@ -162,12 +187,18 @@ class ScanPipelineService:
         result = await self._predict(first.image_data)
         total_ms = (time.perf_counter() - started) * 1000.0
 
+        # Task 5.2 — Grad-CAM: generate + persist the heatmap, best-effort so
+        # an explainability failure never fails the diagnosis itself.
+        heatmap = await self._heatmap(first.image_data, result.disease_name)
+        heatmap_path, grad_cam = self._persist_heatmap(heatmap, prepared.image, result, user_id)
+
         payload = ScanCreate(
             client_scan_id=client_scan_id,
             user_id=user_id,
             image_path=first.media_item["path"],
             media_items=[image.media_item for image in images],
             processed_image_path=processed_key,
+            heatmap_path=heatmap_path,
             crop_id=crop_id,
             part_type=part_type,
             disease_id=result.disease_id,
@@ -182,7 +213,21 @@ class ScanPipelineService:
             preprocessing_time_ms=round(preprocessing_ms, 1),
             inference_time_ms=result.inference_time_ms,
             processing_time_ms=round(total_ms, 1),
-            ai_metadata={"rankings": _rankings(result)},
+            ai_metadata={
+                "rankings": _rankings(result),
+                "top5": _top5(result),
+                "confidence": {
+                    "top": result.confidence,
+                    "level": confidence_level(result.confidence),
+                },
+                "model": {
+                    "provider": result.provider,
+                    "model_name": result.model_name,
+                    "model_version": result.model_version,
+                    "dataset_version": result.dataset_version,
+                },
+                "grad_cam": grad_cam,
+            },
             device_id=device_id,
         )
         try:
@@ -257,6 +302,63 @@ class ScanPipelineService:
             raise ScanTimeoutError("AI inference exceeded the time limit") from None
         except InferenceError as exc:
             raise InferenceFailedError(str(exc)) from exc
+
+    async def _heatmap(self, image: ImageData, class_name: str) -> HeatmapResult | None:
+        """Best-effort Grad-CAM for the predicted class (Task 5.2).
+
+        A failure here (no explainer, timeout, provider error) is logged and
+        swallowed — the diagnosis stands and the scan saves without a heatmap.
+        """
+        try:
+            return await asyncio.wait_for(
+                self.detection.generate_heatmap_async(image, class_name),
+                timeout=self.timeout_seconds,
+            )
+        except (TimeoutError, InferenceError) as exc:
+            logger.warning("heatmap_generation_failed", class_name=class_name, error=str(exc))
+            return None
+
+    def _persist_heatmap(
+        self,
+        heatmap: HeatmapResult | None,
+        base_rgb: np.ndarray,
+        result: ScanResult,
+        user_id: int,
+    ) -> tuple[str | None, dict | None]:
+        """Store the raw + overlay heatmap PNGs; return ``(path, grad_cam meta)``.
+
+        ``heatmap_path`` (the scan column) points at the overlay — the visual
+        artifact the explain endpoint serves — while the raw grayscale map is
+        kept in ``ai_metadata.grad_cam`` so it can be re-blended at any opacity
+        without re-running inference.
+        """
+        if heatmap is None:
+            return None, None
+        raw_key, overlay_key = self._store_heatmap(heatmap.heatmap, base_rgb, user_id)
+        explainer = self.detection.explainer
+        return overlay_key, {
+            "provider": (explainer.provider_name if explainer is not None else "unknown"),
+            "class_name": result.disease_name,
+            "time_ms": heatmap.time_ms,
+            "heatmap_path": raw_key,
+            "overlay_path": overlay_key,
+        }
+
+    def _store_heatmap(
+        self, heatmap: np.ndarray, base_rgb: np.ndarray, user_id: int
+    ) -> tuple[str, str]:
+        """Persist the raw grayscale map and its Jet overlay over the model input."""
+        try:
+            raw_key = self.storage.save(
+                encode_heatmap_png(heatmap), "image/png", user_id, subdir="heatmaps"
+            )
+            overlay = apply_heatmap_overlay(base_rgb, heatmap, opacity=0.5)
+            overlay_key = self.storage.save(
+                encode_rgb_png(overlay), "image/png", user_id, subdir="heatmaps"
+            )
+        except OSError as exc:
+            raise StorageFailedError(f"could not store heatmap: {exc}") from exc
+        return raw_key, overlay_key
 
 
 def _map_validation_error(exc: ImageValidationError) -> ScanPipelineError:

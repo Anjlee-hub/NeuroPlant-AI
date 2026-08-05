@@ -6,7 +6,7 @@ SDKs lazily inside their own modules.
 """
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class InferenceError(Exception):
@@ -66,6 +66,27 @@ class ClassifierPrediction:
     model: ModelInfo | None = None
 
 
+class ExplainabilityProvider(Protocol):
+    """Structural seam for Grad-CAM providers (implemented by ``app.ai.gradcam``).
+
+    Declared here rather than imported so this module stays dependency-free
+    (``gradcam`` imports :class:`ImageData` / :class:`InferenceError` from us,
+    so importing it back would be a cycle) while the detection service can type
+    its explainer seam without pulling in the ML stack.
+    """
+
+    capability: str
+    provider_name: str  # "baseline" | "local_tf" — provenance for the heatmap
+
+    def heatmap(self, image: ImageData, class_name: str | None = None) -> Any:
+        """Return a normalized heatmap result (``app.ai.gradcam.HeatmapResult``).
+
+        The concrete return type lives in ``gradcam``; ``Any`` keeps this module
+        free of numpy/OpenCV imports.
+        """
+        ...
+
+
 class DiseaseClassifier(Protocol):
     """Predicts disease for a (preprocessed) source image.
 
@@ -74,5 +95,15 @@ class DiseaseClassifier(Protocol):
 
     capability: str
     model_info: ModelInfo
+
+    @property
+    def explainer(self) -> ExplainabilityProvider | None:
+        """Optional Grad-CAM provider for the predicted class.
+
+        ``None`` when the classifier has no explainability path (e.g. a model
+        artifact that failed to load). Read-only so concrete providers may back
+        it with either a plain attribute or a lazily-built property.
+        """
+        ...
 
     def predict(self, image: ImageData) -> ClassifierPrediction: ...

@@ -77,6 +77,7 @@ async def test_upload_success(client, db):
     assert body["provider"] == "baseline"
     assert body["image_path"]
     assert body["processed_image_path"]
+    assert body["heatmap_path"]  # Task 5.2 — Grad-CAM stored during upload
     assert body["sync_status"] == "synced"
     assert isinstance(body["rankings"], list)
     assert len(body["media_items"]) == 1

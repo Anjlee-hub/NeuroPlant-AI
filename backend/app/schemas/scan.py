@@ -26,6 +26,7 @@ class ScanCreate(BaseModel):
     image_path: str
     media_items: list = Field(default_factory=list)
     processed_image_path: str | None = None
+    heatmap_path: str | None = None  # Grad-CAM overlay (Task 5.2)
 
     crop_id: int | None = None
     part_type: str | None = Field(default=None, pattern="^(leaf|fruit|stem|plant|whole)$")
@@ -82,6 +83,7 @@ class ScanOut(BaseModel):
                     "processing_time_ms": 31.9,
                     "image_path": "42/scans/ab12cd34ef56.jpg",
                     "processed_image_path": "42/processed/ab12cd34ef56.jpg",
+                    "heatmap_path": "42/heatmaps/ab12cd34ef56.png",
                     "media_items": [
                         {
                             "source_type": "upload",
@@ -121,6 +123,7 @@ class ScanOut(BaseModel):
     processing_time_ms: float
     image_path: str
     processed_image_path: str | None = None  # padded model-input image (Task 5)
+    heatmap_path: str | None = None  # Grad-CAM overlay (Task 5.2)
     media_items: list
     sync_status: str
     rankings: list[RankingOut] = Field(default_factory=list)

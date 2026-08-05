@@ -25,10 +25,12 @@ from pathlib import Path
 from typing import Any
 
 from app.ai.datasets import DiseaseCatalog
+from app.ai.gradcam import RuleBaselineSaliency, TensorFlowGradCAM
 from app.ai.preprocess import ImageValidationError, get_preprocessor
 from app.ai.types import (
     ClassifierPrediction,
     DiseaseClassifier,
+    ExplainabilityProvider,
     ImageData,
     InferenceError,
     ModelInfo,
@@ -44,8 +46,9 @@ logger = get_logger(__name__)
 # threshold so consumers can distinguish "best-effort" from real model output.
 BASELINE_CONFIDENCE = 0.6
 
-# Number of ranked candidates returned by the local TF provider.
-TOP_K = 3
+# Number of ranked candidates returned by the local TF provider (Task 5.2
+# stores the full top-5 as confidence metadata).
+TOP_K = 5
 
 
 class RuleBaselineClassifier:
@@ -61,6 +64,8 @@ class RuleBaselineClassifier:
     ) -> None:
         self._catalog = catalog
         self._index_to_name = {i: name for name, i in catalog.label_map.items()}
+        # Task 5.2 — deterministic saliency (no model required).
+        self.explainer: ExplainabilityProvider = RuleBaselineSaliency()
         self.model_info = ModelInfo(
             name="rule-baseline",
             capability="disease",
@@ -107,6 +112,7 @@ class LocalTensorFlowClassifier:
         self._artifact_path = Path(artifact_path)
         self._model: Any = None  # keras Model, populated lazily by _load()
         self._tensorflow: Any = None  # module reference, set by _load()
+        self._explainer: ExplainabilityProvider | None = None  # built lazily
         self._index_to_name = {i: name for name, i in catalog.label_map.items()}
         self.model_info = ModelInfo(
             name=name,
@@ -118,6 +124,25 @@ class LocalTensorFlowClassifier:
     @property
     def is_available(self) -> bool:
         return self._artifact_path.exists()
+
+    @property
+    def explainer(self) -> ExplainabilityProvider | None:
+        """Grad-CAM built from the loaded model (Task 5.2).
+
+        Lazily loads the artifact (raising :class:`ModelUnavailableError` when
+        TensorFlow or the artifact is missing) and caches the provider, so the
+        heatmap always targets the exact model that produced the prediction.
+        ``None`` is never returned once available — access after a failed load
+        raises instead, so callers degrade explicitly rather than silently.
+        """
+        if self._explainer is None:
+            self._load()
+            self._explainer = TensorFlowGradCAM(
+                self._model,
+                get_preprocessor("default"),
+                self._catalog.label_map,
+            )
+        return self._explainer
 
     def _load(self) -> None:
         if self._model is not None:
