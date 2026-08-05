@@ -140,6 +140,14 @@ async def test_explain_returns_full_payload(client, db):
     assert scan["disease_name"] in body["explanation"]
     assert body["model"]["provider"] == "baseline"
 
+    # Pipeline + Grad-CAM timing (Task 5.4) — captured at prediction time.
+    assert body["timing"]["inference_time_ms"] > 0
+    assert body["timing"]["preprocessing_time_ms"] > 0
+    assert body["timing"]["processing_time_ms"] > 0
+    assert body["timing"]["heatmap_time_ms"] == body["heatmap"]["time_ms"]
+    assert body["model"]["model_version"] == scan["model_version"]
+    assert body["model"]["dataset_version"] == scan["dataset_version"]
+
 
 # ── Ownership / existence guards ─────────────────────────────────────────
 
@@ -175,6 +183,7 @@ async def test_explain_degrades_without_heatmap(client, db):
     assert body["heatmap"] is None
     assert body["heatmap_url"] is None
     assert body["overlay_url"] is None
+    assert body["timing"]["heatmap_time_ms"] is None
     assert "Late Blight" in body["explanation"]
     assert body["confidence"]["level"] == "medium"
     assert body["confidence"]["advice"]

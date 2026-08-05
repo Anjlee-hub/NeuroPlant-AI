@@ -51,64 +51,148 @@ class ScanCreate(BaseModel):
 class RankingOut(BaseModel):
     """One ranked alternative candidate (top-k)."""
 
-    disease_name: str
-    confidence: float = Field(ge=0.0, le=1.0)
-    disease_id: int | None = None
-    crop_id: int | None = None
+    disease_name: str = Field(description="Alternative disease name")
+    confidence: float = Field(ge=0.0, le=1.0, description="Model confidence in [0, 1]")
+    disease_id: int | None = Field(default=None, description="Catalog disease id")
+    crop_id: int | None = Field(default=None, description="Catalog crop id")
 
 
 class ExplainDiseaseOut(BaseModel):
     """The predicted disease plus catalog detail for the explain payload."""
 
-    id: int | None = None
-    name: str
-    crop_id: int | None = None
-    severity: str | None = None
-    stage: str | None = None
-    symptoms: list[str] = Field(default_factory=list)
+    id: int | None = Field(default=None, description="Catalog disease id")
+    name: str = Field(description="Predicted disease name")
+    crop_id: int | None = Field(default=None, description="Catalog crop id")
+    severity: str | None = Field(default=None, description="low | moderate | severe")
+    stage: str | None = Field(default=None, description="Growth stage, e.g. early")
+    symptoms: list[str] = Field(default_factory=list, description="Catalog symptoms to look for")
 
 
 class ExplainConfidenceOut(BaseModel):
     """Top confidence, its band, and expert advice (Task 5.3 low-confidence path)."""
 
-    top: float = Field(ge=0.0, le=1.0)
-    level: str  # high | medium | low
-    advice: str
+    top: float = Field(ge=0.0, le=1.0, description="Top-1 model confidence in [0, 1]")
+    level: str = Field(description="Confidence band: high | medium | low")
+    advice: str = Field(description="Plain-language expert advice for this band")
 
 
 class ExplainHeatmapOut(BaseModel):
     """How / when the Grad-CAM heatmap was produced (Task 5.2 provenance)."""
 
-    provider: str
-    class_name: str
-    time_ms: float = Field(ge=0.0)
+    provider: str = Field(description="Grad-CAM implementation, e.g. baseline")
+    class_name: str = Field(description="Class the heatmap was computed for")
+    time_ms: float = Field(ge=0.0, description="Grad-CAM generation time (ms)")
 
 
 class ExplainModelOut(BaseModel):
     """Serving model provenance for the stored prediction."""
 
-    provider: str
-    model_name: str | None = None
-    model_version: str | None = None
-    dataset_version: str | None = None
+    provider: str = Field(description="Serving provider, e.g. baseline | tensorflow")
+    model_name: str | None = Field(default=None, description="Model architecture name")
+    model_version: str | None = Field(default=None, description="Model artifact version")
+    dataset_version: str | None = Field(default=None, description="Training dataset version")
+
+
+class ExplainTimingOut(BaseModel):
+    """Measured latency for the detection + explainability stages (Task 5.4).
+
+    All values are milliseconds, captured at prediction time and stored on the
+    scan row; ``heatmap_time_ms`` is ``None`` when no heatmap was generated.
+    """
+
+    preprocessing_time_ms: float = Field(ge=0.0, description="Image validation + padding (ms)")
+    inference_time_ms: float = Field(ge=0.0, description="Classifier inference (ms)")
+    processing_time_ms: float = Field(ge=0.0, description="End-to-end upload→persist (ms)")
+    heatmap_time_ms: float | None = Field(
+        default=None, ge=0.0, description="Grad-CAM generation (ms); None when absent"
+    )
 
 
 class ScanExplainOut(BaseModel):
     """GET /scans/{id}/explain — the explainability payload.
 
     Heatmap + overlay (as storage URLs), a plain-language explanation, the full
-    ranked top-5 with per-candidate confidence, and the metadata behind the
-    diagnosis (confidence band + expert advice, Grad-CAM provenance, model).
+    ranked top-5 with per-candidate confidence, the metadata behind the
+    diagnosis (confidence band + expert advice, Grad-CAM + model provenance,
+    pipeline timing), and a graceful degrade when no heatmap exists.
     """
 
-    scan_id: int
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "scan_id": 42,
+                    "disease": {
+                        "id": 15,
+                        "name": "Late Blight",
+                        "crop_id": 101,
+                        "severity": "moderate",
+                        "stage": "early",
+                        "symptoms": [
+                            "Dark water-soaked lesions",
+                            "White fungal ring in high humidity",
+                        ],
+                    },
+                    "confidence": {
+                        "top": 0.92,
+                        "level": "high",
+                        "advice": (
+                            "High-confidence result — the pattern is a strong match for this "
+                            "disease. Treat accordingly, but confirm the symptoms first."
+                        ),
+                    },
+                    "top5": [
+                        {
+                            "disease_name": "Late Blight",
+                            "confidence": 0.92,
+                            "disease_id": 15,
+                            "crop_id": 101,
+                        },
+                        {
+                            "disease_name": "Early Blight",
+                            "confidence": 0.04,
+                            "disease_id": 1,
+                            "crop_id": 101,
+                        },
+                    ],
+                    "heatmap": {
+                        "provider": "baseline",
+                        "class_name": "Late Blight",
+                        "time_ms": 18.2,
+                    },
+                    "heatmap_url": "/media/42/heatmaps/ab12cd34ef56.png",
+                    "overlay_url": "/media/42/heatmaps/ab12cd34ef78.png",
+                    "explanation": "This photo was classified as Late Blight with 92% confidence. "
+                    "The heatmap overlay marks the image regions the model focused on. "
+                    "The pattern is consistent with moderate severity at the early stage.",
+                    "timing": {
+                        "preprocessing_time_ms": 12.4,
+                        "inference_time_ms": 8.1,
+                        "processing_time_ms": 31.9,
+                        "heatmap_time_ms": 18.2,
+                    },
+                    "model": {
+                        "provider": "baseline",
+                        "model_name": "rule-baseline",
+                        "model_version": "baseline-v1",
+                        "dataset_version": "v1",
+                    },
+                }
+            ]
+        },
+    )
+
+    scan_id: int = Field(description="The scan row id")
     disease: ExplainDiseaseOut
     confidence: ExplainConfidenceOut
-    top5: list[RankingOut] = Field(default_factory=list)
-    heatmap: ExplainHeatmapOut | None = None
-    heatmap_url: str | None = None
-    overlay_url: str | None = None
-    explanation: str
+    top5: list[RankingOut] = Field(default_factory=list, description="Ordered top-5 candidates")
+    heatmap: ExplainHeatmapOut | None = Field(
+        default=None, description="Grad-CAM provenance; None when no heatmap exists"
+    )
+    heatmap_url: str | None = Field(default=None, description="Storage URL of the raw heatmap PNG")
+    overlay_url: str | None = Field(default=None, description="Storage URL of the Jet overlay PNG")
+    explanation: str = Field(description="Plain-language 'why' behind the diagnosis")
+    timing: ExplainTimingOut
     model: ExplainModelOut
 
 

@@ -23,6 +23,7 @@ from app.schemas.scan import (
     ExplainDiseaseOut,
     ExplainHeatmapOut,
     ExplainModelOut,
+    ExplainTimingOut,
     RankingOut,
     ScanExplainOut,
 )
@@ -125,6 +126,14 @@ class ExplainService:
             heatmap_url=self.storage.url(raw_key) if raw_key else None,
             overlay_url=self.storage.url(overlay_key) if overlay_key else None,
             explanation=_explanation(scan, heatmap_available),
+            timing=ExplainTimingOut(
+                preprocessing_time_ms=scan.preprocessing_time_ms,
+                inference_time_ms=scan.inference_time_ms,
+                processing_time_ms=scan.processing_time_ms,
+                heatmap_time_ms=(
+                    float(grad_cam["time_ms"]) if grad_cam.get("time_ms") is not None else None
+                ),
+            ),
             model=ExplainModelOut(
                 provider=scan.provider,
                 model_name=scan.model_name,
