@@ -10,8 +10,9 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "motion/react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -28,6 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfidenceBadge, SeverityBadge, SyncBadge } from "@/components/ui/status-badges";
+import { StateCard } from "@/components/ui/state-card";
 import type {
   Scan,
   ScanListParams,
@@ -39,10 +42,6 @@ import type {
 } from "@/types/scan";
 
 const PAGE_SIZE = 12;
-
-/** Confidence cutoffs that select the badge color (mirrors backend bands). */
-const CONFIDENCE_HIGH = 0.85;
-const CONFIDENCE_MEDIUM = 0.6;
 
 const CONFIDENCE_STEPS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1];
 
@@ -76,24 +75,6 @@ const DEFAULT_FILTERS: HistoryFilters = {
   partType: "",
 };
 
-function confidenceVariant(confidence: number): "success" | "secondary" | "destructive" {
-  if (confidence >= CONFIDENCE_HIGH) return "success";
-  if (confidence >= CONFIDENCE_MEDIUM) return "secondary";
-  return "destructive";
-}
-
-function severityVariant(severity: ScanSeverity): "success" | "secondary" | "destructive" {
-  if (severity === "low") return "success";
-  if (severity === "moderate") return "secondary";
-  return "destructive";
-}
-
-function syncVariant(status: ScanSyncStatus): "success" | "outline" | "destructive" {
-  if (status === "synced") return "success";
-  if (status === "pending") return "outline";
-  return "destructive";
-}
-
 /** One scan row — links to the detail page. */
 function ScanCard({ scan }: { scan: Scan }) {
   const { t, i18n } = useTranslation();
@@ -112,20 +93,12 @@ function ScanCard({ scan }: { scan: Scan }) {
                 {formatDate(scan.created_at, i18n.language)}
               </p>
             </div>
-            <Badge variant={confidenceVariant(scan.confidence)} title={t("scanHistory.confidence")}>
-              {formatPercent(scan.confidence)}
-            </Badge>
+            <ConfidenceBadge value={scan.confidence} hint={t("scanHistory.confidence")} />
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {scan.severity && (
-              <Badge variant={severityVariant(scan.severity)}>
-                {t(`scanHistory.severity.${scan.severity}`)}
-              </Badge>
-            )}
-            <Badge variant={syncVariant(scan.sync_status)}>
-              {t(`scanHistory.sync.${scan.sync_status}`)}
-            </Badge>
+            {scan.severity && <SeverityBadge severity={scan.severity} />}
+            <SyncBadge status={scan.sync_status} />
             {scan.part_type && (
               <Badge variant="outline">{t(`scanHistory.partType.${scan.part_type}`)}</Badge>
             )}
@@ -241,15 +214,11 @@ export function ScanHistoryPage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <History className="size-10 text-muted-foreground" />
-            <p className="text-muted-foreground">{t("scanHistory.authRequired")}</p>
-            <Button asChild>
-              <Link to="/login">{t("scanHistory.signIn")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <StateCard icon={History} title={t("scanHistory.authRequired")}>
+          <Button asChild>
+            <Link to="/login">{t("scanHistory.signIn")}</Link>
+          </Button>
+        </StateCard>
       </div>
     );
   }
@@ -491,39 +460,46 @@ export function ScanHistoryPage() {
         {scansQuery.isPending ? (
           <ScanGridSkeleton t={t} />
         ) : scansQuery.isError ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-              <AlertCircle className="size-10 text-destructive" />
-              <h3 className="text-lg font-semibold">{t("scanHistory.errorTitle")}</h3>
-              <p className="text-muted-foreground">{t("scanHistory.errorBody")}</p>
-              <Button variant="outline" onClick={() => void scansQuery.refetch()}>
-                <RefreshCw />
-                {t("common.retry")}
-              </Button>
-            </CardContent>
-          </Card>
+          <StateCard
+            icon={AlertCircle}
+            title={t("scanHistory.errorTitle")}
+            body={t("scanHistory.errorBody")}
+            tone="destructive"
+          >
+            <Button variant="outline" onClick={() => void scansQuery.refetch()}>
+              <RefreshCw />
+              {t("common.retry")}
+            </Button>
+          </StateCard>
         ) : !data || data.items.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-              <ScanLine className="size-10 text-muted-foreground" />
-              <h3 className="text-lg font-semibold">{t("scanHistory.emptyTitle")}</h3>
-              <p className="text-muted-foreground">{t("scanHistory.emptyBody")}</p>
-              <Button asChild>
-                <Link to="/detect">
-                  <ScanLine />
-                  {t("scanHistory.scanNow")}
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <StateCard
+            icon={ScanLine}
+            title={t("scanHistory.emptyTitle")}
+            body={t("scanHistory.emptyBody")}
+          >
+            <Button asChild>
+              <Link to="/detect">
+                <ScanLine />
+                {t("scanHistory.scanNow")}
+              </Link>
+            </Button>
+          </StateCard>
         ) : (
           <>
             <p className="mb-3 text-sm text-muted-foreground">
               {t("scanHistory.totalScans", { count: data.total })}
             </p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {data.items.map((scan) => (
-                <ScanCard key={scan.id} scan={scan} />
+              {data.items.map((scan, index) => (
+                <motion.div
+                  key={scan.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.04, 0.4), duration: 0.2 }}
+                  className="h-full"
+                >
+                  <ScanCard scan={scan} />
+                </motion.div>
               ))}
             </div>
 
@@ -531,7 +507,13 @@ export function ScanHistoryPage() {
               className="mt-6 flex items-center justify-between gap-3"
               aria-label={t("scanHistory.pagination")}
             >
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 sm:h-9"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
                 <ChevronLeft />
                 {t("scanHistory.prev")}
               </Button>
@@ -541,6 +523,7 @@ export function ScanHistoryPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 sm:h-9"
                 disabled={!data.has_next}
                 onClick={() => setPage((p) => p + 1)}
               >

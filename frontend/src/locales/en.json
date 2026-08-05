@@ -82,6 +82,7 @@
     "identifier": "Phone or email",
     "passwordLogin": "Password",
     "otpLogin": "Phone OTP",
+    "loginMethod": "Login method",
     "otpCode": "6-digit OTP",
     "sendOtp": "Send OTP",
     "verifyOtp": "Verify & log in",

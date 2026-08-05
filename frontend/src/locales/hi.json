@@ -82,6 +82,7 @@
     "identifier": "फ़ोन या ईमेल",
     "passwordLogin": "पासवर्ड",
     "otpLogin": "फ़ोन ओटीपी",
+    "loginMethod": "लॉगिन विधि",
     "otpCode": "6 अंकों का ओटीपी",
     "sendOtp": "ओटीपी भेजें",
     "verifyOtp": "सत्यापित करें और लॉग इन करें",

@@ -20,8 +20,8 @@ import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StateCard } from "@/components/ui/state-card";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import {
@@ -146,7 +146,12 @@ function EntryCard({
           )}
           <div className="ml-auto flex gap-1.5">
             {status === "failed" && !syncing && (
-              <Button variant="outline" size="sm" onClick={() => onRetry(entry.id!)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 sm:h-9"
+                onClick={() => onRetry(entry.id!)}
+              >
                 <RotateCcw />
                 {t("offlineQueue.retry")}
               </Button>
@@ -289,15 +294,11 @@ export function OfflineQueuePage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <History className="size-10 text-muted-foreground" />
-            <p className="text-muted-foreground">{t("offlineQueue.authRequired")}</p>
-            <Button asChild>
-              <Link to="/login">{t("offlineQueue.signIn")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <StateCard icon={History} title={t("offlineQueue.authRequired")}>
+          <Button asChild>
+            <Link to="/login">{t("offlineQueue.signIn")}</Link>
+          </Button>
+        </StateCard>
       </div>
     );
   }
@@ -416,27 +417,28 @@ export function OfflineQueuePage() {
           <Skeleton className="h-20 w-full" />
         </div>
       ) : queueQuery.isError ? (
-        <Card className="mt-6">
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <AlertTriangle className="size-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">{t("offlineQueue.errorTitle")}</h3>
-            <p className="text-sm text-muted-foreground">{t("offlineQueue.errorBody")}</p>
-            <Button variant="outline" onClick={() => void queueQuery.refetch()}>
-              {t("offlineQueue.retry")}
-            </Button>
-          </CardContent>
-        </Card>
+        <StateCard
+          className="mt-6"
+          icon={AlertTriangle}
+          title={t("offlineQueue.errorTitle")}
+          body={t("offlineQueue.errorBody")}
+          tone="destructive"
+        >
+          <Button variant="outline" onClick={() => void queueQuery.refetch()}>
+            {t("offlineQueue.retry")}
+          </Button>
+        </StateCard>
       ) : entries.length === 0 && completed.length === 0 ? (
-        <Card className="mt-6">
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <CloudUpload className="size-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">{t("offlineQueue.emptyTitle")}</h3>
-            <p className="text-sm text-muted-foreground">{t("offlineQueue.emptyBody")}</p>
-            <Button asChild>
-              <Link to="/detect">{t("offlineQueue.scanNow")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <StateCard
+          className="mt-6"
+          icon={CloudUpload}
+          title={t("offlineQueue.emptyTitle")}
+          body={t("offlineQueue.emptyBody")}
+        >
+          <Button asChild>
+            <Link to="/detect">{t("offlineQueue.scanNow")}</Link>
+          </Button>
+        </StateCard>
       ) : (
         <div className="mt-6 flex flex-col gap-6">
           {entries.length > 0 && (
@@ -480,6 +482,7 @@ export function OfflineQueuePage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-10 sm:h-9"
                   onClick={() => void clearCompleted()}
                   disabled={syncUi.active}
                 >

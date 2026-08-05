@@ -78,15 +78,24 @@ export function LoginPage() {
     <AuthShell title={t("auth.loginTitle")} subtitle={t("auth.loginSubtitle")}>
       <div
         role="tablist"
+        aria-label={t("auth.loginMethod")}
         className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
-        aria-label="Login method"
+        onKeyDown={(event) => {
+          // Arrow keys move between the two login tabs (WAI-ARIA tabs pattern).
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          setMode((current) => (current === "password" ? "otp" : "password"));
+          setError(null);
+        }}
       >
         {(["password", "otp"] as const).map((value) => (
           <button
             key={value}
+            id={`login-tab-${value}`}
             type="button"
             role="tab"
             aria-selected={mode === value}
+            aria-controls="login-panel"
             onClick={() => {
               setMode(value);
               setError(null);
@@ -103,9 +112,14 @@ export function LoginPage() {
         ))}
       </div>
 
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+      <div
+        id="login-panel"
+        role="tabpanel"
+        aria-label={t("auth.loginMethod")}
+      >
+        {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      {mode === "password" ? (
+        {mode === "password" ? (
         <form onSubmit={handlePasswordSubmit} className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="identifier">{t("auth.identifier")}</Label>
@@ -181,6 +195,8 @@ export function LoginPage() {
           </Button>
         </form>
       )}
+
+      </div>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t("auth.noAccount")}{" "}

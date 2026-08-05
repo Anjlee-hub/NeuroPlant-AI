@@ -29,28 +29,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ScanSeverity, ScanSyncStatus } from "@/types/scan";
-
-const CONFIDENCE_HIGH = 0.85;
-const CONFIDENCE_MEDIUM = 0.6;
-
-function confidenceVariant(confidence: number): "success" | "secondary" | "destructive" {
-  if (confidence >= CONFIDENCE_HIGH) return "success";
-  if (confidence >= CONFIDENCE_MEDIUM) return "secondary";
-  return "destructive";
-}
-
-function severityVariant(severity: ScanSeverity): "success" | "secondary" | "destructive" {
-  if (severity === "low") return "success";
-  if (severity === "moderate") return "secondary";
-  return "destructive";
-}
-
-function syncVariant(status: ScanSyncStatus): "success" | "outline" | "destructive" {
-  if (status === "synced") return "success";
-  if (status === "pending") return "outline";
-  return "destructive";
-}
+import {
+  ConfidenceBadge,
+  SeverityBadge,
+  SyncBadge,
+  confidenceVariant,
+} from "@/components/ui/status-badges";
+import { StateCard } from "@/components/ui/state-card";
 
 /** Label/value pair inside the details definition list. */
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
@@ -183,15 +168,11 @@ export function ScanDetailPage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <History className="size-10 text-muted-foreground" />
-            <p className="text-muted-foreground">{t("scanDetail.authRequired")}</p>
-            <Button asChild>
-              <Link to="/login">{t("scanDetail.signIn")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <StateCard icon={History} title={t("scanDetail.authRequired")}>
+          <Button asChild>
+            <Link to="/login">{t("scanDetail.signIn")}</Link>
+          </Button>
+        </StateCard>
       </div>
     );
   }
@@ -233,22 +214,23 @@ export function ScanDetailPage() {
       {scanQuery.isPending || explainQuery.isPending ? (
         <DetailSkeleton t={t} />
       ) : isError ? (
-        <Card className="mt-4">
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <ScanLine className="size-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">{t("scanDetail.errorTitle")}</h3>
-            <p className="text-muted-foreground">{t("scanDetail.errorBody")}</p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                void scanQuery.refetch();
-                void explainQuery.refetch();
-              }}
-            >
-              {t("common.retry")}
-            </Button>
-          </CardContent>
-        </Card>
+        <StateCard
+          className="mt-4"
+          icon={ScanLine}
+          title={t("scanDetail.errorTitle")}
+          body={t("scanDetail.errorBody")}
+          tone="destructive"
+        >
+          <Button
+            variant="outline"
+            onClick={() => {
+              void scanQuery.refetch();
+              void explainQuery.refetch();
+            }}
+          >
+            {t("common.retry")}
+          </Button>
+        </StateCard>
       ) : !scan ? null : (
         <div className="mt-4">
           <header className="flex flex-wrap items-start justify-between gap-3">
@@ -260,9 +242,7 @@ export function ScanDetailPage() {
                 {formatDate(scan.created_at, i18n.language)}
               </p>
             </div>
-            <Badge variant={confidenceVariant(scan.confidence)} title={t("scanDetail.confidence")}>
-              {formatPercent(scan.confidence)}
-            </Badge>
+            <ConfidenceBadge value={scan.confidence} hint={t("scanDetail.confidence")} />
           </header>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -351,9 +331,7 @@ export function ScanDetailPage() {
                     <DetailRow label={t("scanDetail.disease")}>{scan.disease_name}</DetailRow>
                     <DetailRow label={t("scanDetail.severity")}>
                       {scan.severity ? (
-                        <Badge variant={severityVariant(scan.severity)}>
-                          {t(`scanHistory.severity.${scan.severity}`)}
-                        </Badge>
+                        <SeverityBadge severity={scan.severity} />
                       ) : (
                         t("scanDetail.notSet")
                       )}
@@ -387,9 +365,7 @@ export function ScanDetailPage() {
                       {scan.dataset_version ?? t("scanDetail.notSet")}
                     </DetailRow>
                     <DetailRow label={t("scanDetail.sync")}>
-                      <Badge variant={syncVariant(scan.sync_status)}>
-                        {t(`scanHistory.sync.${scan.sync_status}`)}
-                      </Badge>
+                      <SyncBadge status={scan.sync_status} />
                     </DetailRow>
                   </dl>
 

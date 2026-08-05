@@ -99,4 +99,26 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /* Brand-tinted text selection in both themes. */
+  ::selection {
+    background-color: hsl(var(--ring) / 0.25);
+  }
+
+  /* Users who prefer reduced motion: drop smooth scrolling and collapse
+     decorative CSS animations/transitions. JS-driven motion is handled by
+     <MotionConfig reducedMotion="user"> in app/providers. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }

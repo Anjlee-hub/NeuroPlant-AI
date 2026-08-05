@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { useState, type ReactNode } from "react";
 
 import { ThemeProvider } from "@/app/theme-provider";
@@ -26,7 +27,11 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>{children}</ThemeProvider>
+      <ThemeProvider>
+        {/* reducedMotion="user" disables all motion/react animation for users
+            who prefer reduced motion, app-wide. */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
