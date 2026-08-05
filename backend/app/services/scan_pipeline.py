@@ -1,20 +1,27 @@
-"""Scan upload pipeline — validate → sanitize → store → detect → persist.
+"""Scan processing pipeline — validate → sanitize → store → detect → persist.
 
-``POST /scans`` composes this service: it owns the ordering and timing of every
-stage so the endpoint stays thin and each stage (preprocessor, storage,
-detection, scan persistence) stays independently swappable and testable.
+Live uploads (``POST /scans`` multipart) and offline sync items
+(``POST /scans/sync`` base64 batch) both funnel through the same internal
+representation, :class:`app.ai.types.ImageData`, and the same shared run core
+:meth:`ScanPipelineService._process_images`, so validation, preprocessing,
+inference, explainability, persistence and error handling are byte-for-byte
+identical between the two paths (Task 6.2). Only the raw-input adapters differ
+(:meth:`_image_from_upload` vs :meth:`_image_from_sync`).
 
 Failures surface as :class:`ScanPipelineError` subclasses carrying an HTTP
 ``status_code`` and a machine ``code``; ``main.py`` maps them to the standard
-``{"error": {"code", "message"}}`` envelope.
+``{"error": {"code", "message"}}`` envelope (and the sync endpoint to a
+per-item ``SyncErrorOut``).
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 import numpy as np
 from fastapi import UploadFile
@@ -31,9 +38,9 @@ from app.ai.preprocess import ImageValidationError, Preprocessor
 from app.ai.types import ImageData, InferenceError
 from app.core.logging import get_logger
 from app.models.scan import Scan
-from app.schemas.scan import ScanCreate
+from app.schemas.scan import ScanCreate, ScanSyncItemIn, SyncImageIn
 from app.services.detection import DetectionService, ScanResult, confidence_level
-from app.services.scans import ScanService
+from app.services.scans import ScanService, _now_naive_utc
 from app.services.storage import StorageService
 
 logger = get_logger(__name__)
@@ -157,16 +164,76 @@ class ScanPipelineService:
         part_type: str | None = None,
         device_id: str | None = None,
     ) -> tuple[Scan, bool]:
-        """Run one upload; returns ``(scan, created)``.
+        """Run one live upload; returns ``(scan, created)``.
 
         ``created=False`` is an idempotent replay: the ``client_scan_id`` was
         already processed, so the existing row is returned unchanged and the
         endpoint answers 200 instead of 201.
+
+        The multipart files are adapted to :class:`ImageData` and then handed
+        to the same shared run core as offline sync items (Task 6.2).
         """
-        if not files:
-            raise ImageRejectedError("at least one image file is required")
-        if len(files) > self.max_images:
-            raise ImageRejectedError(f"too many images: {len(files)} (max {self.max_images})")
+        images = [await self._image_from_upload(upload) for upload in files]
+        return await self._process_images(
+            user_id=user_id,
+            images=images,
+            client_scan_id=client_scan_id,
+            crop_id=crop_id,
+            part_type=part_type,
+            device_id=device_id,
+            source_type="upload",
+        )
+
+    async def process_sync_item(
+        self,
+        *,
+        user_id: int,
+        item: ScanSyncItemIn,
+    ) -> tuple[Scan, bool]:
+        """Run one queued offline scan; returns ``(scan, created)``.
+
+        Base64 images are decoded and adapted to :class:`ImageData`, then the
+        *identical* pipeline as a live upload runs — validation, preprocessing,
+        inference, explainability, persistence and error handling are shared.
+        Rows created here carry ``source_type="sync"`` on their media items and
+        a ``synced_at`` stamp (``created=False`` is an idempotent replay, same
+        as ``POST /scans``).
+        """
+        images = [self._image_from_sync(image) for image in item.images]
+        return await self._process_images(
+            user_id=user_id,
+            images=images,
+            client_scan_id=item.client_scan_id,
+            crop_id=item.crop_id,
+            part_type=item.part_type,
+            device_id=item.device_id,
+            source_type="sync",
+            synced_at=_now_naive_utc(),
+        )
+
+    async def _process_images(
+        self,
+        *,
+        user_id: int,
+        images: Sequence[ImageData],
+        client_scan_id: str,
+        crop_id: int | None,
+        part_type: str | None,
+        device_id: str | None,
+        source_type: str,
+        synced_at: datetime | None = None,
+    ) -> tuple[Scan, bool]:
+        """The single run core shared by live uploads and offline sync.
+
+        Everything downstream of input adaptation is here — count/idempotency
+        checks, validate → sanitize → store, preprocessing, inference, Grad-CAM,
+        and persistence — so there is exactly one implementation of the
+        detection pipeline and no online/offline drift.
+        """
+        if not images:
+            raise ImageRejectedError("at least one image is required")
+        if len(images) > self.max_images:
+            raise ImageRejectedError(f"too many images: {len(images)} (max {self.max_images})")
 
         scans = ScanService(self.db)
         existing = await scans.find_by_client_id(client_scan_id, user_id)
@@ -175,10 +242,10 @@ class ScanPipelineService:
             return existing, False
 
         started = time.perf_counter()
-        images = [await self._validate_and_store(upload, user_id, part_type) for upload in files]
+        stored = [await self._validate_and_store(image, user_id, part_type) for image in images]
 
         # Preprocessing timing + persisted model-input image (Task 5 Grad-CAM).
-        first = images[0]
+        first = stored[0]
         prep_started = time.perf_counter()
         prepared = self.preprocessor.prepare(first.image_data)
         preprocessing_ms = (time.perf_counter() - prep_started) * 1000.0
@@ -196,7 +263,7 @@ class ScanPipelineService:
             client_scan_id=client_scan_id,
             user_id=user_id,
             image_path=first.media_item["path"],
-            media_items=[image.media_item for image in images],
+            media_items=[image.media_item for image in stored],
             processed_image_path=processed_key,
             heatmap_path=heatmap_path,
             crop_id=crop_id,
@@ -229,6 +296,7 @@ class ScanPipelineService:
                 "grad_cam": grad_cam,
             },
             device_id=device_id,
+            synced_at=synced_at,
         )
         try:
             scan = await scans.create(payload)
@@ -243,24 +311,45 @@ class ScanPipelineService:
 
     # ── Stages ───────────────────────────────────────────────────────────
 
+    async def _image_from_upload(self, upload: UploadFile) -> ImageData:
+        """Adapt one multipart file into the common internal image type."""
+        data = await upload.read()
+        content_type = (upload.content_type or "").split(";")[0].strip().lower()
+        return ImageData(image_bytes=data, content_type=content_type, source_type="upload")
+
+    def _image_from_sync(self, image: SyncImageIn) -> ImageData:
+        """Decode one base64 offline image into the common internal type.
+
+        Raises :class:`ImageRejectedError` (code ``invalid_image``) when the
+        payload is not valid base64, so malformed sync items fail the same way
+        corrupt uploads do.
+        """
+        try:
+            data = base64.b64decode(image.data.strip(), validate=True)
+        except ValueError as exc:
+            raise ImageRejectedError(f"invalid base64 image payload: {exc}") from exc
+        content_type = (image.content_type or "").split(";")[0].strip().lower()
+        return ImageData(image_bytes=data, content_type=content_type, source_type="sync")
+
     async def _validate_and_store(
         self,
-        upload: UploadFile,
+        image: ImageData,
         user_id: int,
         part_type: str | None,
     ) -> UploadedImage:
-        """Read → validate → sanitize (EXIF strip) → store → media item."""
-        data = await upload.read()
-        content_type = (upload.content_type or "").split(";")[0].strip().lower()
-        source = ImageData(image_bytes=data, content_type=content_type, source_type="upload")
+        """Validate → sanitize (EXIF strip) → store → media item.
 
+        Shared by both input paths — ``image`` is already in the common
+        internal representation, and ``image.source_type`` (``upload`` vs
+        ``sync``) is recorded on the media item.
+        """
         try:
-            self.preprocessor.validate(source)
+            self.preprocessor.validate(image)
         except ImageValidationError as exc:
             raise _map_validation_error(exc) from exc
 
         try:
-            sanitized = self.preprocessor.sanitize(source)
+            sanitized = self.preprocessor.sanitize(image)
         except ImageValidationError as exc:
             raise ImageRejectedError(str(exc)) from exc
 
@@ -272,7 +361,7 @@ class ScanPipelineService:
             raise StorageFailedError(f"could not store image: {exc}") from exc
 
         media_item = {
-            "source_type": "upload",
+            "source_type": image.source_type,
             "path": key,
             "url": self.storage.url(key),
             "part_type": part_type,

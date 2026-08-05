@@ -170,6 +170,7 @@ class ScanService:
             processing_time_ms=payload.processing_time_ms,
             ai_metadata=payload.ai_metadata,
             device_id=payload.device_id,
+            synced_at=payload.synced_at,
         )
         self.db.add(scan)
         await self.db.commit()
