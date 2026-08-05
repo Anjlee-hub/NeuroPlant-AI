@@ -36,6 +36,7 @@ import {
   confidenceVariant,
 } from "@/components/ui/status-badges";
 import { StateCard } from "@/components/ui/state-card";
+import { RecommendationsPanel } from "@/components/treatment/recommendations";
 
 /** Label/value pair inside the details definition list. */
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
@@ -205,7 +206,7 @@ export function ScanDetailPage() {
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <Link
         to="/scans"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground print:hidden"
       >
         <ChevronLeft className="size-4" />
         {t("scanDetail.back")}
@@ -295,7 +296,7 @@ export function ScanDetailPage() {
                       <a
                         href={explain.overlay_url}
                         download={`scan-${id}-heatmap.png`}
-                        className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                        className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground print:hidden"
                       >
                         <Download />
                         {t("scanDetail.downloadHeatmap")}
@@ -369,7 +370,7 @@ export function ScanDetailPage() {
                     </DetailRow>
                   </dl>
 
-                  <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4 print:hidden">
                     <Button variant="outline" onClick={() => void copyPrediction()}>
                       {copied ? <Check /> : <Copy />}
                       {copied ? t("scanDetail.copied") : t("scanDetail.copy")}
@@ -464,6 +465,10 @@ export function ScanDetailPage() {
                 </>
               )}
             </section>
+          </div>
+
+          <div className="mt-8">
+            <RecommendationsPanel scanId={id} />
           </div>
         </div>
       )}

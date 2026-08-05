@@ -7,6 +7,7 @@ import type {
   TokenResponse,
   User,
 } from "@/types/auth";
+import type { DiseaseRecommendation } from "@/types/recommendation";
 import type {
   CropOption,
   Scan,
@@ -225,6 +226,9 @@ export const api = {
   getScan: (scanId: number) => request<Scan>(`/scans/${scanId}`, { auth: true }),
   getScanExplain: (scanId: number) =>
     request<ScanExplain>(`/scans/${scanId}/explain`, { auth: true }),
+  /** Treatment care plan for a scan's predicted disease (M3 T2). */
+  getScanRecommendations: (scanId: number) =>
+    request<DiseaseRecommendation>(`/scans/${scanId}/recommendations`, { auth: true }),
   listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
   // Offline reconciliation: upload the queued scans in one JSON batch. The
   // server owns idempotency (created/replayed per client_scan_id) — this

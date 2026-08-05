@@ -32,6 +32,7 @@ import {
   confidenceVariant,
 } from "@/components/ui/status-badges";
 import { StateCard } from "@/components/ui/state-card";
+import { RecommendationsPanel } from "@/components/treatment/recommendations";
 import type { Scan, ScanExplain, ScanPartType } from "@/types/scan";
 
 const PART_TYPES: ScanPartType[] = ["leaf", "fruit", "stem", "plant", "whole"];
@@ -192,8 +193,13 @@ function ResultView({
         </Card>
       )}
 
+      {/* ── Treatment plan ─────────────────────────────────────────── */}
+      <div className="mt-6">
+        <RecommendationsPanel scanId={scan.id} />
+      </div>
+
       {/* ── Actions ──────────────────────────────────────────────────── */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-3 print:hidden">
         <Button asChild>
           <Link to={`/scans/${scan.id}`}>{t("scanCrop.viewDetails")}</Link>
         </Button>

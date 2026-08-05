@@ -345,6 +345,97 @@
       "Answers grounded in your scan history, weather and market prices"
     ]
   },
+  "treatment": {
+    "title": "Treatment Recommendations",
+    "planLabel": "Care Plan",
+    "subtitle": "Step-by-step plan for {{disease}} on {{crop}}",
+    "subtitleNoCrop": "Step-by-step plan for {{disease}}",
+    "loading": "Loading care plan…",
+    "errorTitle": "Couldn't load care plan",
+    "errorBody": "Please try again in a moment.",
+    "retry": "Retry",
+    "emptyTitle": "No treatment plan available",
+    "emptyBody": "This disease doesn't have a curated care plan yet. Check back soon.",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "print": "Print",
+    "overview": "Overview",
+    "cause": "Cause",
+    "spread": "How it spreads",
+    "symptoms": "Symptoms to watch",
+    "homemade": {
+      "title": "Homemade Remedies",
+      "desc": "Kitchen ingredients & traditional sprays",
+      "categories": {
+        "kitchen-ingredients": "Kitchen ingredients",
+        "homemade-spray": "Homemade spray",
+        "traditional": "Traditional"
+      },
+      "ingredients": "Ingredients",
+      "preparation": "Preparation & application",
+      "frequency": "How often"
+    },
+    "organic": {
+      "title": "Organic Remedies",
+      "desc": "Neem oil, bio-fungicides & organic nutrients",
+      "categories": {
+        "neem-oil": "Neem oil",
+        "bio-fungicide": "Bio-fungicide",
+        "organic-pesticide": "Organic pesticide",
+        "organic-nutrient": "Organic nutrient"
+      },
+      "application": "Application & dose",
+      "frequency": "How often"
+    },
+    "chemical": {
+      "title": "Chemical Recommendations",
+      "desc": "Fungicides, insecticides & bactericides",
+      "categories": {
+        "fungicide": "Fungicide",
+        "insecticide": "Insecticide",
+        "bactericide": "Bactericide"
+      },
+      "dosage": "Dosage",
+      "interval": "Interval",
+      "warning": "⚠ Safety precautions"
+    },
+    "fertilizer": {
+      "title": "Fertilizer Recommendation",
+      "desc": "Nutrient guidance for recovery"
+    },
+    "watering": {
+      "title": "Watering",
+      "desc": "When & how much to water"
+    },
+    "sunlight": {
+      "title": "Sunlight",
+      "desc": "Light exposure needs"
+    },
+    "temperature": {
+      "title": "Temperature",
+      "desc": "Ideal temperature range"
+    },
+    "humidity": {
+      "title": "Humidity",
+      "desc": "Moisture management"
+    },
+    "prevention": {
+      "title": "Prevention Tips",
+      "desc": "How to stop it coming back"
+    },
+    "recovery": {
+      "title": "Recovery Timeline",
+      "desc": "Expected recovery period"
+    },
+    "isolation": {
+      "title": "Isolation",
+      "desc": "Containment measures"
+    },
+    "monitoring": {
+      "title": "Monitoring Advice",
+      "desc": "What to check & how often"
+    }
+  },
   "footer": {
     "tagline": "The AI-powered agriculture platform for India.",
     "rights": "All rights reserved."
