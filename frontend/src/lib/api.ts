@@ -7,6 +7,12 @@ import type {
   TokenResponse,
   User,
 } from "@/types/auth";
+import type {
+  CropOption,
+  ScanList,
+  ScanListParams,
+  Scan,
+} from "@/types/scan";
 
 /**
  * Thin typed client for the FastAPI backend. Responses are the domain
@@ -125,4 +131,18 @@ export const api = {
       body: { code },
       auth: true,
     }),
+
+  // ── Scans (M2 Task 7) ────────────────────────────────────────────────
+  listScans: (params: ScanListParams = {}) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        qs.set(key, String(value));
+      }
+    }
+    const query = qs.toString();
+    return request<ScanList>(`/scans${query ? `?${query}` : ""}`, { auth: true });
+  },
+  getScan: (scanId: number) => request<Scan>(`/scans/${scanId}`, { auth: true }),
+  listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
 };

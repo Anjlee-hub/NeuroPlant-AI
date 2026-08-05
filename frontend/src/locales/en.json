@@ -10,6 +10,7 @@
   "nav": {
     "home": "Home",
     "detect": "Scan Crop",
+    "history": "History",
     "doctor": "Crop Doctor",
     "marketplace": "Marketplace",
     "login": "Log in",
@@ -111,6 +112,60 @@
     "noAccount": "New here?",
     "mfaCode": "Authenticator code",
     "mfaVerify": "Verify code"
+  },
+  "scanHistory": {
+    "title": "Scan History",
+    "subtitle": "Review past crop scans, their predictions and confidence.",
+    "searchPlaceholder": "Search disease or provider",
+    "sort": "Sort by",
+    "sortCreated": "Newest",
+    "sortConfidence": "Confidence",
+    "sortDisease": "Disease",
+    "orderAsc": "Ascending order",
+    "orderDesc": "Descending order",
+    "filterCrop": "Crop",
+    "filterDisease": "Disease",
+    "filterDateFrom": "From date",
+    "filterDateTo": "To date",
+    "filterConfidenceMin": "Min confidence",
+    "filterConfidenceMax": "Max confidence",
+    "filterSeverity": "Severity",
+    "filterSync": "Sync status",
+    "filterPartType": "Plant part",
+    "all": "All",
+    "clear": "Clear filters",
+    "totalScans_one": "{{count}} scan",
+    "totalScans_other": "{{count}} scans",
+    "page": "Page {{page}} of {{pages}}",
+    "prev": "Previous",
+    "next": "Next",
+    "pagination": "Pagination",
+    "emptyTitle": "No scans yet",
+    "emptyBody": "Scan a crop leaf to see the results here.",
+    "scanNow": "Scan a crop",
+    "errorTitle": "Couldn't load your scans",
+    "errorBody": "Please try again in a moment.",
+    "loadingScans": "Loading scans",
+    "authRequired": "Sign in to view your scan history.",
+    "signIn": "Sign in",
+    "confidence": "Confidence",
+    "severity": {
+      "low": "Low",
+      "moderate": "Moderate",
+      "severe": "Severe"
+    },
+    "sync": {
+      "synced": "Synced",
+      "pending": "Pending",
+      "failed": "Failed"
+    },
+    "partType": {
+      "leaf": "Leaf",
+      "fruit": "Fruit",
+      "stem": "Stem",
+      "plant": "Plant",
+      "whole": "Whole plant"
+    }
   },
   "footer": {
     "tagline": "The AI-powered agriculture platform for India.",

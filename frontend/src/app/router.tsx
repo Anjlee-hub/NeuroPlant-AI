@@ -9,6 +9,7 @@ import { MfaSetupPage } from "@/pages/mfa-setup";
 import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
 import { RegisterPage } from "@/pages/register";
+import { ScanHistoryPage } from "@/pages/scan-history";
 
 /**
  * Route tree. M1 ships the shell + auth entry points; feature routes
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "login/mfa", element: <MfaVerifyPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "settings/mfa", element: <MfaSetupPage /> },
+      { path: "scans", element: <ScanHistoryPage /> },
       { path: "detect", element: <ComingSoonPage navKey="detect" /> },
       { path: "doctor", element: <ComingSoonPage navKey="doctor" /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" /> },

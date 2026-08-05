@@ -10,6 +10,7 @@
   "nav": {
     "home": "होम",
     "detect": "फ़सल स्कैन करें",
+    "history": "इतिहास",
     "doctor": "क्रॉप डॉक्टर",
     "marketplace": "मार्केटप्लेस",
     "login": "लॉग इन",
@@ -111,6 +112,60 @@
     "noAccount": "नए हैं?",
     "mfaCode": "ऑथेंटिकेटर कोड",
     "mfaVerify": "कोड सत्यापित करें"
+  },
+  "scanHistory": {
+    "title": "स्कैन इतिहास",
+    "subtitle": "अपने पिछले फ़सल स्कैन, पहचान और विश्वास स्तर देखें।",
+    "searchPlaceholder": "रोग या प्रदाता खोजें",
+    "sort": "क्रमबद्ध करें",
+    "sortCreated": "नवीनतम",
+    "sortConfidence": "विश्वास",
+    "sortDisease": "रोग",
+    "orderAsc": "बढ़ते क्रम में",
+    "orderDesc": "घटते क्रम में",
+    "filterCrop": "फ़सल",
+    "filterDisease": "रोग",
+    "filterDateFrom": "आरंभ तिथि",
+    "filterDateTo": "अंत तिथि",
+    "filterConfidenceMin": "न्यूनतम विश्वास",
+    "filterConfidenceMax": "अधिकतम विश्वास",
+    "filterSeverity": "गंभीरता",
+    "filterSync": "सिंक स्थिति",
+    "filterPartType": "पौधे का भाग",
+    "all": "सभी",
+    "clear": "फ़िल्टर हटाएँ",
+    "totalScans_one": "{{count}} स्कैन",
+    "totalScans_other": "{{count}} स्कैन",
+    "page": "पृष्ठ {{page}} / {{pages}}",
+    "prev": "पिछला",
+    "next": "अगला",
+    "pagination": "पेजिनेशन",
+    "emptyTitle": "अभी कोई स्कैन नहीं",
+    "emptyBody": "परिणाम देखने के लिए फ़सल की पत्ती स्कैन करें।",
+    "scanNow": "फ़सल स्कैन करें",
+    "errorTitle": "स्कैन लोड नहीं हो सके",
+    "errorBody": "कृपया कुछ देर बाद फिर कोशिश करें।",
+    "loadingScans": "स्कैन लोड हो रहे हैं",
+    "authRequired": "स्कैन इतिहास देखने के लिए लॉग इन करें।",
+    "signIn": "लॉग इन",
+    "confidence": "विश्वास",
+    "severity": {
+      "low": "कम",
+      "moderate": "मध्यम",
+      "severe": "गंभीर"
+    },
+    "sync": {
+      "synced": "सिंक हो गया",
+      "pending": "लंबित",
+      "failed": "विफल"
+    },
+    "partType": {
+      "leaf": "पत्ती",
+      "fruit": "फल",
+      "stem": "तना",
+      "plant": "पौधा",
+      "whole": "पूरा पौधा"
+    }
   },
   "footer": {
     "tagline": "भारत के लिए एआई-संचालित कृषि प्लेटफ़ॉर्म।",

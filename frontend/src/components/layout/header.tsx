@@ -1,4 +1,5 @@
 import {
+  History,
   Home,
   Leaf,
   Menu,
@@ -26,6 +27,7 @@ const NAV_ITEMS: Array<{
 }> = [
   { to: "/", labelKey: "nav.home", icon: Home, end: true },
   { to: "/detect", labelKey: "nav.detect", icon: ScanLine },
+  { to: "/scans", labelKey: "nav.history", icon: History },
   { to: "/doctor", labelKey: "nav.doctor", icon: Stethoscope },
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
 ];

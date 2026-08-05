@@ -6,7 +6,7 @@ treatment/soil/calendar → M3, voice/assistant/dataset → M4, …).
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, scans, users
+from app.api.v1.endpoints import auth, catalog, scans, users
 
 api_router = APIRouter()
 
@@ -16,6 +16,7 @@ api_router.include_router(users.router)
 
 # M2 — AI disease detection.
 api_router.include_router(scans.router)
+api_router.include_router(catalog.router)  # read-only filter options (Task 7.1)
 
 # Routers are added milestone-by-milestone:
 # M3: treatment, soil, calendar, crop-doctor, assistant
