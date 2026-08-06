@@ -5,6 +5,7 @@ import {
   History,
   ImagePlus,
   ScanLine,
+  Stethoscope,
   Trash2,
   Wand2,
 } from "lucide-react";
@@ -207,6 +208,12 @@ function ResultView({
       {/* ── Actions ──────────────────────────────────────────────────── */}
       <div className="mt-6 flex flex-wrap items-center gap-3 print:hidden">
         <Button asChild>
+          <Link to={`/scans/${scan.id}/doctor`}>
+            <Stethoscope />
+            {t("doctor.title")}
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
           <Link to={`/scans/${scan.id}`}>{t("scanCrop.viewDetails")}</Link>
         </Button>
         <Button asChild variant="outline">

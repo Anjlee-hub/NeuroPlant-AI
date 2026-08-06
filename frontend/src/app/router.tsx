@@ -1,5 +1,5 @@
-import { createBrowserRouter } from "react-router-dom";
-import { MessageCircle, Stethoscope, Store } from "lucide-react";
+import { createBrowserRouter, Navigate } from "react-router-dom";
+import { MessageCircle, Store } from "lucide-react";
 
 import { ErrorBoundary } from "@/app/error-boundary";
 import { RootLayout } from "@/components/layout/root-layout";
@@ -14,6 +14,7 @@ import { ProfilePage } from "@/pages/profile";
 import { RegisterPage } from "@/pages/register";
 import { ScanCropPage } from "@/pages/scan-crop";
 import { ScanDetailPage } from "@/pages/scan-detail";
+import { ScanDoctorPage } from "@/pages/scan-doctor";
 import { ScanHistoryPage } from "@/pages/scan-history";
 
 /**
@@ -34,9 +35,12 @@ export const router = createBrowserRouter([
       { path: "profile", element: <ProfilePage /> },
       { path: "scans", element: <ScanHistoryPage /> },
       { path: "scans/:scanId", element: <ScanDetailPage /> },
+      { path: "scans/:scanId/doctor", element: <ScanDoctorPage /> },
       { path: "offline", element: <OfflineQueuePage /> },
       { path: "detect", element: <ScanCropPage /> },
-      { path: "doctor", element: <ComingSoonPage navKey="doctor" milestone="3" icon={Stethoscope} /> },
+      // Crop Doctor is live per-scan (M3 T4): the nav hub lands on the scan
+      // list so the user picks a scan to open its dashboard.
+      { path: "doctor", element: <Navigate to="/scans" replace /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" milestone="6" icon={Store} /> },
       { path: "assistant", element: <ComingSoonPage navKey="assistant" milestone="4" icon={MessageCircle} /> },
       { path: "*", element: <NotFoundPage /> },

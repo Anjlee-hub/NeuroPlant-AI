@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { formatPercent } from "@/lib/format";
+import type { RiskLevel } from "@/types/recovery";
 import type { ScanSeverity, ScanSyncStatus } from "@/types/scan";
 
 /**
@@ -37,6 +38,13 @@ export function syncVariant(
 ): "success" | "outline" | "destructive" {
   if (status === "synced") return "success";
   if (status === "pending") return "outline";
+  return "destructive";
+}
+
+/** Risk level (Crop Doctor overview) -> badge color. */
+export function riskVariant(risk: RiskLevel): "success" | "secondary" | "destructive" {
+  if (risk === "low") return "success";
+  if (risk === "medium") return "secondary";
   return "destructive";
 }
 
@@ -86,6 +94,22 @@ export function SyncBadge({
   return (
     <Badge variant={syncVariant(status)} className={className}>
       {t(`scanHistory.sync.${status}`)}
+    </Badge>
+  );
+}
+
+/** Localized risk badge (low / medium / high) for the Crop Doctor overview. */
+export function RiskBadge({
+  risk,
+  className,
+}: {
+  risk: RiskLevel;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Badge variant={riskVariant(risk)} className={className}>
+      {t(`doctor.riskLevel.${risk}`)}
     </Badge>
   );
 }

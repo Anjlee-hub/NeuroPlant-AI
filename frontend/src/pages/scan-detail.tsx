@@ -9,6 +9,7 @@ import {
   Maximize2,
   ScanLine,
   Share2,
+  Stethoscope,
   Wand2,
   X,
 } from "lucide-react";
@@ -372,6 +373,12 @@ export function ScanDetailPage() {
                   </dl>
 
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4 print:hidden">
+                    <Button asChild>
+                      <Link to={`/scans/${id}/doctor`}>
+                        <Stethoscope />
+                        {t("doctor.title")}
+                      </Link>
+                    </Button>
                     <Button variant="outline" onClick={() => void copyPrediction()}>
                       {copied ? <Check /> : <Copy />}
                       {copied ? t("scanDetail.copied") : t("scanDetail.copy")}

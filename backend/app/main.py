@@ -32,6 +32,7 @@ from app.services.recommendations import (
     CatalogUnavailableError,
     RecommendationNotFoundError,
 )
+from app.services.recovery import RecoveryLogNotFoundError
 from app.services.scan_pipeline import ScanPipelineError
 from app.services.scans import ScanNotFoundError
 from app.services.soil import SoilCatalogUnavailableError, SoilNotFoundError
@@ -123,6 +124,9 @@ app.add_exception_handler(CatalogUnavailableError, _error_handler(503))
 # Soil (M3 T3) — same semantics for the soil-intelligence catalog.
 app.add_exception_handler(SoilNotFoundError, _error_handler(404))
 app.add_exception_handler(SoilCatalogUnavailableError, _error_handler(503))
+
+# Recovery (M3 T4) — 404 for a log that isn't on the requested scan.
+app.add_exception_handler(RecoveryLogNotFoundError, _error_handler(404))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

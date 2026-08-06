@@ -7,6 +7,7 @@ Alembic autogenerate and test ``create_all``.
 from app.models.audit import AuditLog
 from app.models.catalog import Crop, Disease
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
+from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
 from app.models.user import (
@@ -29,6 +30,7 @@ __all__ = [
     "DiseaseRecommendation",
     "SoilRecommendationCatalog",
     "SoilRecommendation",
+    "RecoveryLog",
     "Scan",
     "User",
     "FarmerProfile",

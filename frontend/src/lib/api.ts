@@ -8,6 +8,7 @@ import type {
   User,
 } from "@/types/auth";
 import type { DiseaseRecommendation } from "@/types/recommendation";
+import type { RecoveryLog, RecoveryLogInput, RecoveryTracker } from "@/types/recovery";
 import type { SoilRecommendation } from "@/types/soil";
 import type {
   CropOption,
@@ -233,6 +234,29 @@ export const api = {
   /** Disease-aware soil plan for a scan's predicted disease (M3 T3). */
   getScanSoilRecommendations: (scanId: number) =>
     request<SoilRecommendation>(`/scans/${scanId}/soil-recommendations`, { auth: true }),
+  /** Full crop recovery tracker for a scan (M3 T4): percentage/status/risk + timeline. */
+  getScanRecoveryTracker: (scanId: number) =>
+    request<RecoveryTracker>(`/scans/${scanId}/recovery`, { auth: true }),
+  /** Record one treatment action against the scan. */
+  addRecoveryLog: (scanId: number, payload: RecoveryLogInput) =>
+    request<RecoveryLog>(`/scans/${scanId}/recovery/logs`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Edit one of the scan's treatment logs (partial — only sent fields change). */
+  updateRecoveryLog: (scanId: number, logId: number, payload: Partial<RecoveryLogInput>) =>
+    request<RecoveryLog>(`/scans/${scanId}/recovery/logs/${logId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  /** Remove one of the scan's treatment logs. */
+  deleteRecoveryLog: (scanId: number, logId: number) =>
+    request<void>(`/scans/${scanId}/recovery/logs/${logId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
   listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
   // Offline reconciliation: upload the queued scans in one JSON batch. The
   // server owns idempotency (created/replayed per client_scan_id) — this
