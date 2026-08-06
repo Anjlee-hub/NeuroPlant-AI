@@ -1,10 +1,11 @@
-"""Catalog seeder (M1) + recommendation seeder (M3, Task 1).
+"""Catalog seeder (M1) + recommendation (M3 T1) + soil (M3 T3) seeders.
 
 Loads the bootstrap crops + diseases from ``seed_data`` into the database, then
 builds the versioned treatment-recommendation catalog from
-``recommendation_seed_data``. Both are idempotent: an existing crop (matched by
-name) or a catalog row (matched by version/disease) is skipped, so the script
-can be re-run after schema changes without duplicating rows.
+``recommendation_seed_data`` and the soil-intelligence catalog from
+``soil_seed_data``. All are idempotent: an existing crop (matched by name) or a
+catalog row (matched by version/disease) is skipped, so the script can be
+re-run after schema changes without duplicating rows.
 
 Usage:
     python -m app.db.seed
@@ -25,8 +26,10 @@ from app.db.recommendation_seed_data import (
 )
 from app.db.seed_data import CROPS
 from app.db.session import async_session_factory
+from app.db.soil_seed_data import SOIL_BY_CROP, SOIL_VERSION
 from app.models.catalog import Crop, Disease
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
+from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
 
 logger = get_logger("db.seed")
 
@@ -272,13 +275,104 @@ async def seed_recommendations(db: AsyncSession) -> dict[str, int]:
     return {"catalog": 1, "plans": created}
 
 
+# ── Soil catalog (M3, Task 3) ─────────────────────────────────────────────
+
+
+async def seed_soil_recommendations(db: AsyncSession) -> dict[str, int]:
+    """Build the active soil-intelligence catalog.
+
+    Mirrors ``seed_recommendations``: exactly one ``SoilRecommendationCatalog``
+    is active at a time and a version bump deactivates the previous one. Each
+    catalog disease gets one ``SoilRecommendation`` row built from its crop's
+    ``SOIL_BY_CROP`` profile, merged with the disease-specific soil note (if
+    any) and the crop-level severity content. Returns ``{"catalog": 1,
+    "plans": n}`` (created-plan count).
+    """
+    catalog = await db.scalar(
+        select(SoilRecommendationCatalog).where(
+            SoilRecommendationCatalog.version == SOIL_VERSION
+        )
+    )
+    if catalog is None:
+        catalog = SoilRecommendationCatalog(
+            version=SOIL_VERSION,
+            description="Curated soil guidance for every catalog crop and its diseases.",
+            is_active=True,
+        )
+        await db.execute(update(SoilRecommendationCatalog).values(is_active=False))
+        db.add(catalog)
+        await db.flush()
+    elif not catalog.is_active:
+        await db.execute(update(SoilRecommendationCatalog).values(is_active=False))
+        catalog.is_active = True
+        await db.flush()
+
+    created = 0
+    existing = {
+        row.disease_id
+        for row in await db.scalars(
+            select(SoilRecommendation).where(SoilRecommendation.catalog_id == catalog.id)
+        )
+    }
+
+    for crop_seed in CROPS:
+        crop = await db.scalar(select(Crop).where(Crop.name == crop_seed.name))
+        if crop is None:
+            continue
+        profile = SOIL_BY_CROP.get(crop.common_name or crop.name)
+        if profile is None:
+            continue
+        for disease_seed in crop_seed.diseases:
+            disease = await db.scalar(
+                select(Disease).where(
+                    Disease.crop_id == crop.id,
+                    Disease.name == disease_seed.name,
+                )
+            )
+            if disease is None or disease.id in existing:
+                continue
+
+            db.add(
+                SoilRecommendation(
+                    catalog_id=catalog.id,
+                    disease_id=disease.id,
+                    recommended_soil_type=profile.recommended_soil_type,
+                    ph_range=profile.ph_range,
+                    moisture_level=profile.moisture_level,
+                    drainage=profile.drainage,
+                    organic_matter=profile.organic_matter,
+                    npk=profile.npk,
+                    micronutrients=list(profile.micronutrients),
+                    compost=profile.compost,
+                    mulching=profile.mulching,
+                    soil_suitability=profile.soil_suitability,
+                    base_soil_health=profile.base_soil_health,
+                    improvement_suggestions=list(profile.improvement_suggestions),
+                    disease_soil_notes=profile.disease_notes.get(disease.name),
+                    severity_notes=dict(profile.severity_notes),
+                    severity_suggestions=dict(profile.severity_suggestions),
+                )
+            )
+            created += 1
+
+    await db.commit()
+    logger.info(
+        "soil_recommendations_seeded",
+        version=SOIL_VERSION,
+        catalog_id=catalog.id,
+        plans=created,
+    )
+    return {"catalog": 1, "plans": created}
+
+
 async def _run() -> None:
     async with async_session_factory() as db:
         summary = await seed_catalog(db)
         recs = await seed_recommendations(db)
+        soils = await seed_soil_recommendations(db)
     print(
         f"Seeded: {summary['crops']} crops, {summary['diseases']} diseases; "
-        f"{recs['plans']} recommendation plans"
+        f"{recs['plans']} recommendation plans; {soils['plans']} soil plans"
     )
 
 

@@ -248,7 +248,6 @@
     },
     "conflict": "Conflict — this scan was already synced on another device.",
     "lastError": "Error: {{message}}",
-    "retry": "Retry",
     "retryCount_one": "{{count}} failed attempt",
     "retryCount_other": "{{count}} failed attempts",
     "cancelAria": "Cancel this queued scan",
@@ -434,6 +433,69 @@
     "monitoring": {
       "title": "Monitoring Advice",
       "desc": "What to check & how often"
+    }
+  },
+  "soil": {
+    "title": "Soil Health & Recommendations",
+    "planLabel": "Soil Plan",
+    "subtitle": "Soil guidance for {{disease}} on {{crop}}",
+    "subtitleNoCrop": "Soil guidance for {{disease}}",
+    "loading": "Loading soil guidance…",
+    "errorTitle": "Couldn't load soil guidance",
+    "errorBody": "Please try again in a moment.",
+    "retry": "Retry",
+    "emptyTitle": "No soil plan available",
+    "emptyBody": "This disease doesn't have a curated soil plan yet. Check back soon.",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "health": {
+      "title": "Soil Health",
+      "score": "Soil health score",
+      "level": {
+        "excellent": "Excellent",
+        "good": "Good",
+        "fair": "Fair",
+        "poor": "Poor"
+      }
+    },
+    "suitability": "Soil Suitability",
+    "improvements": "Improvement Suggestions",
+    "diseaseNotes": "How this disease affects your soil",
+    "soilType": {
+      "title": "Recommended Soil Type",
+      "desc": "Best soil texture for this crop"
+    },
+    "ph": {
+      "title": "Soil pH Range",
+      "desc": "Acidity level to aim for"
+    },
+    "moisture": {
+      "title": "Soil Moisture",
+      "desc": "How wet the soil should stay"
+    },
+    "drainage": {
+      "title": "Drainage",
+      "desc": "Water movement through the soil"
+    },
+    "organicMatter": {
+      "title": "Organic Matter",
+      "desc": "Compost and humus for soil life"
+    },
+    "npk": {
+      "title": "NPK Recommendation",
+      "desc": "Nitrogen, phosphorus, potassium"
+    },
+    "micronutrients": {
+      "title": "Micronutrients",
+      "desc": "Minor nutrients to watch"
+    },
+    "compost": {
+      "title": "Compost",
+      "desc": "Organic amendment plan"
+    },
+    "mulching": {
+      "title": "Mulching",
+      "desc": "Ground cover to protect the soil"
     }
   },
   "footer": {

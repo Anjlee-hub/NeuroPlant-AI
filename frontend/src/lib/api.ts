@@ -8,6 +8,7 @@ import type {
   User,
 } from "@/types/auth";
 import type { DiseaseRecommendation } from "@/types/recommendation";
+import type { SoilRecommendation } from "@/types/soil";
 import type {
   CropOption,
   Scan,
@@ -229,6 +230,9 @@ export const api = {
   /** Treatment care plan for a scan's predicted disease (M3 T2). */
   getScanRecommendations: (scanId: number) =>
     request<DiseaseRecommendation>(`/scans/${scanId}/recommendations`, { auth: true }),
+  /** Disease-aware soil plan for a scan's predicted disease (M3 T3). */
+  getScanSoilRecommendations: (scanId: number) =>
+    request<SoilRecommendation>(`/scans/${scanId}/soil-recommendations`, { auth: true }),
   listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
   // Offline reconciliation: upload the queued scans in one JSON batch. The
   // server owns idempotency (created/replayed per client_scan_id) — this

@@ -8,6 +8,7 @@ from app.models.audit import AuditLog
 from app.models.catalog import Crop, Disease
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.scan import Scan
+from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
 from app.models.user import (
     MFA,
     Device,
@@ -26,6 +27,8 @@ __all__ = [
     "Disease",
     "RecommendationCatalog",
     "DiseaseRecommendation",
+    "SoilRecommendationCatalog",
+    "SoilRecommendation",
     "Scan",
     "User",
     "FarmerProfile",

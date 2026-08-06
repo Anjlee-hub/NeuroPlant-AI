@@ -50,11 +50,13 @@ from app.schemas.scan import (
     ScanSyncResultOut,
     SyncErrorOut,
 )
+from app.schemas.soil import SoilRecommendationOut
 from app.services.detection import DetectionService
 from app.services.explain import ExplainService
 from app.services.recommendations import RecommendationService
 from app.services.scan_pipeline import ScanPipelineError, ScanPipelineService
 from app.services.scans import ScanService
+from app.services.soil import SoilRecommendationService
 from app.services.storage import get_storage_service
 
 router = APIRouter(prefix="/scans", tags=["scans"])
@@ -323,6 +325,21 @@ async def scan_recommendations(scan_id: int, user: CurrentUser, db: Db) -> Disea
     """
     scan = await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
     return await RecommendationService(db).for_scan(scan)
+
+
+@router.get("/{scan_id}/soil-recommendations", response_model=SoilRecommendationOut)
+async def scan_soil_recommendations(
+    scan_id: int, user: CurrentUser, db: Db
+) -> SoilRecommendationOut:
+    """Disease-aware soil plan for the disease this scan predicted (M3, Task 3).
+
+    Same ownership guard as detail (``404`` for missing / soft-deleted /
+    other-user's scans), then ``404`` when the predicted disease has no soil plan
+    in the active catalog. The advice and the soil-health score adapt to the
+    scan's own severity + confidence — no hardcoded advice in controllers.
+    """
+    scan = await ScanService(db).get_for_user(scan_id, user.id, admin=user.role == UserRole.ADMIN)
+    return await SoilRecommendationService(db).for_scan(scan)
 
 
 @router.delete("/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/status-badges";
 import { StateCard } from "@/components/ui/state-card";
 import { RecommendationsPanel } from "@/components/treatment/recommendations";
+import { SoilRecommendationsPanel } from "@/components/treatment/soil-recommendations";
 import type { Scan, ScanExplain, ScanPartType } from "@/types/scan";
 
 const PART_TYPES: ScanPartType[] = ["leaf", "fruit", "stem", "plant", "whole"];
@@ -196,6 +197,11 @@ function ResultView({
       {/* ── Treatment plan ─────────────────────────────────────────── */}
       <div className="mt-6">
         <RecommendationsPanel scanId={scan.id} />
+      </div>
+
+      {/* ── Soil plan ───────────────────────────────────────────────── */}
+      <div className="mt-6">
+        <SoilRecommendationsPanel scanId={scan.id} />
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────── */}

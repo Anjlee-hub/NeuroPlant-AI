@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/status-badges";
 import { StateCard } from "@/components/ui/state-card";
 import { RecommendationsPanel } from "@/components/treatment/recommendations";
+import { SoilRecommendationsPanel } from "@/components/treatment/soil-recommendations";
 
 /** Label/value pair inside the details definition list. */
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
@@ -469,6 +470,10 @@ export function ScanDetailPage() {
 
           <div className="mt-8">
             <RecommendationsPanel scanId={id} />
+          </div>
+
+          <div className="mt-8">
+            <SoilRecommendationsPanel scanId={id} />
           </div>
         </div>
       )}

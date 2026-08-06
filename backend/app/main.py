@@ -34,6 +34,7 @@ from app.services.recommendations import (
 )
 from app.services.scan_pipeline import ScanPipelineError
 from app.services.scans import ScanNotFoundError
+from app.services.soil import SoilCatalogUnavailableError, SoilNotFoundError
 from app.services.storage import local_storage_root
 
 settings = get_settings()
@@ -118,6 +119,10 @@ app.add_exception_handler(ScanNotFoundError, _error_handler(404))
 # 503 when the catalog itself was never seeded (run `python -m app.db.seed`).
 app.add_exception_handler(RecommendationNotFoundError, _error_handler(404))
 app.add_exception_handler(CatalogUnavailableError, _error_handler(503))
+
+# Soil (M3 T3) — same semantics for the soil-intelligence catalog.
+app.add_exception_handler(SoilNotFoundError, _error_handler(404))
+app.add_exception_handler(SoilCatalogUnavailableError, _error_handler(503))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 
