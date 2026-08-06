@@ -12,7 +12,11 @@
  */
 
 import { api } from "@/lib/api";
-import type { AssistantReply, AssistantRequest } from "@/types/assistant";
+import type {
+  AssistantReply,
+  AssistantRequest,
+  ConversationHistory,
+} from "@/types/assistant";
 import { SpeechRecognitionService } from "@/services/speech-recognition";
 import {
   SpeechSynthesisService,
@@ -42,6 +46,16 @@ export class VoiceAssistantService {
   static ask(query: string, lang: string): Promise<AssistantReply> {
     const payload: AssistantRequest = { query, lang };
     return api.askAssistant(payload);
+  }
+
+  /** Restore the user's chat transcript, oldest first (page-load restore). */
+  static listConversation(): Promise<ConversationHistory> {
+    return api.getAssistantConversation();
+  }
+
+  /** Clear the user's entire chat transcript (clear-chat). */
+  static clearConversation(): Promise<void> {
+    return api.clearAssistantConversation();
   }
 
   /** Read a reply aloud in its own language: message first, then each section. */

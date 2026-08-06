@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssistantReply } from "@/types/assistant";
 
 vi.mock("@/lib/api", () => ({
-  api: { askAssistant: vi.fn() },
+  api: {
+    askAssistant: vi.fn(),
+    getAssistantConversation: vi.fn(),
+    clearAssistantConversation: vi.fn(),
+  },
 }));
 
 vi.mock("@/services/speech-synthesis", () => ({
@@ -28,6 +32,8 @@ import {
 } from "@/services/voice-assistant";
 
 const mockedAsk = vi.mocked(api.askAssistant);
+const mockedList = vi.mocked(api.getAssistantConversation);
+const mockedClear = vi.mocked(api.clearAssistantConversation);
 const mockedSpeak = vi.mocked(SpeechSynthesisService.speak);
 
 const hiReply: AssistantReply = {
@@ -89,5 +95,28 @@ describe("VoiceAssistantService", () => {
 
   it("reports voice support when either speech API exists", () => {
     expect(VoiceAssistantService.isVoiceSupported()).toBe(true); // synthesis stubbed
+  });
+
+  it("restores and clears the persisted conversation", async () => {
+    mockedList.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          role: "user",
+          content: "Hello!",
+          intent: null,
+          lang: null,
+          created_at: "2026-08-06T10:00:00Z",
+        },
+      ],
+    });
+    await expect(VoiceAssistantService.listConversation()).resolves.toMatchObject({
+      items: [{ role: "user", content: "Hello!" }],
+    });
+    expect(mockedList).toHaveBeenCalledTimes(1);
+
+    mockedClear.mockResolvedValue(undefined);
+    await expect(VoiceAssistantService.clearConversation()).resolves.toBeUndefined();
+    expect(mockedClear).toHaveBeenCalledTimes(1);
   });
 });

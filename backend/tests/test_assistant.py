@@ -166,12 +166,15 @@ async def test_hindi_query_auto_detects_language(client):
     assert any("अ" <= ch <= "ॿ" for ch in body["message"])
 
 
-async def test_unknown_query_returns_fallback(client):
+async def test_unknown_query_gets_friendly_boundary(client):
     await _seed()
     headers = await _register(client, "+919310000005")
     body = await _ask(client, headers, "zzzz blorp quux")
-    assert body["intent"] == "fallback"
-    assert "couldn't find" in body["message"]
+    # M3.1: off-topic/gibberish gets the polite non-agriculture boundary,
+    # never the old "I couldn't find an answer" dead-end.
+    assert body["intent"] == "non_agriculture"
+    assert "couldn't find" not in body["message"]
+    assert "farming" in body["message"].lower()
 
 
 # ── Data-backed intents ────────────────────────────────────────────────────
@@ -305,3 +308,144 @@ async def test_hindi_treatment_reply_is_localized(client, db):
     assert body["intent"] == "treatment"
     assert body["lang"] == "hi"
     assert any(s["title"] == "घरेलू उपाय" for s in body["sections"])
+
+
+# ── M3.1: conversational upgrade ────────────────────────────────────────────
+
+
+async def test_identity_help_thanks_smalltalk_intents(client):
+    await _seed()
+    headers = await _register(client, "+919310000015")
+
+    who = await _ask(client, headers, "Who are you?")
+    assert who["intent"] == "identity"
+    assert "NeuroPlant" in who["message"]
+
+    what = await _ask(client, headers, "What can you do?")
+    assert what["intent"] == "help"
+    assert what["sections"][0]["title"] == "Try asking"
+
+    thanks = await _ask(client, headers, "thank you")
+    assert thanks["intent"] == "thanks"
+
+    ok = await _ask(client, headers, "great")
+    assert ok["intent"] == "smalltalk"
+
+
+async def test_non_agriculture_question_gets_polite_boundary(client):
+    await _seed()
+    headers = await _register(client, "+919310000016")
+    body = await _ask(client, headers, "who won the world cup")
+    assert body["intent"] == "non_agriculture"
+    assert "couldn't find" not in body["message"]
+    assert "farming" in body["message"].lower()
+
+
+async def test_agri_hint_without_keyword_gets_help(client):
+    await _seed()
+    headers = await _register(client, "+919310000017")
+    body = await _ask(client, headers, "I want to grow vegetables")
+    assert body["intent"] == "help"
+
+
+async def test_statement_is_acknowledged_as_report(client):
+    await _seed()
+    headers = await _register(client, "+919310000018")
+    body = await _ask(client, headers, "I have a tomato plant")
+    assert body["intent"] == "report"
+    assert "tomato" in body["message"].lower()
+
+
+async def test_follow_up_questions_keep_context(client):
+    """The M3.1 signature behavior: anaphora across turns."""
+    await _seed()
+    headers = await _register(client, "+919310000019")
+
+    first = await _ask(client, headers, "My tomato plant has early blight")
+    assert first["intent"] == "disease"
+    assert "Early Blight" in first["message"]
+
+    follow = await _ask(client, headers, "How do I treat it?")
+    assert follow["intent"] == "treatment"
+    assert "Early Blight" in follow["message"]
+    titles = {s["title"] for s in follow["sections"]}
+    assert "Homemade remedy" in titles
+
+    danger = await _ask(client, headers, "Is it dangerous?")
+    assert danger["intent"] == "disease_explain"
+    assert "Early Blight" in danger["message"]
+
+    timeline = await _ask(client, headers, "How long will recovery take?")
+    assert timeline["intent"] == "recovery_timeline"
+    assert "recovery" in timeline["message"].lower()
+
+
+async def test_hindi_follow_up_uses_remembered_disease(client):
+    await _seed()
+    headers = await _register(client, "+919310000020")
+    first = await _ask(client, headers, "My tomato plant has early blight")
+    assert first["intent"] == "disease"
+
+    follow = await _ask(client, headers, "इसका इलाज कैसे करूँ?")
+    assert follow["intent"] == "treatment"
+    assert follow["lang"] == "hi"
+    assert "Early Blight" in follow["message"]
+    assert "उपचार" in follow["message"]
+
+
+async def test_natural_farming_questions(client):
+    await _seed()
+    headers = await _register(client, "+919310000021")
+
+    yellow = await _ask(client, headers, "My leaves are yellow")
+    assert yellow["intent"] == "symptoms"
+    assert "yellow" in yellow["message"].lower()
+
+    water = await _ask(client, headers, "How often should I water?")
+    assert water["intent"] == "watering"
+    assert "water" in water["message"].lower()
+
+    neem = await _ask(client, headers, "Can I use neem oil?")
+    assert neem["intent"] == "neem"
+    assert "neem" in neem["message"].lower()
+
+    fert = await _ask(client, headers, "Which fertilizer is best?")
+    assert fert["intent"] == "fertilizer"
+
+
+async def test_conversation_history_restores_and_clears(client):
+    await _seed()
+    headers = await _register(client, "+919310000022")
+
+    # No history yet.
+    resp = await client.get("/api/v1/assistant/conversation", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["items"] == []
+
+    await _ask(client, headers, "Hello!")
+    await _ask(client, headers, "thank you")
+
+    resp = await client.get("/api/v1/assistant/conversation", headers=headers)
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert len(items) == 4
+    assert items[0]["role"] == "user"
+    assert items[0]["content"] == "Hello!"
+    assert items[1]["role"] == "assistant"
+    assert items[1]["intent"] == "greeting"
+    assert items[3]["role"] == "assistant"
+    assert items[3]["intent"] == "thanks"
+    assert items[3]["lang"] in ("en", "hi")
+
+    # Clear-chat → transcript is gone.
+    resp = await client.delete("/api/v1/assistant/conversation", headers=headers)
+    assert resp.status_code == 204
+    resp = await client.get("/api/v1/assistant/conversation", headers=headers)
+    assert resp.json()["items"] == []
+
+
+async def test_conversation_endpoints_require_auth(client):
+    resp = await client.get("/api/v1/assistant/conversation")
+    assert resp.status_code == 401
+    resp = await client.delete("/api/v1/assistant/conversation")
+    assert resp.status_code == 401

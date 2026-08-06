@@ -27,6 +27,8 @@ interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   reply?: AssistantReply;
+  /** ISO timestamp — server time for restored turns, client time for new ones. */
+  createdAt?: string;
   isError?: boolean;
 }
 
@@ -50,7 +52,14 @@ export function AssistantPage() {
 
   const push = (message: Omit<ChatMessage, "id">) => {
     idRef.current += 1;
-    setMessages((prev) => [...prev, { ...message, id: idRef.current }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        ...message,
+        id: idRef.current,
+        createdAt: message.createdAt ?? new Date().toISOString(),
+      },
+    ]);
   };
 
   // React Query keeps mutation callbacks fresh each render, so onSuccess reads
@@ -78,7 +87,48 @@ export function AssistantPage() {
   const clear = () => {
     SpeechSynthesisService.cancel();
     setMessages([]);
+    setInput("");
+    // Best-effort server clear so a reload doesn't resurrect the chat (M3.1).
+    VoiceAssistantService.clearConversation().catch(() => {
+      /* offline / server error — the local view is already cleared */
+    });
   };
+
+  // Restore the persisted transcript on mount so a page reload keeps the chat
+  // and follow-ups stay in context (M3.1 conversation memory).
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    VoiceAssistantService.listConversation()
+      .then(({ items }) => {
+        if (!active) return;
+        idRef.current = items.length;
+        setMessages(
+          items.map((item, index) => ({
+            id: index + 1,
+            role: item.role,
+            text: item.content,
+            createdAt: item.created_at,
+            // Badges + speech locale are restored; sections aren't persisted.
+            reply:
+              item.role === "assistant" && item.intent && item.lang
+                ? {
+                    intent: item.intent,
+                    message: item.content,
+                    sections: [],
+                    lang: item.lang,
+                  }
+                : undefined,
+          })),
+        );
+      })
+      .catch(() => {
+        /* offline / not yet migrated — start with an empty chat */
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     // Optional-call guard: scrollTo is missing in some embedded/legacy webviews.
@@ -138,6 +188,8 @@ export function AssistantPage() {
           "flex h-[58vh] min-h-72 flex-col gap-4 overflow-y-auto rounded-lg border bg-muted/20 p-4",
           messages.length === 0 && "justify-center",
         )}
+        role="log"
+        aria-live="polite"
         aria-label={t("assistant.conversation")}
       >
         {messages.length === 0 && !askMutation.isPending ? (
@@ -185,6 +237,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       <div className="flex justify-end">
         <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
           {message.text}
+          {message.createdAt && (
+            <span
+              className="mt-1 block text-right text-[10px] font-normal opacity-70"
+              title={formatDate(message.createdAt)}
+            >
+              {formatTime(message.createdAt)}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -228,11 +288,35 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 )}
               </>
             )}
+            {message.createdAt && (
+              <span
+                className="mt-1.5 block text-right text-[10px] text-muted-foreground/70"
+                title={formatDate(message.createdAt)}
+              >
+                {formatTime(message.createdAt)}
+              </span>
+            )}
           </>
         )}
       </div>
     </div>
   );
+}
+
+/** Time-only stamp (e.g. "14:05") for a chat bubble. */
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Full readable date for the hover title of a chat bubble stamp. */
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString([], {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /** Empty state: greeting + tappable suggestion chips that send the question. */

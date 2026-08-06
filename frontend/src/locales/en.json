@@ -667,7 +667,7 @@
     "suggestions": [
       "What disease does my crop have?",
       "How do I treat this disease?",
-      "What fertilizer should I use?",
+      "What does this disease mean?",
       "Read today's farming tasks."
     ],
     "errorBody": "I couldn't get an answer right now. Please try again.",
@@ -675,14 +675,24 @@
     "signIn": "Sign in",
     "intents": {
       "greeting": "Greeting",
+      "identity": "About me",
       "help": "Help",
+      "thanks": "Thanks",
+      "smalltalk": "Chat",
       "disease": "Disease",
+      "disease_explain": "Explainer",
+      "symptoms": "Symptoms",
       "treatment": "Treatment",
       "fertilizer": "Fertilizer",
+      "watering": "Watering",
+      "neem": "Neem",
       "soil": "Soil",
-      "calendar": "Calendar",
       "recovery": "Recovery",
-      "fallback": "Answer"
+      "recovery_timeline": "Timeline",
+      "calendar": "Calendar",
+      "report": "Noted",
+      "conversation": "Answer",
+      "non_agriculture": "Off-topic"
     },
     "speechErrors": {
       "not-allowed": "Microphone access was denied. Allow it in your browser settings and try again.",

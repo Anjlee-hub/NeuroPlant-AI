@@ -1,4 +1,4 @@
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -60,7 +60,7 @@ export function SpeakButton({
       className={className}
     >
       {speaking ? (
-        <VolumeX className="size-4" aria-hidden="true" />
+        <Equalizer />
       ) : (
         <Volume2 className="size-4" aria-hidden="true" />
       )}
@@ -68,5 +68,16 @@ export function SpeakButton({
         {speaking ? t("assistant.stopSpeaking") : accessibleLabel}
       </span>
     </Button>
+  );
+}
+
+/** Speaking indicator: three pulsing bars (equalizer) while TTS is playing. */
+function Equalizer() {
+  return (
+    <span className="flex h-4 items-end gap-0.5" aria-hidden="true">
+      <span className="h-3 w-0.5 animate-pulse rounded-sm bg-current [animation-delay:-0.3s]" />
+      <span className="h-4 w-0.5 animate-pulse rounded-sm bg-current [animation-delay:-0.15s]" />
+      <span className="h-2 w-0.5 animate-pulse rounded-sm bg-current" />
+    </span>
   );
 }

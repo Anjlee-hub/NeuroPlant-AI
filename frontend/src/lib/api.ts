@@ -16,7 +16,11 @@ import type {
   FarmerCalendar,
   ScheduleInput,
 } from "@/types/calendar";
-import type { AssistantReply, AssistantRequest } from "@/types/assistant";
+import type {
+  AssistantReply,
+  AssistantRequest,
+  ConversationHistory,
+} from "@/types/assistant";
 import type { DiseaseRecommendation } from "@/types/recommendation";
 import type { RecoveryLog, RecoveryLogInput, RecoveryTracker } from "@/types/recovery";
 import type { SoilRecommendation } from "@/types/soil";
@@ -300,10 +304,16 @@ export const api = {
       method: "DELETE",
       auth: true,
     }),
-  // ── Voice AI Assistant (M3 T6) ────────────────────────────────────────
-  /** Route a free-text question (English/Hindi) to the rule-based assistant. */
+  // ── Voice AI Assistant (M3 T6 → M3.1 conversational) ──────────────────
+  /** Route a free-text question (English/Hindi) to the conversational assistant. */
   askAssistant: (payload: AssistantRequest) =>
     request<AssistantReply>("/assistant", { method: "POST", body: payload, auth: true }),
+  /** Restore the user's chat transcript, oldest first (page-load restore). */
+  getAssistantConversation: () =>
+    request<ConversationHistory>("/assistant/conversation", { auth: true }),
+  /** Clear the user's entire chat transcript (clear-chat). */
+  clearAssistantConversation: () =>
+    request<void>("/assistant/conversation", { method: "DELETE", auth: true }),
   // Offline reconciliation: upload the queued scans in one JSON batch. The
   // server owns idempotency (created/replayed per client_scan_id) — this
   // just transports the queue.

@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str | None = None
     llm_api_key: str | None = None
     llm_provider: str = "anthropic"  # anthropic | openai | google
+    llm_model: str = "claude-sonnet-5"  # used by LLMConversationProvider (M3.1)
 
     @field_validator("allowed_origins")
     @classmethod

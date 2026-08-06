@@ -12,6 +12,8 @@ const authMock = vi.hoisted(() => ({
 }));
 const apiMock = vi.hoisted(() => ({
   askAssistant: vi.fn(),
+  getAssistantConversation: vi.fn(),
+  clearAssistantConversation: vi.fn(),
 }));
 const synthMock = vi.hoisted(() => ({
   isSupported: vi.fn(() => true),
@@ -70,6 +72,8 @@ describe("AssistantPage", () => {
     vi.clearAllMocks();
     authMock.user = { id: 1, name: "Tester" };
     apiMock.askAssistant.mockResolvedValue(reply);
+    apiMock.getAssistantConversation.mockResolvedValue({ items: [] });
+    apiMock.clearAssistantConversation.mockResolvedValue(undefined);
     synthMock.isSupported.mockReturnValue(true);
   });
 
@@ -155,5 +159,48 @@ describe("AssistantPage", () => {
     await user.click(screen.getByRole("button", { name: "Clear conversation" }));
     expect(synthMock.cancel).toHaveBeenCalled();
     expect(await screen.findByText("Ask your NeuroPlant assistant")).toBeInTheDocument();
+  });
+
+  it("restores the chat transcript on mount (M3.1 conversation memory)", async () => {
+    apiMock.getAssistantConversation.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          role: "user",
+          content: "My tomato has early blight",
+          intent: null,
+          lang: null,
+          created_at: "2026-08-06T10:00:00Z",
+        },
+        {
+          id: 2,
+          role: "assistant",
+          content: "Got it — Early Blight.",
+          intent: "disease",
+          lang: "en",
+          created_at: "2026-08-06T10:00:01Z",
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByText("My tomato has early blight")).toBeInTheDocument();
+    expect(await screen.findByText("Got it — Early Blight.")).toBeInTheDocument();
+    // Restored assistant turns bring their intent badge back too.
+    expect(screen.getByText("Disease")).toBeInTheDocument();
+  });
+
+  it("clears the server transcript when the chat is cleared", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Ask your NeuroPlant assistant");
+
+    await user.click(
+      screen.getByRole("button", { name: "What disease does my crop have?" }),
+    );
+    await screen.findByText("Your tomato has Early Blight.");
+    await user.click(screen.getByRole("button", { name: "Clear conversation" }));
+
+    expect(apiMock.clearAssistantConversation).toHaveBeenCalledTimes(1);
   });
 });
