@@ -13,6 +13,7 @@
     "history": "History",
     "offlineQueue": "Offline",
     "doctor": "Crop Doctor",
+    "calendar": "Calendar",
     "marketplace": "Marketplace",
     "assistant": "AI Assistant",
     "login": "Log in",
@@ -582,6 +583,74 @@
     "addError": "Couldn't save the treatment. Please try again.",
     "updateError": "Couldn't update the treatment. Please try again.",
     "deleteError": "Couldn't delete the treatment. Please try again."
+  },
+  "calendar": {
+    "authRequired": "Sign in to view your crop calendar.",
+    "signIn": "Sign in",
+    "title": "Farmer Calendar",
+    "subtitle": "Plan each crop's growth stages and never miss a watering, spray, or soil check.",
+    "errorTitle": "Couldn't load your calendar",
+    "errorBody": "Check your connection and try again.",
+    "empty": "No crops scheduled yet. Pick a crop above to start its calendar.",
+    "schedules": "Active crop schedules",
+    "buckets": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "completed": "Completed"
+    },
+    "picker": {
+      "title": "Schedule a crop",
+      "cropLabel": "Crop",
+      "cropPlaceholder": "Choose a crop…",
+      "dateLabel": "Planting date (optional)",
+      "schedule": "Schedule",
+      "loading": "Loading crops…",
+      "error": "Couldn't load the crop list.",
+      "empty": "No crops with a growth template are available yet.",
+      "errorSchedule": "Couldn't schedule this crop. Please try again."
+    },
+    "schedule": {
+      "plantedOn": "Planted {{date}}",
+      "progress": "Schedule progress",
+      "completedCount": "{{completed}} of {{total}} tasks done",
+      "stages": "Growth stages",
+      "noTasks": "No tasks in this schedule yet.",
+      "addCustom": "Add a custom note / to-do"
+    },
+    "stages": {
+      "planting": "Planting",
+      "germination": "Germination",
+      "vegetative": "Vegetative",
+      "flowering": "Flowering",
+      "fruiting": "Fruiting",
+      "harvest": "Harvest"
+    },
+    "kinds": {
+      "watering": "Watering",
+      "fertilizer": "Fertilizer",
+      "organic_treatment": "Organic",
+      "chemical_treatment": "Chemical",
+      "disease_monitoring": "Monitoring",
+      "soil_inspection": "Soil",
+      "custom": "Custom"
+    },
+    "task": {
+      "complete": "Mark as complete",
+      "undoComplete": "Mark as not done",
+      "snooze": "Snooze 1 day",
+      "delete": "Delete",
+      "deleteConfirm": "Delete task"
+    },
+    "custom": {
+      "titleLabel": "What needs doing?",
+      "titlePlaceholder": "e.g. Check irrigation lines",
+      "dateLabel": "Due date (optional)",
+      "save": "Add task",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": "Couldn't add the task. Please try again."
+    }
   },
   "footer": {
     "tagline": "The AI-powered agriculture platform for India.",

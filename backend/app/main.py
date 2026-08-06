@@ -27,6 +27,11 @@ from app.services.auth import (
     UserExistsError,
     UserNotFoundError,
 )
+from app.services.calendar import (
+    CalendarPlanNotFoundError,
+    CalendarScheduleNotFoundError,
+    CalendarTaskNotFoundError,
+)
 from app.services.otp import OtpError
 from app.services.recommendations import (
     CatalogUnavailableError,
@@ -127,6 +132,12 @@ app.add_exception_handler(SoilCatalogUnavailableError, _error_handler(503))
 
 # Recovery (M3 T4) — 404 for a log that isn't on the requested scan.
 app.add_exception_handler(RecoveryLogNotFoundError, _error_handler(404))
+
+# Calendar (M3 T5) — 404 for a crop without a plan, another user's schedule,
+# or another user's task (same enumeration guard as scans/recovery).
+app.add_exception_handler(CalendarPlanNotFoundError, _error_handler(404))
+app.add_exception_handler(CalendarScheduleNotFoundError, _error_handler(404))
+app.add_exception_handler(CalendarTaskNotFoundError, _error_handler(404))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

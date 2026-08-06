@@ -1,11 +1,12 @@
-"""Catalog seeder (M1) + recommendation (M3 T1) + soil (M3 T3) seeders.
+"""Catalog seeder (M1) + recommendation (M3 T1) + soil (M3 T3) + calendar (M3 T5) seeders.
 
 Loads the bootstrap crops + diseases from ``seed_data`` into the database, then
 builds the versioned treatment-recommendation catalog from
-``recommendation_seed_data`` and the soil-intelligence catalog from
-``soil_seed_data``. All are idempotent: an existing crop (matched by name) or a
-catalog row (matched by version/disease) is skipped, so the script can be
-re-run after schema changes without duplicating rows.
+``recommendation_seed_data``, the soil-intelligence catalog from
+``soil_seed_data``, and the crop-calendar catalog from ``calendar_seed_data``.
+All are idempotent: an existing crop (matched by name) or a catalog row (matched
+by version/disease/crop) is skipped, so the script can be re-run after schema
+changes without duplicating rows.
 
 Usage:
     python -m app.db.seed
@@ -17,6 +18,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.db.calendar_seed_data import CALENDAR_PLANS, CALENDAR_VERSION
 from app.db.recommendation_seed_data import (
     RECOMMENDATION_VERSION,
     RECOMMENDATIONS,
@@ -27,6 +29,7 @@ from app.db.recommendation_seed_data import (
 from app.db.seed_data import CROPS
 from app.db.session import async_session_factory
 from app.db.soil_seed_data import SOIL_BY_CROP, SOIL_VERSION
+from app.models.calendar import CropCalendarCatalog, CropCalendarPlan
 from app.models.catalog import Crop, Disease
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
@@ -275,6 +278,73 @@ async def seed_recommendations(db: AsyncSession) -> dict[str, int]:
     return {"catalog": 1, "plans": created}
 
 
+# ── Crop calendar catalog (M3, Task 5) ────────────────────────────────────
+
+
+async def seed_crop_calendar(db: AsyncSession) -> dict[str, int]:
+    """Build the active crop-calendar catalog.
+
+    Mirrors ``seed_recommendations`` / ``seed_soil_recommendations``: exactly one
+    ``CropCalendarCatalog`` is active at a time and a version bump deactivates
+    the previous one. Each crop gets one ``CropCalendarPlan`` (planting window +
+    stage durations) from ``CALENDAR_PLANS``; crops without a curated plan are
+    skipped so seeding is never partial. Returns ``{"catalog": 1, "plans": n}``.
+    """
+    catalog = await db.scalar(
+        select(CropCalendarCatalog).where(CropCalendarCatalog.version == CALENDAR_VERSION)
+    )
+    if catalog is None:
+        catalog = CropCalendarCatalog(
+            version=CALENDAR_VERSION,
+            description="Curated growth-stage templates for every catalog crop.",
+            is_active=True,
+        )
+        await db.execute(update(CropCalendarCatalog).values(is_active=False))
+        db.add(catalog)
+        await db.flush()
+    elif not catalog.is_active:
+        await db.execute(update(CropCalendarCatalog).values(is_active=False))
+        catalog.is_active = True
+        await db.flush()
+
+    created = 0
+    existing = {
+        row.crop_id
+        for row in await db.scalars(
+            select(CropCalendarPlan).where(CropCalendarPlan.catalog_id == catalog.id)
+        )
+    }
+
+    for crop in await db.scalars(select(Crop).order_by(Crop.id)):
+        plan_seed = CALENDAR_PLANS.get(crop.common_name or crop.name)
+        if plan_seed is None or crop.id in existing:
+            continue
+        db.add(
+            CropCalendarPlan(
+                catalog_id=catalog.id,
+                crop_id=crop.id,
+                planting_start_month=plan_seed.planting_start_month,
+                planting_end_month=plan_seed.planting_end_month,
+                germination_days=plan_seed.germination_days,
+                vegetative_days=plan_seed.vegetative_days,
+                flowering_days=plan_seed.flowering_days,
+                fruiting_days=plan_seed.fruiting_days,
+                harvest_days=plan_seed.harvest_days,
+                notes=plan_seed.notes,
+            )
+        )
+        created += 1
+
+    await db.commit()
+    logger.info(
+        "crop_calendar_seeded",
+        version=CALENDAR_VERSION,
+        catalog_id=catalog.id,
+        plans=created,
+    )
+    return {"catalog": 1, "plans": created}
+
+
 # ── Soil catalog (M3, Task 3) ─────────────────────────────────────────────
 
 
@@ -289,9 +359,7 @@ async def seed_soil_recommendations(db: AsyncSession) -> dict[str, int]:
     "plans": n}`` (created-plan count).
     """
     catalog = await db.scalar(
-        select(SoilRecommendationCatalog).where(
-            SoilRecommendationCatalog.version == SOIL_VERSION
-        )
+        select(SoilRecommendationCatalog).where(SoilRecommendationCatalog.version == SOIL_VERSION)
     )
     if catalog is None:
         catalog = SoilRecommendationCatalog(
@@ -370,9 +438,11 @@ async def _run() -> None:
         summary = await seed_catalog(db)
         recs = await seed_recommendations(db)
         soils = await seed_soil_recommendations(db)
+        calendars = await seed_crop_calendar(db)
     print(
         f"Seeded: {summary['crops']} crops, {summary['diseases']} diseases; "
-        f"{recs['plans']} recommendation plans; {soils['plans']} soil plans"
+        f"{recs['plans']} recommendation plans; {soils['plans']} soil plans; "
+        f"{calendars['plans']} calendar plans"
     )
 
 

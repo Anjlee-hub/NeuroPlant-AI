@@ -5,6 +5,12 @@ Alembic autogenerate and test ``create_all``.
 """
 
 from app.models.audit import AuditLog
+from app.models.calendar import (
+    CalendarTask,
+    CropCalendarCatalog,
+    CropCalendarPlan,
+    CropSchedule,
+)
 from app.models.catalog import Crop, Disease
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.recovery import RecoveryLog
@@ -24,6 +30,10 @@ from app.models.user import (
 
 __all__ = [
     "AuditLog",
+    "CalendarTask",
+    "CropCalendarCatalog",
+    "CropCalendarPlan",
+    "CropSchedule",
     "Crop",
     "Disease",
     "RecommendationCatalog",

@@ -16,6 +16,7 @@ import { ScanCropPage } from "@/pages/scan-crop";
 import { ScanDetailPage } from "@/pages/scan-detail";
 import { ScanDoctorPage } from "@/pages/scan-doctor";
 import { ScanHistoryPage } from "@/pages/scan-history";
+import { FarmerCalendarPage } from "@/pages/farmer-calendar";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       // Crop Doctor is live per-scan (M3 T4): the nav hub lands on the scan
       // list so the user picks a scan to open its dashboard.
       { path: "doctor", element: <Navigate to="/scans" replace /> },
+      { path: "calendar", element: <FarmerCalendarPage /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" milestone="6" icon={Store} /> },
       { path: "assistant", element: <ComingSoonPage navKey="assistant" milestone="4" icon={MessageCircle} /> },
       { path: "*", element: <NotFoundPage /> },

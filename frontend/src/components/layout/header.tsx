@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   CloudUpload,
   History,
   Home,
@@ -31,6 +32,7 @@ const NAV_ITEMS: Array<{
   { to: "/scans", labelKey: "nav.history", icon: History },
   { to: "/offline", labelKey: "nav.offlineQueue", icon: CloudUpload },
   { to: "/doctor", labelKey: "nav.doctor", icon: Stethoscope },
+  { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
 ];
 

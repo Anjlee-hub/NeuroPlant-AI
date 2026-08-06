@@ -7,6 +7,15 @@ import type {
   TokenResponse,
   User,
 } from "@/types/auth";
+import type {
+  CalendarCrop,
+  CalendarTask,
+  CalendarTaskUpdate,
+  CustomTaskInput,
+  CropCalendar,
+  FarmerCalendar,
+  ScheduleInput,
+} from "@/types/calendar";
 import type { DiseaseRecommendation } from "@/types/recommendation";
 import type { RecoveryLog, RecoveryLogInput, RecoveryTracker } from "@/types/recovery";
 import type { SoilRecommendation } from "@/types/soil";
@@ -258,6 +267,38 @@ export const api = {
       auth: true,
     }),
   listCrops: () => request<CropOption[]>("/catalog/crops", { auth: true }),
+  // ── Farmer Calendar (M3 T5) ──────────────────────────────────────────
+  /** Catalog crops with growth-stage templates (crop picker). */
+  listCalendarCrops: () => request<CalendarCrop[]>("/calendar/crops", { auth: true }),
+  /** Start (or refresh) a schedule for one crop. */
+  scheduleCrop: (cropId: number, payload: ScheduleInput = {}) =>
+    request<CropCalendar>(`/calendar/crops/${cropId}/schedule`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** The Farmer Calendar dashboard: schedules + bucket counts. */
+  getFarmerCalendar: () => request<FarmerCalendar>("/calendar", { auth: true }),
+  /** Add a farmer-typed note / to-do to a schedule. */
+  addCalendarTask: (payload: CustomTaskInput) =>
+    request<CalendarTask>("/calendar/tasks", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Complete / snooze / re-title / re-date / note one task (partial). */
+  updateCalendarTask: (taskId: number, payload: CalendarTaskUpdate) =>
+    request<CalendarTask>(`/calendar/tasks/${taskId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  /** Remove a task from the schedule. */
+  deleteCalendarTask: (taskId: number) =>
+    request<void>(`/calendar/tasks/${taskId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
   // Offline reconciliation: upload the queued scans in one JSON batch. The
   // server owns idempotency (created/replayed per client_scan_id) — this
   // just transports the queue.
