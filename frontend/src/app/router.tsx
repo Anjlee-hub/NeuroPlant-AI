@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { MessageCircle, Store } from "lucide-react";
+import { Store } from "lucide-react";
 
 import { ErrorBoundary } from "@/app/error-boundary";
 import { RootLayout } from "@/components/layout/root-layout";
@@ -17,6 +17,7 @@ import { ScanDetailPage } from "@/pages/scan-detail";
 import { ScanDoctorPage } from "@/pages/scan-doctor";
 import { ScanHistoryPage } from "@/pages/scan-history";
 import { FarmerCalendarPage } from "@/pages/farmer-calendar";
+import { AssistantPage } from "@/pages/assistant";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -44,7 +45,8 @@ export const router = createBrowserRouter([
       { path: "doctor", element: <Navigate to="/scans" replace /> },
       { path: "calendar", element: <FarmerCalendarPage /> },
       { path: "marketplace", element: <ComingSoonPage navKey="marketplace" milestone="6" icon={Store} /> },
-      { path: "assistant", element: <ComingSoonPage navKey="assistant" milestone="4" icon={MessageCircle} /> },
+      // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
+      { path: "assistant", element: <AssistantPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

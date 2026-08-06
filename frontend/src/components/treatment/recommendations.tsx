@@ -24,6 +24,8 @@ import {
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SpeakButton } from "@/components/assistant/speak-button";
+import { describeRecommendation } from "@/components/assistant/describe";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -180,6 +182,7 @@ export function RecommendationsView({
               <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2 print:hidden">
+              <SpeakButton text={describeRecommendation(rec)} />
               <Button variant="outline" size="sm" onClick={toggleAll}>
                 <ListCollapse />
                 {allOpen ? t("treatment.collapseAll") : t("treatment.expandAll")}

@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 
+import { SpeakButton } from "@/components/assistant/speak-button";
+import { describePlantOverview } from "@/components/assistant/describe";
 import {
   Card,
   CardContent,
@@ -41,8 +43,9 @@ export function PlantOverview({
   const { t, i18n } = useTranslation();
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
         <CardTitle className="text-base">{t("doctor.overview")}</CardTitle>
+        <SpeakButton text={describePlantOverview(scan, risk)} />
       </CardHeader>
       <CardContent>
         <dl className="divide-y divide-border">

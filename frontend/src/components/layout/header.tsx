@@ -5,6 +5,7 @@ import {
   Home,
   Leaf,
   Menu,
+  MessageCircle,
   ScanLine,
   Stethoscope,
   Store,
@@ -33,6 +34,7 @@ const NAV_ITEMS: Array<{
   { to: "/offline", labelKey: "nav.offlineQueue", icon: CloudUpload },
   { to: "/doctor", labelKey: "nav.doctor", icon: Stethoscope },
   { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { to: "/assistant", labelKey: "nav.assistant", icon: MessageCircle },
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
 ];
 

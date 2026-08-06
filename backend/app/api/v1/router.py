@@ -7,6 +7,7 @@ treatment/soil/calendar → M3, voice/assistant/dataset → M4, …).
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    assistant,
     auth,
     calendar,
     catalog,
@@ -27,13 +28,14 @@ api_router.include_router(users.router)
 api_router.include_router(scans.router)
 api_router.include_router(catalog.router)  # read-only filter options (Task 7.1)
 
-# M3 — smart treatment recommendation engine (+ soil intelligence + recovery + calendar).
+# M3 — smart treatment recommendation engine (+ soil intelligence + recovery
+# + calendar + the rule-based voice AI assistant).
 api_router.include_router(recommendations.router)
 api_router.include_router(soil.router)
 api_router.include_router(recovery.router)
 api_router.include_router(calendar.router)
+api_router.include_router(assistant.router)
 
 # Routers are added milestone-by-milestone:
-# M3: crop-doctor, assistant
-# M4: voice, assistant, dataset
+# M4: voice, dataset
 # ...

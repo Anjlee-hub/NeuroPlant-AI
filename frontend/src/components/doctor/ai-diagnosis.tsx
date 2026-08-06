@@ -1,6 +1,8 @@
 import { Eye, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { SpeakButton } from "@/components/assistant/speak-button";
+import { describeAiDiagnosis } from "@/components/assistant/describe";
 import {
   Card,
   CardContent,
@@ -38,8 +40,9 @@ export function AiDiagnosis({ explain }: { explain: ScanExplain | null }) {
   return (
     <section className="flex flex-col gap-4">
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
           <CardTitle className="text-base">{t("doctor.explanation")}</CardTitle>
+          <SpeakButton text={describeAiDiagnosis(explain)} />
         </CardHeader>
         <CardContent>
           <p className="text-sm leading-relaxed">{explain.explanation}</p>

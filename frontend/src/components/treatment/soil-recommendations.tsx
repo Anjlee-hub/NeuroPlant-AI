@@ -21,6 +21,8 @@ import {
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SpeakButton } from "@/components/assistant/speak-button";
+import { describeSoil } from "@/components/assistant/describe";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -193,6 +195,7 @@ export function SoilRecommendationsView({
             </div>
             {sections.length > 0 && (
               <div className="flex shrink-0 flex-wrap items-center gap-2 print:hidden">
+                <SpeakButton text={describeSoil(rec)} />
                 <Button variant="outline" size="sm" onClick={toggleAll}>
                   <ListCollapse />
                   {allOpen ? t("soil.collapseAll") : t("soil.expandAll")}

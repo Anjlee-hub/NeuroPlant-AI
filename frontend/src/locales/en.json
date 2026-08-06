@@ -337,12 +337,6 @@
       "Verified product listings and seller profiles",
       "Secure payments, orders and delivery tracking",
       "AI-powered price recommendations and nearby buyers"
-    ],
-    "assistantBody": "A conversational AI assistant that answers your farming questions in your own language.",
-    "assistantFeatures": [
-      "Ask about a disease, treatment or crop in your language",
-      "Voice input — Hindi and more Indian languages",
-      "Answers grounded in your scan history, weather and market prices"
     ]
   },
   "treatment": {
@@ -650,6 +644,53 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "error": "Couldn't add the task. Please try again."
+    }
+  },
+  "assistant": {
+    "tagline": "Ask in your own words — English or हिन्दी.",
+    "inputPlaceholder": "Ask about a disease, treatment, soil, or today's tasks…",
+    "inputLabel": "Your question",
+    "send": "Send",
+    "speak": "Read aloud",
+    "stopSpeaking": "Stop",
+    "speakPrompt": "Speak your question",
+    "stopListening": "Stop listening",
+    "listening": "Listening…",
+    "voiceUnsupported": "Voice input isn't supported in this browser.",
+    "voiceOutput": "Voice replies",
+    "typing": "Assistant is typing…",
+    "clear": "Clear conversation",
+    "conversation": "Conversation",
+    "emptyTitle": "Ask your NeuroPlant assistant",
+    "emptyBody": "Get answers grounded in your own scan history, treatment plans, soil care and calendar — in English or हिन्दी.",
+    "suggestionsLabel": "Try asking",
+    "suggestions": [
+      "What disease does my crop have?",
+      "How do I treat this disease?",
+      "What fertilizer should I use?",
+      "Read today's farming tasks."
+    ],
+    "errorBody": "I couldn't get an answer right now. Please try again.",
+    "authRequired": "Sign in to use the AI assistant.",
+    "signIn": "Sign in",
+    "intents": {
+      "greeting": "Greeting",
+      "help": "Help",
+      "disease": "Disease",
+      "treatment": "Treatment",
+      "fertilizer": "Fertilizer",
+      "soil": "Soil",
+      "calendar": "Calendar",
+      "recovery": "Recovery",
+      "fallback": "Answer"
+    },
+    "speechErrors": {
+      "not-allowed": "Microphone access was denied. Allow it in your browser settings and try again.",
+      "no-speech": "No speech was heard. Try speaking a little louder.",
+      "audio-capture": "No microphone was found on this device.",
+      "network": "Voice recognition needs an internet connection.",
+      "aborted": "Listening stopped.",
+      "unknown": "Voice input isn't working right now."
     }
   },
   "footer": {

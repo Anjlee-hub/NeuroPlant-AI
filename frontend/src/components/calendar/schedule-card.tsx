@@ -11,6 +11,8 @@ import {
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SpeakButton } from "@/components/assistant/speak-button";
+import { describeSchedule } from "@/components/assistant/describe";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,6 +105,7 @@ export function ScheduleCard({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <SpeakButton text={describeSchedule(schedule)} />
             <span className="text-lg font-bold tabular-nums">{percent}%</span>
           </div>
         </div>

@@ -16,6 +16,7 @@ import type {
   FarmerCalendar,
   ScheduleInput,
 } from "@/types/calendar";
+import type { AssistantReply, AssistantRequest } from "@/types/assistant";
 import type { DiseaseRecommendation } from "@/types/recommendation";
 import type { RecoveryLog, RecoveryLogInput, RecoveryTracker } from "@/types/recovery";
 import type { SoilRecommendation } from "@/types/soil";
@@ -299,6 +300,10 @@ export const api = {
       method: "DELETE",
       auth: true,
     }),
+  // ── Voice AI Assistant (M3 T6) ────────────────────────────────────────
+  /** Route a free-text question (English/Hindi) to the rule-based assistant. */
+  askAssistant: (payload: AssistantRequest) =>
+    request<AssistantReply>("/assistant", { method: "POST", body: payload, auth: true }),
   // Offline reconciliation: upload the queued scans in one JSON batch. The
   // server owns idempotency (created/replayed per client_scan_id) — this
   // just transports the queue.

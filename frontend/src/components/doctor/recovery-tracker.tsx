@@ -3,6 +3,8 @@ import { AlertCircle, CalendarDays, Check, Plus, Sprout, Trash2, X } from "lucid
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SpeakButton } from "@/components/assistant/speak-button";
+import { describeRecovery } from "@/components/assistant/describe";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -166,7 +168,10 @@ export function RecoveryTrackerView({
               </p>
               <h3 className="mt-1 text-xl font-bold tracking-tight">{t("recovery.subtitle")}</h3>
             </div>
-            <Badge className={cn("shrink-0 text-xs", styles.badge)}>{statusLabel}</Badge>
+            <div className="flex shrink-0 items-center gap-2">
+              <SpeakButton text={describeRecovery(tracker)} />
+              <Badge className={cn("text-xs", styles.badge)}>{statusLabel}</Badge>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3.5">

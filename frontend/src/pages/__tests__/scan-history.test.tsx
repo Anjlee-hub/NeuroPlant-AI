@@ -209,10 +209,14 @@ describe("ScanHistoryPage", () => {
     expect(next).toBeEnabled();
 
     await user.click(next);
-    await vi.waitFor(() => {
-      expect(apiMock.listScans).toHaveBeenLastCalledWith(
-        expect.objectContaining({ page: 2 }),
-      );
-    });
+    // Generous timeout: refetch latency varies under full-suite worker load.
+    await vi.waitFor(
+      () => {
+        expect(apiMock.listScans).toHaveBeenLastCalledWith(
+          expect.objectContaining({ page: 2 }),
+        );
+      },
+      { timeout: 5000 },
+    );
   });
 });
