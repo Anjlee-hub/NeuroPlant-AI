@@ -19,8 +19,11 @@ filter semantics never diverge between the two endpoints.
 
 from __future__ import annotations
 
+import io
 from math import ceil
 
+from fastapi import UploadFile
+from PIL import Image
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +35,7 @@ from app.schemas.marketplace import (
     CropListingIn,
     CropListingOut,
     CropListingPageOut,
+    CropListingStatsOut,
     CropListingUpdate,
     FarmerSummaryOut,
     ProductIn,
@@ -40,6 +44,7 @@ from app.schemas.marketplace import (
     SellerOut,
     SellerRegister,
 )
+from app.services.storage import get_storage_service
 
 logger = get_logger(__name__)
 
@@ -53,6 +58,18 @@ SORT_PRICE_ASC = "price_asc"
 SORT_PRICE_DESC = "price_desc"
 SORT_KEYS = (SORT_NEWEST, SORT_PRICE_ASC, SORT_PRICE_DESC)
 
+# ── Listing image upload (M4, Task 2) ─────────────────────────────────────
+MAX_LISTING_IMAGES = 8  # matches the schema's images list cap
+MAX_LISTING_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB per image
+IMAGE_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/bmp",
+    "image/gif",
+    "image/tiff",
+}
+
 
 class CropListingNotFoundError(Exception):
     """No crop listing with this id (or none owned by this farmer)."""
@@ -64,6 +81,10 @@ class ProductNotFoundError(Exception):
 
 class SellerShopNotFoundError(Exception):
     """The user has no registered shop profile (role seller without a profile)."""
+
+
+class ListingImageUploadError(Exception):
+    """A listing image failed validation (type / size / not decodable)."""
 
 
 class MarketplaceService:
@@ -125,6 +146,66 @@ class MarketplaceService:
             .order_by(CropListing.created_at.desc(), CropListing.id.desc())
         )
         return [CropListingOut.model_validate(row) for row in rows.all()]
+
+    async def my_listings_stats(self, user: User) -> CropListingStatsOut:
+        """Dashboard counts over the farmer's own listings (M4, Task 2)."""
+        rows = await self.db.execute(
+            select(CropListing.availability, func.count(CropListing.id))
+            .where(CropListing.farmer_id == user.id)
+            .group_by(CropListing.availability)
+        )
+        by_status = {avail: count for avail, count in rows.all()}
+        available = by_status.get("available", 0)
+        limited = by_status.get("limited", 0)
+        sold = by_status.get("sold_out", 0)
+        archived = by_status.get("archived", 0)
+        return CropListingStatsOut(
+            total=available + limited + sold + archived,
+            active=available + limited,
+            sold=sold,
+            archived=archived,
+        )
+
+    async def upload_listing_images(self, user: User, files: list[UploadFile]) -> list[str]:
+        """Persist one or more listing photos and return their public URLs.
+
+        Validates count, content type and size, then decodes each file with
+        PIL so a renamed text file can't sneak through as "an image". Files are
+        stored via the platform's object-storage abstraction (local disk today,
+        S3 in M11) under a user-scoped ``marketplace`` subdir.
+        """
+        if not files:
+            raise ListingImageUploadError("at least one image is required")
+        if len(files) > MAX_LISTING_IMAGES:
+            raise ListingImageUploadError(f"at most {MAX_LISTING_IMAGES} images per listing")
+
+        storage = get_storage_service()
+        urls: list[str] = []
+        for file in files:
+            content_type = (file.content_type or "").split(";")[0].strip().lower()
+            if content_type not in IMAGE_CONTENT_TYPES:
+                raise ListingImageUploadError(
+                    f"unsupported image type: {content_type or 'unknown'}"
+                )
+            data = await file.read()
+            if not data:
+                raise ListingImageUploadError("image file is empty")
+            if len(data) > MAX_LISTING_IMAGE_BYTES:
+                raise ListingImageUploadError("image exceeds the 10 MB limit")
+            self._verify_image(data)
+            key = storage.save(data, content_type, user.id, subdir="marketplace")
+            urls.append(storage.url(key))
+        logger.info("listing_images_uploaded", user_id=user.id, count=len(urls))
+        return urls
+
+    @staticmethod
+    def _verify_image(data: bytes) -> None:
+        """Decode + verify the bytes are a real image (rejects text-as-image)."""
+        try:
+            with Image.open(io.BytesIO(data)) as image:
+                image.verify()
+        except Exception as exc:
+            raise ListingImageUploadError("file is not a valid image") from exc
 
     # ── Customer: browse / search / filter / detail ─────────────────────
 

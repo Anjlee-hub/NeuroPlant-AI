@@ -646,6 +646,122 @@
       "error": "कार्य जोड़ा नहीं जा सका। कृपया पुनः प्रयास करें।"
     }
   },
+  "marketplace": {
+    "authRequired": "अपनी फ़सलों की सूची देखने के लिए साइन इन करें।",
+    "signIn": "साइन इन करें",
+    "title": "मेरी फ़सलों की सूची",
+    "subtitle": "अपनी उपज बिक्री के लिए पेश करें और हर सूची को अद्यतन रखें।",
+    "errorTitle": "आपकी सूचियाँ लोड नहीं हो सकीं",
+    "errorBody": "अपना कनेक्शन जाँचें और पुनः प्रयास करें।",
+    "empty": "अभी कोई सूची नहीं है। बिक्री शुरू करने के लिए अपनी पहली सूची बनाएँ।",
+    "newListing": "नई सूची",
+    "stats": {
+      "total": "कुल",
+      "active": "सक्रिय",
+      "sold": "बिक चुकी",
+      "archived": "संग्रहीत"
+    },
+    "availability": {
+      "available": "उपलब्ध",
+      "limited": "सीमित",
+      "sold_out": "बिक गई",
+      "archived": "संग्रहीत"
+    },
+    "categories": {
+      "vegetable": "सब्ज़ी",
+      "fruit": "फल",
+      "grain": "अनाज",
+      "pulses": "दालें",
+      "spice": "मसाला",
+      "other": "अन्य"
+    },
+    "units": {
+      "kg": "किग्रा",
+      "g": "ग्राम",
+      "qtl": "क्विंटल",
+      "bag": "बोरी",
+      "dozen": "दर्जन",
+      "piece": "पीस",
+      "l": "लीटर",
+      "box": "बॉक्स",
+      "bundle": "गट्ठा"
+    },
+    "card": {
+      "perUnit": "/{{unit}}",
+      "organic": "जैविक",
+      "noImage": "कोई फ़ोटो नहीं",
+      "edit": "संपादित करें",
+      "delete": "हटाएँ",
+      "markSold": "बिक चुकी के रूप में चिह्नित करें",
+      "markAvailable": "उपलब्ध के रूप में चिह्नित करें",
+      "archive": "संग्रहीत करें",
+      "quantity": "{{quantity}} {{unit}}"
+    },
+    "filter": {
+      "searchPlaceholder": "अपनी सूचियाँ खोजें…",
+      "statusLabel": "स्थिति",
+      "statusAll": "सभी स्थितियाँ",
+      "categoryLabel": "श्रेणी",
+      "categoryAll": "सभी श्रेणियाँ",
+      "organicOnly": "केवल जैविक",
+      "dateLabel": "सूचीबद्ध",
+      "dateAll": "कोई भी तिथि",
+      "dateToday": "आज",
+      "dateWeek": "पिछले 7 दिन",
+      "dateMonth": "पिछले 30 दिन",
+      "noResults": "कोई सूची आपके फ़िल्टर से मेल नहीं खाती।"
+    },
+    "form": {
+      "titleNew": "सूची बनाएँ",
+      "titleEdit": "सूची संपादित करें",
+      "back": "मेरी सूचियों पर वापस जाएँ",
+      "cropNameLabel": "फ़सल का नाम",
+      "cropNamePlaceholder": "जैसे टमाटर",
+      "categoryLabel": "श्रेणी",
+      "varietyLabel": "किस्म (वैकल्पिक)",
+      "varietyPlaceholder": "जैसे देसी",
+      "quantityLabel": "मात्रा",
+      "unitLabel": "इकाई",
+      "priceLabel": "प्रति इकाई मूल्य",
+      "pricePlaceholder": "जैसे 40",
+      "descriptionLabel": "विवरण (वैकल्पिक)",
+      "descriptionPlaceholder": "अपनी उपज का विवरण दें…",
+      "locationLabel": "स्थान (वैकल्पिक)",
+      "locationPlaceholder": "जैसे नाशिक, महाराष्ट्र",
+      "organicLabel": "जैविक उपज",
+      "harvestDateLabel": "कटाई तिथि (वैकल्पिक)",
+      "availabilityLabel": "स्थिति",
+      "imagesLabel": "फ़ोटो",
+      "save": "सूची सहेजें",
+      "saving": "सहेजा जा रहा है…",
+      "cancel": "रद्द करें",
+      "created": "सूची बन गई",
+      "updated": "सूची अद्यतन हो गई",
+      "error": "सूची सहेजी नहीं जा सकी। कृपया पुनः प्रयास करें।",
+      "requiredFields": "कृपया आवश्यक फ़ील्ड भरें।"
+    },
+    "upload": {
+      "add": "फ़ोटो जोड़ें",
+      "adding": "अपलोड हो रहा है…",
+      "hint": "JPEG, PNG या WebP · अधिकतम 8 · प्रत्येक 10 MB तक",
+      "remove": "हटाएँ",
+      "tooMany": "आप अधिकतम 8 फ़ोटो जोड़ सकते हैं।",
+      "tooLarge": "यह फ़ोटो 10 MB से बड़ी है।",
+      "invalidType": "केवल JPEG, PNG या WebP चित्र अनुमत हैं।",
+      "error": "फ़ोटो अपलोड नहीं हो सकीं। कृपया पुनः प्रयास करें।"
+    },
+    "actions": {
+      "confirmDelete": "इस सूची को हटाएँ?",
+      "confirmDeleteBody": "इसे पूर्ववत नहीं किया जा सकता।",
+      "confirmArchive": "इस सूची को संग्रहीत करें?",
+      "confirmArchiveBody": "यह बाज़ार से छिप जाएगी लेकिन आपके रिकॉर्ड के लिए रखी जाएगी।",
+      "soldToast": "सूची बिक चुकी के रूप में चिह्नित हो गई",
+      "availableToast": "सूची उपलब्ध के रूप में चिह्नित हो गई",
+      "archivedToast": "सूची संग्रहीत हो गई",
+      "deletedToast": "सूची हट गई",
+      "error": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+    }
+  },
   "assistant": {
     "tagline": "अपने शब्दों में पूछिए — English या हिन्दी।",
     "inputPlaceholder": "रोग, उपचार, मिट्टी या आज के कार्यों के बारे में पूछिए…",

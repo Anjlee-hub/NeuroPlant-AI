@@ -64,7 +64,9 @@ class CropListing(Base, TimestampMixin):
     harvest_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     organic: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    # available | limited | sold_out (app-level validation).
+    # available | limited | sold_out | archived (app-level validation; the
+    # archived status is an M4 Task 2 additive extension for retiring a
+    # listing without deleting it).
     availability: Mapped[str] = mapped_column(String(20), default="available", nullable=False)
 
 

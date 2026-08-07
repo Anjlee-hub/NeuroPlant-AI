@@ -13,15 +13,20 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 # ── Vocabularies (validated at the boundary) ──────────────────────────────
+#
+# ``archived`` was added in M4 Task 2 (additive extension) so farmers can
+# retire a listing without deleting it; the dashboard's "archived" bucket and
+# the mark-as-archived action both map to this value. Existing values are
+# unchanged, so the Task 1 contract is backward compatible.
 
 CROP_CATEGORIES = ("vegetable", "fruit", "grain", "pulses", "spice", "other")
 PRODUCT_CATEGORIES = ("fertilizer", "pesticide", "seed", "tool")
-AVAILABILITY = ("available", "limited", "sold_out")
+AVAILABILITY = ("available", "limited", "sold_out", "archived")
 UNITS = ("kg", "g", "qtl", "bag", "dozen", "piece", "l", "box", "bundle")
 
 _CROP_CATEGORY_PATTERN = "^(vegetable|fruit|grain|pulses|spice|other)$"
 _PRODUCT_CATEGORY_PATTERN = "^(fertilizer|pesticide|seed|tool)$"
-_AVAILABILITY_PATTERN = "^(available|limited|sold_out)$"
+_AVAILABILITY_PATTERN = "^(available|limited|sold_out|archived)$"
 _UNIT_PATTERN = "^(kg|g|qtl|bag|dozen|piece|l|box|bundle)$"
 
 # A single image is a URL-ish string; lists are capped so one listing can't
@@ -113,6 +118,30 @@ class CropListingPageOut(BaseModel):
     page: int = Field(ge=1)
     page_size: int = Field(ge=1)
     pages: int = Field(ge=0)
+
+
+class CropListingStatsOut(BaseModel):
+    """Dashboard summary counts for the farmer's own listings (M4, Task 2).
+
+    ``active`` counts everything still offered for sale (``available`` +
+    ``limited``); ``sold`` is ``sold_out``; ``archived`` is ``archived``;
+    ``total`` is every listing the farmer owns.
+    """
+
+    total: int = Field(ge=0)
+    active: int = Field(ge=0)
+    sold: int = Field(ge=0)
+    archived: int = Field(ge=0)
+
+
+class ListingImagesOut(BaseModel):
+    """Response for the multi-image upload endpoint — persisted media URLs.
+
+    URLs are storage-relative (``/media/...``) and go straight into the
+    ``images`` field of a listing payload.
+    """
+
+    urls: list[str] = Field(default_factory=list)
 
 
 # ── Seller shop ───────────────────────────────────────────────────────────

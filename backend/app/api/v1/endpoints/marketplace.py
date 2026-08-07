@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, require_roles
@@ -32,7 +32,9 @@ from app.schemas.marketplace import (
     CropListingIn,
     CropListingOut,
     CropListingPageOut,
+    CropListingStatsOut,
     CropListingUpdate,
+    ListingImagesOut,
     ProductIn,
     ProductOut,
     ProductUpdate,
@@ -123,6 +125,30 @@ async def search_crops(
 async def my_crop_listings(user: FarmerUser, db: Db) -> list[CropListingOut]:
     """The farmer's own listings (newest first)."""
     return await MarketplaceService(db).my_listings(user)
+
+
+@router.get("/crops/stats", response_model=CropListingStatsOut)
+async def crop_listing_stats(user: FarmerUser, db: Db) -> CropListingStatsOut:
+    """Dashboard summary counts (total / active / sold / archived) over the
+    farmer's own listings (M4, Task 2)."""
+    return await MarketplaceService(db).my_listings_stats(user)
+
+
+@router.post("/crops/images", response_model=ListingImagesOut)
+async def upload_listing_images(
+    user: FarmerUser,
+    db: Db,
+    files: list[UploadFile] = File(description="Listing photos (JPEG/PNG/WebP, max 8)"),
+) -> ListingImagesOut:
+    """Upload one or more listing photos and get back storage URLs to drop
+    into the listing's ``images`` field (M4, Task 2).
+
+    Validated by type / size and decoded to reject non-images; ``422`` on any
+    invalid file. The returned URLs are what a create/update listing payload
+    sends as ``images``.
+    """
+    urls = await MarketplaceService(db).upload_listing_images(user, files)
+    return ListingImagesOut(urls=urls)
 
 
 @router.post("/crops", response_model=CropListingOut, status_code=status.HTTP_201_CREATED)

@@ -34,6 +34,7 @@ from app.services.calendar import (
 )
 from app.services.marketplace import (
     CropListingNotFoundError,
+    ListingImageUploadError,
     ProductNotFoundError,
     SellerShopNotFoundError,
 )
@@ -149,6 +150,8 @@ app.add_exception_handler(CalendarTaskNotFoundError, _error_handler(404))
 app.add_exception_handler(CropListingNotFoundError, _error_handler(404))
 app.add_exception_handler(ProductNotFoundError, _error_handler(404))
 app.add_exception_handler(SellerShopNotFoundError, _error_handler(404))
+# Marketplace (M4 T2) — 422 when a listing photo fails validation.
+app.add_exception_handler(ListingImageUploadError, _error_handler(422))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

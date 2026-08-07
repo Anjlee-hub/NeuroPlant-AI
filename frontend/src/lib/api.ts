@@ -34,6 +34,13 @@ import type {
   ScanSyncItem,
   ScanSyncOut,
 } from "@/types/scan";
+import type {
+  CropListing,
+  CropListingInput,
+  CropListingStats,
+  CropListingUpdate,
+  ListingImagesResult,
+} from "@/types/marketplace";
 
 /** Editable profile fields (mirrors `UserUpdate` — name is the main one). */
 export interface ProfileUpdateInput {
@@ -319,6 +326,43 @@ export const api = {
   // just transports the queue.
   syncScans: (items: ScanSyncItem[]) =>
     request<ScanSyncOut>("/scans/sync", { method: "POST", body: items, auth: true }),
+
+  // ── Farmer Marketplace (M4 Task 2) ────────────────────────────────────
+  /** The farmer's own listings (newest first) — dashboard table/cards. */
+  myCropListings: () => request<CropListing[]>("/marketplace/crops/mine", { auth: true }),
+  /** Dashboard counts over the farmer's own listings. */
+  getCropListingStats: () =>
+    request<CropListingStats>("/marketplace/crops/stats", { auth: true }),
+  /** One listing with its farmer attached (detail view). */
+  getCropListing: (listingId: number) =>
+    request<CropListing>(`/marketplace/crops/${listingId}`, { auth: true }),
+  /** Offer produce for sale. */
+  createCropListing: (payload: CropListingInput) =>
+    request<CropListing>("/marketplace/crops", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Partial edit of one of the farmer's own listings. */
+  updateCropListing: (listingId: number, payload: CropListingUpdate) =>
+    request<CropListing>(`/marketplace/crops/${listingId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  /** Remove one of the farmer's own listings. */
+  deleteCropListing: (listingId: number) =>
+    request<void>(`/marketplace/crops/${listingId}`, { method: "DELETE", auth: true }),
+  /** Upload listing photos (multipart) → storage URLs for the images field. */
+  uploadListingImages: (files: File[]) => {
+    const fd = new FormData();
+    for (const file of files) fd.append("files", file);
+    return request<ListingImagesResult>("/marketplace/crops/images", {
+      method: "POST",
+      body: fd,
+      auth: true,
+    });
+  },
 
   // ── M2.1 — live scan upload + profile ────────────────────────────────
   /** Multipart upload → runs the same pipeline as the offline sync path. */

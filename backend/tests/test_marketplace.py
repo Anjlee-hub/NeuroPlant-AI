@@ -469,3 +469,124 @@ async def test_page_size_is_clamped(db):
     # Invalid sort falls back to newest (never raises).
     result2 = await service.browse_crops(sort="bogus")
     assert result2.items == []
+
+
+# ── M4 Task 2: status transitions, stats, image upload ─────────────────────
+
+PNG_1X1 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+    "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+async def test_farmer_status_transitions(client):
+    """Mark a listing sold → available → archived via the same PATCH API."""
+    headers = await _register(client, "919000000040")
+    created = await _make_listing(client, headers)
+
+    sold = await client.patch(
+        f"/api/v1/marketplace/crops/{created['id']}",
+        json={"availability": "sold_out"},
+        headers=headers,
+    )
+    assert sold.status_code == 200
+    assert sold.json()["availability"] == "sold_out"
+
+    back = await client.patch(
+        f"/api/v1/marketplace/crops/{created['id']}",
+        json={"availability": "available"},
+        headers=headers,
+    )
+    assert back.status_code == 200
+    assert back.json()["availability"] == "available"
+
+    archived = await client.patch(
+        f"/api/v1/marketplace/crops/{created['id']}",
+        json={"availability": "archived"},
+        headers=headers,
+    )
+    assert archived.status_code == 200
+    assert archived.json()["availability"] == "archived"
+
+
+async def test_listing_stats_counts(client):
+    headers = await _register(client, "919000000041")
+    await _make_listing(client, headers, availability="available")
+    await _make_listing(client, headers, availability="limited")
+    await _make_listing(client, headers, availability="sold_out")
+    await _make_listing(client, headers, availability="archived")
+
+    resp = await client.get("/api/v1/marketplace/crops/stats", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 4
+    assert body["active"] == 2  # available + limited
+    assert body["sold"] == 1
+    assert body["archived"] == 1
+
+
+async def test_stats_require_farmer_role(client):
+    customer = await _register(client, "919000000042", role="customer")
+    resp = await client.get("/api/v1/marketplace/crops/stats", headers=customer)
+    assert resp.status_code == 403
+
+
+async def test_listing_image_upload(client):
+    headers = await _register(client, "919000000043")
+    import base64
+
+    png = base64.b64decode(PNG_1X1)
+    resp = await client.post(
+        "/api/v1/marketplace/crops/images",
+        files=[("files", ("photo.png", png, "image/png"))],
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    urls = resp.json()["urls"]
+    assert len(urls) == 1
+    assert urls[0].startswith("/media/")
+    assert urls[0].endswith(".png")
+
+
+async def test_listing_image_upload_multiple(client):
+    headers = await _register(client, "919000000044")
+    import base64
+
+    png = base64.b64decode(PNG_1X1)
+    resp = await client.post(
+        "/api/v1/marketplace/crops/images",
+        files=[("files", ("a.png", png, "image/png")), ("files", ("b.png", png, "image/png"))],
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["urls"]) == 2
+
+
+async def test_listing_image_upload_rejects_non_image(client):
+    headers = await _register(client, "919000000045")
+    resp = await client.post(
+        "/api/v1/marketplace/crops/images",
+        files=[("files", ("note.txt", b"this is not an image", "image/png"))],
+        headers=headers,
+    )
+    assert resp.status_code == 422  # decodes as a non-image
+
+
+async def test_listing_image_upload_rejects_bad_content_type(client):
+    headers = await _register(client, "919000000046")
+    resp = await client.post(
+        "/api/v1/marketplace/crops/images",
+        files=[("files", ("x.pdf", b"pdf-data", "application/pdf"))],
+        headers=headers,
+    )
+    assert resp.status_code == 422  # content type not in whitelist
+
+
+async def test_listing_image_upload_rejects_too_many(client):
+    headers = await _register(client, "919000000047")
+    import base64
+
+    png = base64.b64decode(PNG_1X1)
+    many = [("files", (f"img-{i}.png", png, "image/png")) for i in range(9)]
+    resp = await client.post("/api/v1/marketplace/crops/images", files=many, headers=headers)
+    assert resp.status_code == 422  # > MAX_LISTING_IMAGES (8)

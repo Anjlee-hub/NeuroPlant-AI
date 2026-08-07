@@ -646,6 +646,122 @@
       "error": "Couldn't add the task. Please try again."
     }
   },
+  "marketplace": {
+    "authRequired": "Sign in to manage your crop listings.",
+    "signIn": "Sign in",
+    "title": "My Crop Listings",
+    "subtitle": "Offer your produce for sale and keep every listing up to date.",
+    "errorTitle": "Couldn't load your listings",
+    "errorBody": "Check your connection and try again.",
+    "empty": "No listings yet. Create your first listing to start selling.",
+    "newListing": "New listing",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "sold": "Sold",
+      "archived": "Archived"
+    },
+    "availability": {
+      "available": "Available",
+      "limited": "Limited",
+      "sold_out": "Sold out",
+      "archived": "Archived"
+    },
+    "categories": {
+      "vegetable": "Vegetable",
+      "fruit": "Fruit",
+      "grain": "Grain",
+      "pulses": "Pulses",
+      "spice": "Spice",
+      "other": "Other"
+    },
+    "units": {
+      "kg": "kg",
+      "g": "g",
+      "qtl": "quintal",
+      "bag": "bag",
+      "dozen": "dozen",
+      "piece": "piece",
+      "l": "L",
+      "box": "box",
+      "bundle": "bundle"
+    },
+    "card": {
+      "perUnit": "/{{unit}}",
+      "organic": "Organic",
+      "noImage": "No photo",
+      "edit": "Edit",
+      "delete": "Delete",
+      "markSold": "Mark as sold",
+      "markAvailable": "Mark as available",
+      "archive": "Archive",
+      "quantity": "{{quantity}} {{unit}}"
+    },
+    "filter": {
+      "searchPlaceholder": "Search your listings…",
+      "statusLabel": "Status",
+      "statusAll": "All statuses",
+      "categoryLabel": "Category",
+      "categoryAll": "All categories",
+      "organicOnly": "Organic only",
+      "dateLabel": "Listed",
+      "dateAll": "Any date",
+      "dateToday": "Today",
+      "dateWeek": "Last 7 days",
+      "dateMonth": "Last 30 days",
+      "noResults": "No listings match your filters."
+    },
+    "form": {
+      "titleNew": "Create a listing",
+      "titleEdit": "Edit listing",
+      "back": "Back to my listings",
+      "cropNameLabel": "Crop name",
+      "cropNamePlaceholder": "e.g. Tomatoes",
+      "categoryLabel": "Category",
+      "varietyLabel": "Variety (optional)",
+      "varietyPlaceholder": "e.g. Desi",
+      "quantityLabel": "Quantity",
+      "unitLabel": "Unit",
+      "priceLabel": "Price per unit",
+      "pricePlaceholder": "e.g. 40",
+      "descriptionLabel": "Description (optional)",
+      "descriptionPlaceholder": "Describe your produce…",
+      "locationLabel": "Location (optional)",
+      "locationPlaceholder": "e.g. Nashik, Maharashtra",
+      "organicLabel": "Organic produce",
+      "harvestDateLabel": "Harvest date (optional)",
+      "availabilityLabel": "Status",
+      "imagesLabel": "Photos",
+      "save": "Save listing",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "created": "Listing created",
+      "updated": "Listing updated",
+      "error": "Couldn't save the listing. Please try again.",
+      "requiredFields": "Please fill in the required fields."
+    },
+    "upload": {
+      "add": "Add photos",
+      "adding": "Uploading…",
+      "hint": "JPEG, PNG or WebP · up to 8 · max 10 MB each",
+      "remove": "Remove",
+      "tooMany": "You can add at most 8 photos.",
+      "tooLarge": "This photo is larger than 10 MB.",
+      "invalidType": "Only JPEG, PNG or WebP images are allowed.",
+      "error": "Couldn't upload the photos. Please try again."
+    },
+    "actions": {
+      "confirmDelete": "Delete this listing?",
+      "confirmDeleteBody": "This can't be undone.",
+      "confirmArchive": "Archive this listing?",
+      "confirmArchiveBody": "It will be hidden from the market but kept for your records.",
+      "soldToast": "Listing marked as sold",
+      "availableToast": "Listing marked as available",
+      "archivedToast": "Listing archived",
+      "deletedToast": "Listing deleted",
+      "error": "Something went wrong. Please try again."
+    }
+  },
   "assistant": {
     "tagline": "Ask in your own words — English or हिन्दी.",
     "inputPlaceholder": "Ask about a disease, treatment, soil, or today's tasks…",
