@@ -15,6 +15,7 @@
     "doctor": "क्रॉप डॉक्टर",
     "calendar": "कैलेंडर",
     "marketplace": "मार्केटप्लेस",
+    "marketplaceBuy": "खरीदें",
     "assistant": "एआई सहायक",
     "login": "लॉग इन",
     "register": "साइन अप",
@@ -760,6 +761,88 @@
       "archivedToast": "सूची संग्रहीत हो गई",
       "deletedToast": "सूची हट गई",
       "error": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+    }
+  },
+  "marketplaceBuy": {
+    "authRequired": "बाज़ार देखने के लिए साइन इन करें।",
+    "signIn": "साइन इन करें",
+    "title": "ताज़ी उपज खरीदें",
+    "subtitle": "देश भर की खेत-सूचियाँ ब्राउज़ करें और सीधे स्रोत से खरीदें।",
+    "errorTitle": "सूचियाँ लोड नहीं हो सकीं",
+    "errorBody": "अपना कनेक्शन जाँचें और पुनः प्रयास करें।",
+    "empty": "अभी बाज़ार में कोई सूची नहीं है। थोड़ी देर बाद फिर देखें।",
+    "noResults": "कोई सूची आपके फ़िल्टर से मेल नहीं खाती। फ़िल्टर को व्यापक करने का प्रयास करें।",
+    "resultsCount": "{{count}} सूचियाँ",
+    "sort": {
+      "label": "क्रमबद्ध करें",
+      "newest": "नवीनतम",
+      "oldest": "सबसे पुरानी",
+      "price_asc": "मूल्य: निम्न से उच्च",
+      "price_desc": "मूल्य: उच्च से निम्न"
+    },
+    "filter": {
+      "searchPlaceholder": "फ़सलें खोजें…",
+      "categoryLabel": "श्रेणी",
+      "categoryAll": "सभी श्रेणियाँ",
+      "organicLabel": "केवल जैविक",
+      "availabilityLabel": "उपलब्धता",
+      "availabilityAll": "कोई भी उपलब्धता",
+      "priceLabel": "प्रति इकाई मूल्य",
+      "minPrice": "न्यूनतम मूल्य",
+      "maxPrice": "अधिकतम मूल्य",
+      "harvestFrom": "कटाई तिथि (से)",
+      "harvestTo": "कटाई तिथि (तक)",
+      "locationPlaceholder": "स्थान…",
+      "clear": "फ़िल्टर साफ़ करें",
+      "showFilters": "फ़िल्टर"
+    },
+    "card": {
+      "perUnit": "/{{unit}}",
+      "quantity": "{{quantity}} {{unit}}",
+      "harvestDate": "कटाई: {{date}}",
+      "viewDetails": "विवरण देखें"
+    },
+    "detail": {
+      "back": "सूचियों पर वापस जाएँ",
+      "descriptionLabel": "विवरण",
+      "harvestDate": "कटाई तिथि",
+      "listedOn": "सूचीबद्ध",
+      "quantity": "मात्रा",
+      "price": "मूल्य",
+      "organic": "जैविक",
+      "notOrganic": "गैर-जैविक",
+      "farmer": "किसान",
+      "verified": "सत्यापित",
+      "location": "स्थान",
+      "noImages": "इस सूची में कोई फ़ोटो नहीं है।"
+    },
+    "gallery": {
+      "mainImage": "{{name}} की फ़ोटो",
+      "thumbnail": "{{name}} का थंबनेल {{n}}",
+      "openLightbox": "फ़ोटो खोलें",
+      "closeLightbox": "फ़ोटो दर्शक बंद करें",
+      "prev": "पिछली फ़ोटो",
+      "next": "अगली फ़ोटो",
+      "thumbnails": "{{name}} की फ़ोटो"
+    },
+    "actions": {
+      "copyLink": "लिंक कॉपी करें",
+      "linkCopied": "लिंक कॉपी हो गया",
+      "favourite": "पसंदीदा में सहेजें",
+      "unfavourite": "पसंदीदा से हटाएँ",
+      "favourited": "सहेज लिया",
+      "contactFarmer": "किसान से संपर्क करें",
+      "contactSoon": "मैसेजिंग जल्द आ रही है।"
+    },
+    "grid": {
+      "listLabel": "फ़सल सूचियाँ"
+    },
+    "pagination": {
+      "label": "पृष्ठांकन",
+      "previous": "पिछला",
+      "next": "अगला",
+      "goTo": "पृष्ठ {{page}} पर जाएँ",
+      "page": "पृष्ठ {{page}} / {{pages}}"
     }
   },
   "assistant": {

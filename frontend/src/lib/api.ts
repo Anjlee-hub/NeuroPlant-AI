@@ -36,7 +36,10 @@ import type {
 } from "@/types/scan";
 import type {
   CropListing,
+  CropListingDetail,
   CropListingInput,
+  CropListingPage,
+  CropListingQuery,
   CropListingStats,
   CropListingUpdate,
   ListingImagesResult,
@@ -327,6 +330,21 @@ export const api = {
   syncScans: (items: ScanSyncItem[]) =>
     request<ScanSyncOut>("/scans/sync", { method: "POST", body: items, auth: true }),
 
+  // ── Buyer Marketplace (M4 Task 3) ─────────────────────────────────────
+  /** Browse/search/filter the live storefront — server-side pagination. */
+  browseCrops: (params: CropListingQuery = {}) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        qs.set(key, String(value));
+      }
+    }
+    const query = qs.toString();
+    return request<CropListingPage>(`/marketplace/crops${query ? `?${query}` : ""}`, {
+      auth: true,
+    });
+  },
+
   // ── Farmer Marketplace (M4 Task 2) ────────────────────────────────────
   /** The farmer's own listings (newest first) — dashboard table/cards. */
   myCropListings: () => request<CropListing[]>("/marketplace/crops/mine", { auth: true }),
@@ -335,7 +353,7 @@ export const api = {
     request<CropListingStats>("/marketplace/crops/stats", { auth: true }),
   /** One listing with its farmer attached (detail view). */
   getCropListing: (listingId: number) =>
-    request<CropListing>(`/marketplace/crops/${listingId}`, { auth: true }),
+    request<CropListingDetail>(`/marketplace/crops/${listingId}`, { auth: true }),
   /** Offer produce for sale. */
   createCropListing: (payload: CropListingInput) =>
     request<CropListing>("/marketplace/crops", {

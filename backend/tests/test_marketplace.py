@@ -257,6 +257,82 @@ async def test_browse_sort(client):
     assert names_desc == ["Mango", "Basmati Rice", "Desi Tomato"]
 
 
+# ── M4 Task 3: oldest sort + harvest-date window (buyer storefront) ─────────
+
+
+async def test_browse_sort_oldest(client):
+    """The buyer storefront needs oldest-first as well as newest/price."""
+    farmer = await _register(client, "919000000018", role="farmer")
+    await _seed_three(client, farmer)
+    customer = await _register(client, "919000000019", role="customer")
+
+    # _seed_three creates Desi Tomato → Mango → Basmati Rice in that order, so
+    # oldest-first is creation order (created_at asc, id asc tiebreak).
+    resp = await client.get("/api/v1/marketplace/crops?sort=oldest", headers=customer)
+    assert resp.status_code == 200, resp.text
+    names = [i["crop_name"] for i in resp.json()["items"]]
+    assert names == ["Desi Tomato", "Mango", "Basmati Rice"]
+
+    # The inverse (newest, the default) flips it — same rows, other direction.
+    resp_newest = await client.get("/api/v1/marketplace/crops?sort=newest", headers=customer)
+    names_newest = [i["crop_name"] for i in resp_newest.json()["items"]]
+    assert names_newest == list(reversed(names))
+
+
+async def test_browse_harvest_date_window(client):
+    """harvest_from/harvest_to bound listings by harvest date, inclusive; a
+    listing with no harvest date is outside any window (matches UI intent)."""
+    farmer = await _register(client, "919000000020", role="farmer")
+    await _make_listing(client, farmer, crop_name="Early Potato", harvest_date="2026-06-10")
+    await _make_listing(client, farmer, crop_name="Mid Mango", harvest_date="2026-07-15")
+    await _make_listing(client, farmer, crop_name="Late Rice", harvest_date="2026-08-20")
+    # No harvest date set — must be excluded whenever a window is applied.
+    await _make_listing(client, farmer, crop_name="No Date")
+    customer = await _register(client, "919000000021", role="customer")
+
+    async def names(params: str) -> list[str]:
+        resp = await client.get(f"/api/v1/marketplace/crops{params}", headers=customer)
+        assert resp.status_code == 200, resp.text
+        return sorted(i["crop_name"] for i in resp.json()["items"])
+
+    assert await names("?harvest_from=2026-07-01") == ["Late Rice", "Mid Mango"]
+    assert await names("?harvest_to=2026-07-31") == ["Early Potato", "Mid Mango"]
+    assert await names("?harvest_from=2026-07-01&harvest_to=2026-08-31") == [
+        "Late Rice",
+        "Mid Mango",
+    ]
+    # A full range still excludes the un-dated listing.
+    assert await names("?harvest_from=2026-01-01&harvest_to=2026-12-31") == [
+        "Early Potato",
+        "Late Rice",
+        "Mid Mango",
+    ]
+    # Both bounds must be satisfied — a reversed window is simply empty.
+    assert await names("?harvest_from=2026-08-01&harvest_to=2026-07-01") == []
+
+
+async def test_browse_hides_archived_unless_requested(client):
+    """Archived listings are off the market (Task 2 semantics): the default
+    browse feed hides them, but an explicit availability=archived filter
+    still reaches them (M4 Task 3 storefront)."""
+    farmer = await _register(client, "919000000048", role="farmer")
+    await _make_listing(client, farmer, crop_name="On The Market")
+    await _make_listing(client, farmer, crop_name="Retired", availability="archived")
+    customer = await _register(client, "919000000049", role="customer")
+
+    resp = await client.get("/api/v1/marketplace/crops", headers=customer)
+    assert resp.status_code == 200, resp.text
+    names = [i["crop_name"] for i in resp.json()["items"]]
+    assert names == ["On The Market"]
+
+    resp_archived = await client.get(
+        "/api/v1/marketplace/crops?availability=archived", headers=customer
+    )
+    assert resp_archived.status_code == 200, resp_archived.text
+    names_archived = [i["crop_name"] for i in resp_archived.json()["items"]]
+    assert names_archived == ["Retired"]
+
+
 async def test_search_crops(client):
     farmer = await _register(client, "919000000016", role="farmer")
     await _seed_three(client, farmer)

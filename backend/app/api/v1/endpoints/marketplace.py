@@ -18,6 +18,7 @@ reads them as an id.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
@@ -70,13 +71,19 @@ async def browse_crops(
     min_price: float | None = Query(None, ge=0, description="Filter: minimum price per unit"),
     max_price: float | None = Query(None, ge=0, description="Filter: maximum price per unit"),
     location: str | None = Query(None, max_length=200, description="Filter: location substring"),
+    harvest_from: date | None = Query(
+        None, description="Filter: harvest date on/after this day (inclusive)"
+    ),
+    harvest_to: date | None = Query(
+        None, description="Filter: harvest date on/before this day (inclusive)"
+    ),
     sort: str = Query(SORT_NEWEST, pattern="|".join(SORT_KEYS), description="Sort order"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Items per page"),
 ) -> CropListingPageOut:
     """Browse the marketplace (paginated), optionally filtered by category /
-    organic / availability / price range / location and sorted newest or by
-    price. Passing ``q`` searches at the same time.
+    organic / availability / price range / location / harvest-date window and
+    sorted newest / oldest / by price. Passing ``q`` searches at the same time.
     """
     return await MarketplaceService(db).browse_crops(
         q=q,
@@ -86,6 +93,8 @@ async def browse_crops(
         min_price=min_price,
         max_price=max_price,
         location=location,
+        harvest_from=harvest_from,
+        harvest_to=harvest_to,
         sort=sort,
         page=page,
         page_size=page_size,
@@ -102,6 +111,12 @@ async def search_crops(
     min_price: float | None = Query(None, ge=0, description="Filter: minimum price per unit"),
     max_price: float | None = Query(None, ge=0, description="Filter: maximum price per unit"),
     location: str | None = Query(None, max_length=200, description="Filter: location substring"),
+    harvest_from: date | None = Query(
+        None, description="Filter: harvest date on/after this day (inclusive)"
+    ),
+    harvest_to: date | None = Query(
+        None, description="Filter: harvest date on/before this day (inclusive)"
+    ),
     sort: str = Query(SORT_NEWEST, pattern="|".join(SORT_KEYS), description="Sort order"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Items per page"),
@@ -115,6 +130,8 @@ async def search_crops(
         min_price=min_price,
         max_price=max_price,
         location=location,
+        harvest_from=harvest_from,
+        harvest_to=harvest_to,
         sort=sort,
         page=page,
         page_size=page_size,

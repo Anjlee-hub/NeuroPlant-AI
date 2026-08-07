@@ -20,6 +20,7 @@ filter semantics never diverge between the two endpoints.
 from __future__ import annotations
 
 import io
+from datetime import date, datetime, time
 from math import ceil
 
 from fastapi import UploadFile
@@ -52,11 +53,19 @@ logger = get_logger(__name__)
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 
-# Sort keys accepted by the browse endpoint.
+# Sort keys accepted by the browse endpoint. ``oldest`` is the M4 Task 3
+# additive extension (the buyer storefront needs oldest-first in addition to
+# the Task 1 newest/price sorts); everything else is unchanged.
 SORT_NEWEST = "newest"
+SORT_OLDEST = "oldest"
 SORT_PRICE_ASC = "price_asc"
 SORT_PRICE_DESC = "price_desc"
-SORT_KEYS = (SORT_NEWEST, SORT_PRICE_ASC, SORT_PRICE_DESC)
+SORT_KEYS = (SORT_NEWEST, SORT_OLDEST, SORT_PRICE_ASC, SORT_PRICE_DESC)
+
+# The public browse feed hides archived listings unless a caller asks for them
+# explicitly (M4 Task 3): ``archived`` means "hidden from the market" per Task
+# 2, so the buyer storefront shouldn't surface retired listings by default.
+AVAILABILITY_ARCHIVED = "archived"
 
 # ── Listing image upload (M4, Task 2) ─────────────────────────────────────
 MAX_LISTING_IMAGES = 8  # matches the schema's images list cap
@@ -219,13 +228,17 @@ class MarketplaceService:
         min_price: float | None = None,
         max_price: float | None = None,
         location: str | None = None,
+        harvest_from: date | None = None,
+        harvest_to: date | None = None,
         sort: str = SORT_NEWEST,
         page: int = 1,
         page_size: int = DEFAULT_PAGE_SIZE,
     ) -> CropListingPageOut:
         """Paginated listing feed. ``q`` is the search term; every other
         keyword is a filter. One query builder serves both the browse and
-        search endpoints so their semantics can't drift."""
+        search endpoints so their semantics can't drift. ``harvest_from`` /
+        ``harvest_to`` bound the listing's harvest date to a window (M4 Task 3
+        additive extension)."""
         conds = self._filter_conditions(
             q=q,
             category=category,
@@ -234,6 +247,8 @@ class MarketplaceService:
             min_price=min_price,
             max_price=max_price,
             location=location,
+            harvest_from=harvest_from,
+            harvest_to=harvest_to,
         )
         page = max(1, page)
         page_size = max(1, min(page_size, MAX_PAGE_SIZE))
@@ -396,8 +411,15 @@ class MarketplaceService:
         min_price: float | None,
         max_price: float | None,
         location: str | None,
+        harvest_from: date | None = None,
+        harvest_to: date | None = None,
     ) -> list:
         conds = []
+        # Archived listings are off the market: hide them from the default
+        # feed, but let an explicit availability=archived filter (used by the
+        # buyer's availability select) still reach them.
+        if availability is None:
+            conds.append(CropListing.availability != AVAILABILITY_ARCHIVED)
         if q:
             like = f"%{q}%"
             conds.append(
@@ -420,10 +442,19 @@ class MarketplaceService:
             conds.append(CropListing.price <= max_price)
         if location:
             conds.append(CropListing.location.ilike(f"%{location}%"))
+        # Harvest window: listings harvested between (inclusive) the two dates.
+        # Listings with no harvest date fall outside any window, matching how
+        # a farmer who leaves the field blank isn't advertising a date.
+        if harvest_from is not None:
+            conds.append(CropListing.harvest_date >= datetime.combine(harvest_from, time.min))
+        if harvest_to is not None:
+            conds.append(CropListing.harvest_date <= datetime.combine(harvest_to, time.max))
         return conds
 
     @staticmethod
     def _sort_clauses(sort: str) -> list:
+        if sort == SORT_OLDEST:
+            return [CropListing.created_at.asc(), CropListing.id.asc()]
         if sort == SORT_PRICE_ASC:
             return [CropListing.price.asc(), CropListing.id.asc()]
         if sort == SORT_PRICE_DESC:

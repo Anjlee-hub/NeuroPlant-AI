@@ -72,6 +72,48 @@ export interface ListingImagesResult {
   urls: string[];
 }
 
+/** Public farmer summary attached to a listing's detail view. */
+export interface FarmerSummary {
+  id: number;
+  name: string;
+  verified: boolean;
+}
+
+/** One listing with its farmer attached (the detail endpoint's payload). */
+export interface CropListingDetail extends CropListing {
+  farmer: FarmerSummary;
+}
+
+/** Paginated browse response — mirrors `CropListingPageOut`. */
+export interface CropListingPage {
+  items: CropListing[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+/** Sort keys the browse/search endpoints accept (Task 3 adds `oldest`). */
+export type CropListingSort = "newest" | "oldest" | "price_asc" | "price_desc";
+
+/** Query parameters for browse/search (all optional; server-owned rules). */
+export interface CropListingQuery {
+  q?: string;
+  category?: CropCategory;
+  organic?: boolean;
+  availability?: CropAvailability;
+  min_price?: number;
+  max_price?: number;
+  location?: string;
+  /** Inclusive lower bound on harvest date (YYYY-MM-DD). */
+  harvest_from?: string;
+  /** Inclusive upper bound on harvest date (YYYY-MM-DD). */
+  harvest_to?: string;
+  sort?: CropListingSort;
+  page?: number;
+  page_size?: number;
+}
+
 /** The farmer-facing availability label set for the dashboard status bucket. */
 export const CROP_AVAILABILITY_OPTIONS: CropAvailability[] = [
   "available",

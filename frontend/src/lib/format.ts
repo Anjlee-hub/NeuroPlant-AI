@@ -23,3 +23,12 @@ export function formatDate(iso: string, locale: string): string {
     timeStyle: "short",
   }).format(date);
 }
+
+/** "2026-07-15" (date-only, no timezone) -> localized date without a time.
+ * Parsed as local midnight so the day never shifts across timezones — the
+ * calendar and marketplace dates are stored this way. */
+export function formatDateOnly(dateStr: string, locale: string): string {
+  const date = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date);
+}

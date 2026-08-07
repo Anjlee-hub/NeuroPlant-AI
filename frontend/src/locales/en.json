@@ -15,6 +15,7 @@
     "doctor": "Crop Doctor",
     "calendar": "Calendar",
     "marketplace": "Marketplace",
+    "marketplaceBuy": "Buy",
     "assistant": "AI Assistant",
     "login": "Log in",
     "register": "Sign up",
@@ -760,6 +761,88 @@
       "archivedToast": "Listing archived",
       "deletedToast": "Listing deleted",
       "error": "Something went wrong. Please try again."
+    }
+  },
+  "marketplaceBuy": {
+    "authRequired": "Sign in to browse the marketplace.",
+    "signIn": "Sign in",
+    "title": "Buy Fresh Produce",
+    "subtitle": "Browse farm listings from across the country and buy straight from the source.",
+    "errorTitle": "Couldn't load listings",
+    "errorBody": "Check your connection and try again.",
+    "empty": "No listings are on the market right now. Check back soon.",
+    "noResults": "No listings match your filters. Try widening them.",
+    "resultsCount": "{{count}} listings",
+    "sort": {
+      "label": "Sort by",
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "price_asc": "Price: low to high",
+      "price_desc": "Price: high to low"
+    },
+    "filter": {
+      "searchPlaceholder": "Search crops…",
+      "categoryLabel": "Category",
+      "categoryAll": "All categories",
+      "organicLabel": "Organic only",
+      "availabilityLabel": "Availability",
+      "availabilityAll": "Any availability",
+      "priceLabel": "Price per unit",
+      "minPrice": "Min price",
+      "maxPrice": "Max price",
+      "harvestFrom": "Harvested on/after",
+      "harvestTo": "Harvested on/before",
+      "locationPlaceholder": "Location…",
+      "clear": "Clear filters",
+      "showFilters": "Filters"
+    },
+    "card": {
+      "perUnit": "/{{unit}}",
+      "quantity": "{{quantity}} {{unit}}",
+      "harvestDate": "Harvested {{date}}",
+      "viewDetails": "View details"
+    },
+    "detail": {
+      "back": "Back to listings",
+      "descriptionLabel": "Description",
+      "harvestDate": "Harvest date",
+      "listedOn": "Listed on",
+      "quantity": "Quantity",
+      "price": "Price",
+      "organic": "Organic",
+      "notOrganic": "Not organic",
+      "farmer": "Farmer",
+      "verified": "Verified",
+      "location": "Location",
+      "noImages": "No photos for this listing."
+    },
+    "gallery": {
+      "mainImage": "Photo of {{name}}",
+      "thumbnail": "Thumbnail {{n}} of {{name}}",
+      "openLightbox": "Open photo",
+      "closeLightbox": "Close photo viewer",
+      "prev": "Previous photo",
+      "next": "Next photo",
+      "thumbnails": "Photos of {{name}}"
+    },
+    "actions": {
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied",
+      "favourite": "Save to favourites",
+      "unfavourite": "Remove from favourites",
+      "favourited": "Saved",
+      "contactFarmer": "Contact farmer",
+      "contactSoon": "Messaging is coming soon."
+    },
+    "grid": {
+      "listLabel": "Crop listings"
+    },
+    "pagination": {
+      "label": "Pagination",
+      "previous": "Previous",
+      "next": "Next",
+      "goTo": "Go to page {{page}}",
+      "page": "Page {{page}} of {{pages}}"
     }
   },
   "assistant": {

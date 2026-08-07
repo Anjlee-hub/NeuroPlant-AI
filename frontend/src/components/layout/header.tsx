@@ -7,6 +7,7 @@ import {
   Menu,
   MessageCircle,
   ScanLine,
+  ShoppingBag,
   Stethoscope,
   Store,
   X,
@@ -35,7 +36,10 @@ const NAV_ITEMS: Array<{
   { to: "/doctor", labelKey: "nav.doctor", icon: Stethoscope },
   { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { to: "/assistant", labelKey: "nav.assistant", icon: MessageCircle },
+  // Seller dashboard (M4 T2) then buyer storefront (M4 T3) — two entry points
+  // into the same marketplace backend.
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
+  { to: "/marketplace/browse", labelKey: "nav.marketplaceBuy", icon: ShoppingBag },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {

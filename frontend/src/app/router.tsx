@@ -18,6 +18,8 @@ import { FarmerCalendarPage } from "@/pages/farmer-calendar";
 import { AssistantPage } from "@/pages/assistant";
 import { MarketplaceDashboardPage } from "@/pages/marketplace-dashboard";
 import { MarketplaceListingFormPage } from "@/pages/marketplace-listing-form";
+import { MarketplaceBuyPage } from "@/pages/marketplace-buy";
+import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -50,6 +52,11 @@ export const router = createBrowserRouter([
       { path: "marketplace", element: <MarketplaceDashboardPage /> },
       { path: "marketplace/listings/new", element: <MarketplaceListingFormPage /> },
       { path: "marketplace/listings/:listingId/edit", element: <MarketplaceListingFormPage /> },
+      // Buyer storefront (M4 T3): browse with server-side filters + the shared
+      // listing detail. Static segments (new/edit) outrank :listingId, so the
+      // farmer's create/edit routes stay unambiguous.
+      { path: "marketplace/browse", element: <MarketplaceBuyPage /> },
+      { path: "marketplace/listings/:listingId", element: <MarketplaceListingDetailPage /> },
       // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
       { path: "assistant", element: <AssistantPage /> },
       { path: "*", element: <NotFoundPage /> },
