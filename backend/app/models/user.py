@@ -17,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -78,6 +79,16 @@ class ExpertProfile(Base, TimestampMixin):
 
 
 class SellerProfile(Base, TimestampMixin):
+    """Agricultural shop registration (M1) extended with marketplace fields (M4, Task 1).
+
+    This IS the marketplace ``Seller`` model: creating a second seller table
+    would duplicate ``shop_name``/``address``/``verified``. Task 1 adds the
+    requirement's missing fields — shop ``phone``, ``delivery_available`` and a
+    read-mostly ``rating`` (0.0 until a review system lands in a later task).
+    ``owner`` is the linked ``User`` (``user_id``) and ``products`` are the
+    seller's ``Product`` rows (queried by seller user id, not a relationship).
+    """
+
     __tablename__ = "seller_profiles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -87,6 +98,14 @@ class SellerProfile(Base, TimestampMixin):
     business_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ── Marketplace fields (M4, Task 1) ────────────────────────────────────
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)  # shop contact line
+    delivery_available: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("0"), nullable=False
+    )
+    rating: Mapped[float] = mapped_column(
+        Float, default=0.0, server_default=text("0"), nullable=False
+    )
 
 
 class MFA(Base, TimestampMixin):
