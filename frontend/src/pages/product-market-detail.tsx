@@ -6,6 +6,8 @@ import { Link, useParams } from "react-router-dom";
 
 import { ProductAvailabilityBadge } from "@/components/marketplace/availability-badge";
 import { ProductListingGallery } from "@/components/marketplace/product-listing-gallery";
+import { ContactSellerButton } from "@/components/messages/contact-seller-button";
+import { CopyLinkButton } from "@/components/marketplace/copy-link-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,8 +22,8 @@ import type { ProductDetail } from "@/types/marketplace";
  * Public product market detail (M4 Task 4) at /marketplace/products/:id. Loads
  * the single product with its seller shop attached, shows the full photo gallery
  * with a lightbox, every field the seller entered, and buyer actions — copy the
- * shareable link and a Contact Seller placeholder that M4 Task 5 messaging will
- * fill in.
+ * shareable link and Contact Seller (M4 Task 5) which opens a real message
+ * thread with the product's shop.
  */
 
 export const PRODUCT_MARKET_DETAIL_KEY = ["product-market-detail"] as const;
@@ -202,12 +204,11 @@ function ProductMarketDetail({ product }: { product: ProductDetail }) {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button className="btn btn-outline" type="button">
-                  {t("productMarket.detail.copyLink")}
-                </button>
-                <button className="btn btn-primary" type="button">
-                  {t("productMarket.detail.contactSeller")}
-                </button>
+                <CopyLinkButton url={window.location.href} />
+                <ContactSellerButton
+                  label={t("productMarket.detail.contactSeller")}
+                  productId={product.id}
+                />
               </div>
             </CardContent>
           </Card>

@@ -14,6 +14,7 @@ from app.models.calendar import (
 from app.models.catalog import Crop, Disease
 from app.models.conversation import ConversationMessage
 from app.models.marketplace import CropListing, Product
+from app.models.messaging import MarketplaceConversation, MarketplaceMessage
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
@@ -41,6 +42,8 @@ __all__ = [
     "ConversationMessage",
     "CropListing",
     "Product",
+    "MarketplaceConversation",
+    "MarketplaceMessage",
     "RecommendationCatalog",
     "DiseaseRecommendation",
     "SoilRecommendationCatalog",

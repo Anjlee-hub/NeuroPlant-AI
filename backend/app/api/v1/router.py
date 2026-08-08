@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     calendar,
     catalog,
     marketplace,
+    messaging,
     recommendations,
     recovery,
     scans,
@@ -39,6 +40,8 @@ api_router.include_router(assistant.router)
 
 # M4 — farmer marketplace & community (Task 1: marketplace backend foundation).
 api_router.include_router(marketplace.router)
+# M4 Task 5 — buyer↔seller communication (inquiry/chat system).
+api_router.include_router(messaging.router)
 
 # Routers are added milestone-by-milestone:
 # M4: voice, dataset, marketplace (in progress)

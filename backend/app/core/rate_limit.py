@@ -84,6 +84,7 @@ class RateLimiter:
 
 _scan_limiter: RateLimiter | None = None
 _sync_limiter: RateLimiter | None = None
+_message_limiter: RateLimiter | None = None
 
 
 def get_scan_limiter() -> RateLimiter:
@@ -110,3 +111,18 @@ def get_scan_sync_limiter() -> RateLimiter:
             enabled=settings.rate_limit_enabled,
         )
     return _sync_limiter
+
+
+def get_message_limiter() -> RateLimiter:
+    """Process-wide marketplace-message limiter (M4 Task 5) — bounds chat spam
+    with a per-user budget, sharing the in-process token-bucket approach until
+    the Redis-backed limiter lands in M11."""
+    global _message_limiter
+    if _message_limiter is None:
+        settings = get_settings()
+        _message_limiter = RateLimiter(
+            capacity=settings.rate_limit_messages_per_minute,
+            refill_per_sec=settings.rate_limit_messages_per_minute / 60.0,
+            enabled=settings.rate_limit_enabled,
+        )
+    return _message_limiter

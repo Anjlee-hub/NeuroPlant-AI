@@ -38,6 +38,11 @@ from app.services.marketplace import (
     ProductNotFoundError,
     SellerShopNotFoundError,
 )
+from app.services.messaging import (
+    ConversationClosedError,
+    ConversationNotFoundError,
+    ConversationValidationError,
+)
 from app.services.otp import OtpError
 from app.services.recommendations import (
     CatalogUnavailableError,
@@ -152,6 +157,13 @@ app.add_exception_handler(ProductNotFoundError, _error_handler(404))
 app.add_exception_handler(SellerShopNotFoundError, _error_handler(404))
 # Marketplace (M4 T2) — 422 when a listing photo fails validation.
 app.add_exception_handler(ListingImageUploadError, _error_handler(422))
+
+# Messaging (M4 T5) — 404 when a thread isn't the caller's (enumeration guard),
+# 409 when a closed thread is messaged, 400 for bad create context (self-contact,
+# wrong/missing listing/product/seller).
+app.add_exception_handler(ConversationNotFoundError, _error_handler(404))
+app.add_exception_handler(ConversationClosedError, _error_handler(409))
+app.add_exception_handler(ConversationValidationError, _error_handler(400))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

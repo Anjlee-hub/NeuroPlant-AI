@@ -18,6 +18,7 @@
     "marketplaceBuy": "Buy",
     "sellerPortal": "My Shop",
     "productMarket": "Buy Farm Inputs",
+    "messages": "Messages",
     "assistant": "AI Assistant",
     "login": "Log in",
     "register": "Sign up",
@@ -835,8 +836,7 @@
       "favourite": "Save to favourites",
       "unfavourite": "Remove from favourites",
       "favourited": "Saved",
-      "contactFarmer": "Contact farmer",
-      "contactSoon": "Messaging is coming soon."
+      "contactFarmer": "Contact farmer"
     },
     "grid": {
       "listLabel": "Crop listings"
@@ -1106,6 +1106,43 @@
       "goTo": "Go to page {{page}}",
       "page": "Page {{page}} of {{pages}}"
     }
+  },
+  "messages": {
+    "title": "Messages",
+    "subtitle": "Ask sellers and farmers about their produce.",
+    "authRequired": "Sign in to read your messages.",
+    "signIn": "Sign in",
+    "loading": "Loading conversations",
+    "errorTitle": "Couldn't load conversations",
+    "errorBody": "Something went wrong while loading your inbox.",
+    "emptyTitle": "No conversations yet",
+    "emptyBody": "When you ask a seller or farmer a question, it shows up here.",
+    "browseMarketplace": "Browse the marketplace",
+    "inboxLabel": "Conversations",
+    "openThread": "Open conversation with {{name}}",
+    "noMessages": "No messages yet — say hello.",
+    "unreadCount": "{{count}} unread messages",
+    "closed": "Closed",
+    "threadLabel": "Message history",
+    "threadClosed": "This conversation is closed.",
+    "threadClosedNote": "This conversation is closed. Contact the seller again to reopen it.",
+    "composerLabel": "Message",
+    "composerPlaceholder": "Type a message…",
+    "send": "Send message",
+    "sending": "Sending…",
+    "read": "Read",
+    "opening": "Opening…",
+    "backToInbox": "Back to messages",
+    "notFoundTitle": "Conversation not found",
+    "notFoundBody": "This conversation doesn't exist or isn't yours.",
+    "threadErrorTitle": "Couldn't load conversation",
+    "threadErrorBody": "Something went wrong while loading this conversation.",
+    "closeThread": "Close conversation",
+    "confirmClose": "Close this conversation? Messages stay visible, but new ones are blocked.",
+    "inquiriesTitle": "Inquiries",
+    "inquiriesUnread": "{{count}} unread",
+    "inquiriesEmpty": "No inquiries yet. When a buyer contacts you, it shows up here.",
+    "viewAll": "View all messages"
   },
   "footer": {
     "tagline": "The AI-powered agriculture platform for India.",

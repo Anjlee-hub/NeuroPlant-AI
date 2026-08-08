@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     rate_limit_scan_per_minute: int = 10
     # Per-user offline-sync quota — a separate budget from live uploads.
     rate_limit_scan_sync_per_minute: int = 10
+    # Per-user marketplace-message quota (M4 Task 5) — bounds chat spam.
+    rate_limit_messages_per_minute: int = 30
 
     # ── Scan uploads ─────────────────────────────────────────────────────
     scan_max_images: int = 5  # max images per POST /scans

@@ -11,12 +11,14 @@ const authMock = vi.hoisted(() => ({
 }));
 const apiMock = vi.hoisted(() => ({
   getCropListing: vi.fn(),
+  createConversation: vi.fn(),
+  errorMessage: (err: Error) => err.message,
 }));
 
 vi.mock("@/stores/auth", () => ({
   useAuth: () => ({ user: authMock.user, loading: false }),
 }));
-vi.mock("@/lib/api", () => ({ api: apiMock }));
+vi.mock("@/lib/api", () => ({ api: apiMock, errorMessage: apiMock.errorMessage }));
 
 import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail";
 
@@ -52,6 +54,11 @@ function renderPage(id = 1) {
       { path: "/", element: <div>home</div> },
       { path: "/login", element: <div>login</div> },
       { path: "/marketplace/browse", element: <div>browse</div> },
+      { path: "/marketplace/messages", element: <div>messages</div> },
+      {
+        path: "/marketplace/messages/:conversationId",
+        element: <div>conversation</div>,
+      },
       {
         path: "/marketplace/listings/:listingId",
         element: <MarketplaceListingDetailPage />,
@@ -170,12 +177,30 @@ describe("MarketplaceListingDetailPage", () => {
     expect(screen.getByRole("button", { name: "Link copied" })).toBeInTheDocument();
   });
 
-  it("reveals a messaging coming-soon note via the contact button", async () => {
+  it("opens a conversation with the listing's farmer on contact", async () => {
+    apiMock.createConversation.mockResolvedValue({ id: 42 });
     renderPage();
 
     await userEvent.click(await screen.findByRole("button", { name: "Contact farmer" }));
 
-    expect(screen.getByText("Messaging is coming soon.")).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(apiMock.createConversation).toHaveBeenCalledWith({
+        listing_id: 1,
+        product_id: undefined,
+        seller_id: undefined,
+      });
+    });
+    // The button opens the new thread in the messaging UI.
+    expect(await screen.findByText("conversation")).toBeInTheDocument();
+  });
+
+  it("shows an inline error when starting a conversation fails", async () => {
+    apiMock.createConversation.mockRejectedValue(new Error("Something went wrong"));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Contact farmer" }));
+
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
   });
 
   it("shows an error state with retry when the listing fails to load", async () => {

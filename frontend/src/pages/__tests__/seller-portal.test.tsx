@@ -24,6 +24,7 @@ const apiMock = vi.hoisted(() => ({
   deleteProduct: vi.fn(),
   browseProducts: vi.fn(),
   getProduct: vi.fn(),
+  listConversations: vi.fn(),
 }));
 
 vi.mock("@/stores/auth", () => ({
@@ -116,6 +117,7 @@ describe("SellerDashboardPage (/marketplace/shop)", () => {
     apiMock.updateProduct.mockResolvedValue(neem);
     apiMock.deleteProduct.mockResolvedValue(undefined);
     apiMock.updateShop.mockResolvedValue(shop);
+    apiMock.listConversations.mockResolvedValue([]);
   });
 
   it("asks to sign in when no user is authenticated", async () => {

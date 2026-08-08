@@ -10,7 +10,11 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.rate_limit import get_scan_limiter, get_scan_sync_limiter
+from app.core.rate_limit import (
+    get_message_limiter,
+    get_scan_limiter,
+    get_scan_sync_limiter,
+)
 from app.core.security import TokenError, decode_access_token
 from app.db.session import get_db
 from app.models.user import User
@@ -113,4 +117,23 @@ async def scan_sync_rate_limit(
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many scan syncs, please try again shortly",
+        )
+
+
+async def message_rate_limit(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> None:
+    """Dependency: one marketplace message slot per user+IP per minute (M4 T5).
+
+    Bounds chat spam while keeping the surface open in dev (the limiter is a
+    no-op when ``rate_limit_enabled`` is False). Applies to both thread creation
+    (the opening message) and each reply.
+    """
+    limiter = get_message_limiter()
+    client_ip = request.client.host if request.client else "?"
+    if not limiter.allow(f"message:{user.id}:{client_ip}"):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many messages, please try again shortly",
         )

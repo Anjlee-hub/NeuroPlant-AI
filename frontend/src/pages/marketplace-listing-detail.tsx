@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import { AvailabilityBadge } from "@/components/marketplace/availability-badge";
-import { ContactFarmerButton } from "@/components/marketplace/contact-farmer-button";
+import { ContactSellerButton } from "@/components/messages/contact-seller-button";
 import { CopyLinkButton } from "@/components/marketplace/copy-link-button";
 import { FavouriteButton } from "@/components/marketplace/favourite-button";
 import { ListingGallery } from "@/components/marketplace/listing-gallery";
@@ -23,8 +23,8 @@ import type { CropListingDetail } from "@/types/marketplace";
  * Buyer listing detail (M4 Task 3) at /marketplace/listings/:id. Loads the
  * single listing with its farmer attached, shows the full photo gallery with a
  * lightbox, every field the seller entered, and the buyer actions — save to
- * favourites (localStorage), copy the shareable link, and the Contact Farmer
- * placeholder that M4 Task 5 messaging will fill in.
+ * favourites (localStorage), copy the shareable link, and Contact Farmer
+ * (M4 Task 5) which opens a real message thread with the listing's farmer.
  */
 
 export const MARKETPLACE_DETAIL_KEY = ["marketplace-listing-detail"] as const;
@@ -197,7 +197,10 @@ function ListingDetail({ listing }: { listing: CropListingDetail }) {
                 </p>
               </div>
             </div>
-            <ContactFarmerButton farmerId={listing.farmer.id} />
+            <ContactSellerButton
+              label={t("marketplaceBuy.actions.contactFarmer")}
+              listingId={listing.id}
+            />
           </CardContent>
         </Card>
 

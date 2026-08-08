@@ -22,6 +22,14 @@ import type {
   ConversationHistory,
 } from "@/types/assistant";
 import type { DiseaseRecommendation } from "@/types/recommendation";
+import type {
+  ConversationCreateInput,
+  ConversationDetail,
+  ConversationListItem,
+  Message,
+  ReadResult,
+  SendMessageInput,
+} from "@/types/messages";
 import type { RecoveryLog, RecoveryLogInput, RecoveryTracker } from "@/types/recovery";
 import type { SoilRecommendation } from "@/types/soil";
 import type {
@@ -472,6 +480,42 @@ export const api = {
       auth: true,
     });
   },
+
+  // ── Messaging (M4 Task 5) ─────────────────────────────────────────────
+  /** Start (or reuse) a conversation with a seller or listing farmer. */
+  createConversation: (payload: ConversationCreateInput) =>
+    request<ConversationDetail>("/marketplace/conversations", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** The caller's inbox — every thread they're a participant of. */
+  listConversations: () =>
+    request<ConversationListItem[]>("/marketplace/conversations", { auth: true }),
+  /** One full thread (participants only — anyone else gets 404). */
+  getConversation: (conversationId: number) =>
+    request<ConversationDetail>(`/marketplace/conversations/${conversationId}`, {
+      auth: true,
+    }),
+  /** Append one message to a thread. */
+  sendMessage: (conversationId: number, payload: SendMessageInput) =>
+    request<Message>(`/marketplace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Mark the other side's messages as read. */
+  markConversationRead: (conversationId: number) =>
+    request<ReadResult>(`/marketplace/conversations/${conversationId}/read`, {
+      method: "POST",
+      auth: true,
+    }),
+  /** Close the thread (idempotent; history stays visible). */
+  closeConversation: (conversationId: number) =>
+    request<ConversationListItem>(`/marketplace/conversations/${conversationId}/close`, {
+      method: "POST",
+      auth: true,
+    }),
 
   // ── M2.1 — live scan upload + profile ────────────────────────────────
   /** Multipart upload → runs the same pipeline as the offline sync path. */

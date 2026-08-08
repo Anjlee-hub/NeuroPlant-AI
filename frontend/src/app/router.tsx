@@ -23,6 +23,8 @@ import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail
 import { SellerDashboardPage } from "@/pages/seller-dashboard";
 import { ProductMarketBrowsePage } from "@/pages/product-market-browse";
 import { ProductMarketDetailPage } from "@/pages/product-market-detail";
+import { MessagesDetailPage } from "@/pages/messages-detail";
+import { MessagesListPage } from "@/pages/messages-list";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -67,6 +69,9 @@ export const router = createBrowserRouter([
       { path: "marketplace/shop", element: <SellerDashboardPage /> },
       { path: "marketplace/products", element: <ProductMarketBrowsePage /> },
       { path: "marketplace/products/:id", element: <ProductMarketDetailPage /> },
+      // Buyer↔seller messaging (M4 T5): inbox + one thread.
+      { path: "marketplace/messages", element: <MessagesListPage /> },
+      { path: "marketplace/messages/:conversationId", element: <MessagesDetailPage /> },
       // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
       { path: "assistant", element: <AssistantPage /> },
       { path: "*", element: <NotFoundPage /> },

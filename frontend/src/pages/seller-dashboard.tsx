@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ProductForm } from "@/components/marketplace/product-form";
 import { ProductStatsCards } from "@/components/marketplace/product-stats-cards";
+import { SellerInquiriesSection } from "@/components/messages/seller-inquiries-section";
 import {
   DEFAULT_SELLER_FILTERS,
   SellerProductFilterBar,
@@ -175,6 +176,8 @@ export function SellerDashboardPage() {
             )}
 
             {statsQuery.data && <ProductStatsCards stats={statsQuery.data} />}
+
+            <SellerInquiriesSection currentUserId={user.id} />
 
             <SellerProductFilterBar filters={filters} onChange={setFilters} />
 

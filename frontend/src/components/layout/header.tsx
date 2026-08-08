@@ -3,6 +3,7 @@ import {
   CloudUpload,
   History,
   Home,
+  Inbox,
   Leaf,
   Menu,
   MessageCircle,
@@ -43,6 +44,8 @@ const NAV_ITEMS: Array<{
   // Seller Portal (M4 T4): seller dashboard + public product market
   { to: "/marketplace/shop", labelKey: "nav.sellerPortal", icon: Store },
   { to: "/marketplace/products", labelKey: "nav.productMarket", icon: ShoppingBag },
+  // Buyer↔seller messaging (M4 T5): shared inbox.
+  { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {
