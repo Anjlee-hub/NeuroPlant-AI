@@ -40,6 +40,9 @@ const NAV_ITEMS: Array<{
   // into the same marketplace backend.
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
   { to: "/marketplace/browse", labelKey: "nav.marketplaceBuy", icon: ShoppingBag },
+  // Seller Portal (M4 T4): seller dashboard + public product market
+  { to: "/marketplace/shop", labelKey: "nav.sellerPortal", icon: Store },
+  { to: "/marketplace/products", labelKey: "nav.productMarket", icon: ShoppingBag },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {

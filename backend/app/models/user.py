@@ -106,6 +106,11 @@ class SellerProfile(Base, TimestampMixin):
     rating: Mapped[float] = mapped_column(
         Float, default=0.0, server_default=text("0"), nullable=False
     )
+    # ── Seller Portal fields (M4, Task 4) ──────────────────────────────────
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opening_hours: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    banner_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class MFA(Base, TimestampMixin):

@@ -39,11 +39,16 @@ from app.schemas.marketplace import (
     CropListingStatsOut,
     CropListingUpdate,
     FarmerSummaryOut,
+    ProductDetailOut,
     ProductIn,
     ProductOut,
+    ProductPageOut,
+    ProductStatsOut,
     ProductUpdate,
     SellerOut,
     SellerRegister,
+    SellerUpdate,
+    ShopSummaryOut,
 )
 from app.services.storage import get_storage_service
 
@@ -176,17 +181,23 @@ class MarketplaceService:
         )
 
     async def upload_listing_images(self, user: User, files: list[UploadFile]) -> list[str]:
-        """Persist one or more listing photos and return their public URLs.
+        """Persist one or more listing photos and return their public URLs."""
+        return await self._persist_images(
+            user, files, subdir="marketplace", max_files=MAX_LISTING_IMAGES
+        )
 
-        Validates count, content type and size, then decodes each file with
-        PIL so a renamed text file can't sneak through as "an image". Files are
-        stored via the platform's object-storage abstraction (local disk today,
-        S3 in M11) under a user-scoped ``marketplace`` subdir.
-        """
+    async def _persist_images(
+        self, user: User, files: list[UploadFile], *, subdir: str, max_files: int
+    ) -> list[str]:
+        """Shared image pipeline: count / content-type / size checks, PIL decode
+        so a renamed text file can't sneak through as "an image", then store via
+        the platform's object-storage abstraction (local disk today, S3 in M11)
+        under a user-scoped subdir. Raises :class:`ListingImageUploadError` for
+        every reject path."""
         if not files:
             raise ListingImageUploadError("at least one image is required")
-        if len(files) > MAX_LISTING_IMAGES:
-            raise ListingImageUploadError(f"at most {MAX_LISTING_IMAGES} images per listing")
+        if len(files) > max_files:
+            raise ListingImageUploadError(f"at most {max_files} images per upload")
 
         storage = get_storage_service()
         urls: list[str] = []
@@ -202,9 +213,9 @@ class MarketplaceService:
             if len(data) > MAX_LISTING_IMAGE_BYTES:
                 raise ListingImageUploadError("image exceeds the 10 MB limit")
             self._verify_image(data)
-            key = storage.save(data, content_type, user.id, subdir="marketplace")
+            key = storage.save(data, content_type, user.id, subdir=subdir)
             urls.append(storage.url(key))
-        logger.info("listing_images_uploaded", user_id=user.id, count=len(urls))
+        logger.info("images_uploaded", user_id=user.id, subdir=subdir, count=len(urls))
         return urls
 
     @staticmethod
@@ -321,6 +332,10 @@ class MarketplaceService:
             unit=payload.unit,
             stock_quantity=payload.stock_quantity,
             images=payload.images,
+            organic=payload.organic,
+            manufacturer=payload.manufacturer,
+            usage_instructions=payload.usage_instructions,
+            availability=payload.availability,
         )
         self.db.add(product)
         await self.db.commit()
@@ -350,6 +365,124 @@ class MarketplaceService:
         )
         return [ProductOut.model_validate(row) for row in rows.all()]
 
+    async def update_shop(self, user: User, payload: SellerUpdate) -> SellerOut:
+        """Edit the seller's shop profile (M4 Task 4). Only the fields sent are
+        changed; ``shop()`` re-assembles the full shop payload."""
+        profile = await self._profile_for_user(user.id)
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(profile, field, value)
+        self.db.add(profile)
+        await self.db.commit()
+        await self.db.refresh(profile)
+        logger.info("shop_updated", user_id=user.id, profile_id=profile.id)
+        return await self.shop(user)
+
+    async def delete_product(self, user: User, product_id: int) -> None:
+        """Remove one of the seller's own products (M4 Task 4)."""
+        product = await self._product_for_seller(product_id, user.id)
+        await self.db.delete(product)
+        await self.db.commit()
+        logger.info("product_deleted", seller_id=user.id, product_id=product_id)
+
+    async def my_products_stats(self, user: User) -> ProductStatsOut:
+        """Dashboard counts over the seller's own catalog (M4 Task 4)."""
+        rows = await self.db.execute(
+            select(Product.availability, func.count(Product.id))
+            .where(Product.seller_id == user.id)
+            .group_by(Product.availability)
+        )
+        by_status = {avail: count for avail, count in rows.all()}
+        in_stock = by_status.get("in_stock", 0)
+        out_of_stock = by_status.get("out_of_stock", 0)
+        archived = by_status.get("archived", 0)
+        return ProductStatsOut(
+            total=in_stock + out_of_stock + archived,
+            active=in_stock,
+            out_of_stock=out_of_stock,
+            archived=archived,
+        )
+
+    async def upload_shop_image(self, user: User, file: UploadFile, kind: str) -> str:
+        """Persist the shop's logo or banner and return its public URL (M4 Task
+        4). The caller drops the returned URL into the shop profile's
+        ``logo_url`` / ``banner_url``."""
+        urls = await self._persist_images(user, [file], subdir=f"shop/{kind}", max_files=1)
+        return urls[0]
+
+    async def upload_product_images(self, user: User, files: list[UploadFile]) -> list[str]:
+        """Persist one or more product photos and return their public URLs (M4
+        Task 4), to drop into the product's ``images`` field."""
+        return await self._persist_images(
+            user, files, subdir="products", max_files=MAX_LISTING_IMAGES
+        )
+
+    # ── Public product market (M4 Task 4) ────────────────────────────────
+
+    async def browse_products(
+        self,
+        *,
+        q: str | None = None,
+        category: str | None = None,
+        organic: bool | None = None,
+        availability: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        brand: str | None = None,
+        sort: str = SORT_NEWEST,
+        page: int = 1,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> ProductPageOut:
+        """Paginated public product feed — search + filter + sort, server-side.
+        Mirrors ``browse_crops`` so the two marketplaces share one query shape.
+        ``q`` matches name / brand / description / manufacturer."""
+        conds = self._product_filters(
+            q=q,
+            category=category,
+            organic=organic,
+            availability=availability,
+            min_price=min_price,
+            max_price=max_price,
+            brand=brand,
+        )
+        page = max(1, page)
+        page_size = max(1, min(page_size, MAX_PAGE_SIZE))
+
+        total = int(await self.db.scalar(select(func.count(Product.id)).where(*conds)) or 0)
+        rows = await self.db.scalars(
+            select(Product)
+            .where(*conds)
+            .order_by(*self._product_sort(sort))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        items = [ProductOut.model_validate(row) for row in rows.all()]
+        return ProductPageOut(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            pages=ceil(total / page_size) if total else 0,
+        )
+
+    async def product_detail(self, product_id: int) -> ProductDetailOut:
+        """One product with its shop attached (for the public detail view)."""
+        product = await self.db.get(Product, product_id)
+        if product is None:
+            raise ProductNotFoundError(f"product {product_id} not found")
+        profile = await self.db.scalar(
+            select(SellerProfile).where(SellerProfile.user_id == product.seller_id)
+        )
+        return ProductDetailOut(
+            **ProductOut.model_validate(product).model_dump(),
+            shop=ShopSummaryOut(
+                user_id=product.seller_id,
+                shop_name=profile.shop_name if profile is not None else None,
+                verified=profile.verified if profile is not None else False,
+                rating=profile.rating if profile is not None else 0.0,
+                delivery_available=profile.delivery_available if profile is not None else False,
+            ),
+        )
+
     # ── Internals ────────────────────────────────────────────────────────
 
     async def shop(self, user: User) -> SellerOut:
@@ -366,6 +499,10 @@ class MarketplaceService:
             rating=profile.rating,
             verified=profile.verified,
             created_at=profile.created_at,
+            description=profile.description,
+            opening_hours=profile.opening_hours,
+            logo_url=profile.logo_url,
+            banner_url=profile.banner_url,
             products=products,
         )
 
@@ -460,3 +597,54 @@ class MarketplaceService:
         if sort == SORT_PRICE_DESC:
             return [CropListing.price.desc(), CropListing.id.desc()]
         return [CropListing.created_at.desc(), CropListing.id.desc()]
+
+    @staticmethod
+    def _product_filters(
+        *,
+        q: str | None,
+        category: str | None,
+        organic: bool | None,
+        availability: str | None,
+        min_price: float | None,
+        max_price: float | None,
+        brand: str | None,
+    ) -> list:
+        """Search/filter conditions for the public product market (M4 Task 4).
+        Mirrors ``_filter_conditions`` for crops: archived products stay hidden
+        from the default feed unless explicitly requested."""
+        conds = []
+        if availability is None:
+            conds.append(Product.availability != AVAILABILITY_ARCHIVED)
+        if q:
+            like = f"%{q}%"
+            conds.append(
+                or_(
+                    Product.name.ilike(like),
+                    Product.brand.ilike(like),
+                    Product.description.ilike(like),
+                    Product.manufacturer.ilike(like),
+                )
+            )
+        if category:
+            conds.append(Product.category == category)
+        if organic is not None:
+            conds.append(Product.organic == organic)
+        if availability:
+            conds.append(Product.availability == availability)
+        if min_price is not None:
+            conds.append(Product.price >= min_price)
+        if max_price is not None:
+            conds.append(Product.price <= max_price)
+        if brand:
+            conds.append(Product.brand.ilike(f"%{brand}%"))
+        return conds
+
+    @staticmethod
+    def _product_sort(sort: str) -> list:
+        if sort == SORT_OLDEST:
+            return [Product.created_at.asc(), Product.id.asc()]
+        if sort == SORT_PRICE_ASC:
+            return [Product.price.asc(), Product.id.asc()]
+        if sort == SORT_PRICE_DESC:
+            return [Product.price.desc(), Product.id.desc()]
+        return [Product.created_at.desc(), Product.id.desc()]

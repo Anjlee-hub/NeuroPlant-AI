@@ -20,6 +20,9 @@ import { MarketplaceDashboardPage } from "@/pages/marketplace-dashboard";
 import { MarketplaceListingFormPage } from "@/pages/marketplace-listing-form";
 import { MarketplaceBuyPage } from "@/pages/marketplace-buy";
 import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail";
+import { SellerDashboardPage } from "@/pages/seller-dashboard";
+import { ProductMarketBrowsePage } from "@/pages/product-market-browse";
+import { ProductMarketDetailPage } from "@/pages/product-market-detail";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -57,6 +60,13 @@ export const router = createBrowserRouter([
       // farmer's create/edit routes stay unambiguous.
       { path: "marketplace/browse", element: <MarketplaceBuyPage /> },
       { path: "marketplace/listings/:listingId", element: <MarketplaceListingDetailPage /> },
+      // Seller Portal (M4 T4): seller dashboard at /marketplace/shop, public
+      // product market at /marketplace/products (browse + detail). Static segments
+      // rank above :id, so "products" won't capture "products/new" etc. — we
+      // don't have such routes yet, but this keeps future-proof.
+      { path: "marketplace/shop", element: <SellerDashboardPage /> },
+      { path: "marketplace/products", element: <ProductMarketBrowsePage /> },
+      { path: "marketplace/products/:id", element: <ProductMarketDetailPage /> },
       // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
       { path: "assistant", element: <AssistantPage /> },
       { path: "*", element: <NotFoundPage /> },

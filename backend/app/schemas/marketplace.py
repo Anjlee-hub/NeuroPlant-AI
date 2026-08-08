@@ -20,13 +20,21 @@ from pydantic import BaseModel, ConfigDict, Field
 # unchanged, so the Task 1 contract is backward compatible.
 
 CROP_CATEGORIES = ("vegetable", "fruit", "grain", "pulses", "spice", "other")
-PRODUCT_CATEGORIES = ("fertilizer", "pesticide", "seed", "tool")
+# ``organic`` was added in M4 Task 4 (additive extension) so agricultural
+# shops can list organic inputs alongside fertilizers / pesticides / seeds /
+# tools. Existing values are unchanged, so the Task 1 contract is intact.
+PRODUCT_CATEGORIES = ("fertilizer", "pesticide", "seed", "tool", "organic")
 AVAILABILITY = ("available", "limited", "sold_out", "archived")
 UNITS = ("kg", "g", "qtl", "bag", "dozen", "piece", "l", "box", "bundle")
 
+# Product stock/archive lifecycle (M4 Task 4) — ``archived`` mirrors the crop
+# listings convention; in/out of stock is the seller's day-to-day toggle.
+PRODUCT_AVAILABILITY = ("in_stock", "out_of_stock", "archived")
+
 _CROP_CATEGORY_PATTERN = "^(vegetable|fruit|grain|pulses|spice|other)$"
-_PRODUCT_CATEGORY_PATTERN = "^(fertilizer|pesticide|seed|tool)$"
+_PRODUCT_CATEGORY_PATTERN = "^(fertilizer|pesticide|seed|tool|organic)$"
 _AVAILABILITY_PATTERN = "^(available|limited|sold_out|archived)$"
+_PRODUCT_AVAILABILITY_PATTERN = "^(in_stock|out_of_stock|archived)$"
 _UNIT_PATTERN = "^(kg|g|qtl|bag|dozen|piece|l|box|bundle)$"
 
 # A single image is a URL-ish string; lists are capped so one listing can't
@@ -152,22 +160,31 @@ class SellerRegister(BaseModel):
 
     ``owner`` is the authenticated user (the shop's owner) and ``rating`` is a
     read-only, review-driven field (0.0 until a later task) — neither is set
-    here.
+    here. The Seller Portal fields (description / opening_hours / logo_url /
+    banner_url) are the M4 Task 4 additive extension.
     """
 
     shop_name: str = Field(min_length=1, max_length=200)
     address: str | None = Field(default=None, max_length=2000)
     phone: str | None = Field(default=None, max_length=20)
     delivery_available: bool = Field(default=False)
+    description: str | None = Field(default=None, max_length=5000)
+    opening_hours: str | None = Field(default=None, max_length=200)
+    logo_url: str | None = Field(default=None, max_length=500)
+    banner_url: str | None = Field(default=None, max_length=500)
 
 
 class SellerUpdate(BaseModel):
-    """PATCH-able shape (reused by register for the first write) — partial."""
+    """PATCH /marketplace/shop/me — partial edit of the shop profile."""
 
     shop_name: str | None = Field(default=None, min_length=1, max_length=200)
     address: str | None = Field(default=None, max_length=2000)
     phone: str | None = Field(default=None, max_length=20)
     delivery_available: bool | None = Field(default=None)
+    description: str | None = Field(default=None, max_length=5000)
+    opening_hours: str | None = Field(default=None, max_length=200)
+    logo_url: str | None = Field(default=None, max_length=500)
+    banner_url: str | None = Field(default=None, max_length=500)
 
 
 class SellerOut(BaseModel):
@@ -184,6 +201,10 @@ class SellerOut(BaseModel):
     rating: float = Field(ge=0)
     verified: bool
     created_at: datetime
+    description: str | None
+    opening_hours: str | None
+    logo_url: str | None
+    banner_url: str | None
     products: list["ProductOut"] = Field(default_factory=list)
 
 
@@ -191,7 +212,12 @@ class SellerOut(BaseModel):
 
 
 class ProductIn(BaseModel):
-    """POST /marketplace/shop/products — list an agricultural input for sale."""
+    """POST /marketplace/shop/products — list an agricultural input for sale.
+
+    The Seller Portal fields (organic / manufacturer / usage_instructions /
+    availability) are the M4 Task 4 additive extension; everything else is the
+    Task 1 contract.
+    """
 
     name: str = Field(min_length=1, max_length=200)
     category: str = Field(pattern=_PRODUCT_CATEGORY_PATTERN)
@@ -201,6 +227,10 @@ class ProductIn(BaseModel):
     unit: str = Field(pattern=_UNIT_PATTERN)
     stock_quantity: float | None = Field(default=None, ge=0)
     images: list[ImageUrl] | None = Field(default=None, max_length=8)
+    organic: bool = Field(default=False)
+    manufacturer: str | None = Field(default=None, max_length=200)
+    usage_instructions: str | None = Field(default=None, max_length=5000)
+    availability: str = Field(default="in_stock", pattern=_PRODUCT_AVAILABILITY_PATTERN)
 
 
 class ProductUpdate(BaseModel):
@@ -214,6 +244,10 @@ class ProductUpdate(BaseModel):
     unit: str | None = Field(default=None, pattern=_UNIT_PATTERN)
     stock_quantity: float | None = Field(default=None, ge=0)
     images: list[ImageUrl] | None = Field(default=None, max_length=8)
+    organic: bool | None = Field(default=None)
+    manufacturer: str | None = Field(default=None, max_length=200)
+    usage_instructions: str | None = Field(default=None, max_length=5000)
+    availability: str | None = Field(default=None, pattern=_PRODUCT_AVAILABILITY_PATTERN)
 
 
 class ProductOut(BaseModel):
@@ -231,8 +265,54 @@ class ProductOut(BaseModel):
     unit: str
     stock_quantity: float | None
     images: list[str] | None
+    organic: bool
+    manufacturer: str | None
+    usage_instructions: str | None
+    availability: str
     created_at: datetime
     updated_at: datetime
+
+
+class ProductStatsOut(BaseModel):
+    """Dashboard summary counts for the seller's own catalog (M4, Task 4).
+
+    ``active`` is everything currently on sale (``in_stock``); ``out_of_stock``
+    is the day-to-day gap; ``archived`` is retired products; ``total`` is every
+    product the seller owns.
+    """
+
+    total: int = Field(ge=0)
+    active: int = Field(ge=0)
+    out_of_stock: int = Field(ge=0)
+    archived: int = Field(ge=0)
+
+
+class ShopSummaryOut(BaseModel):
+    """Compact shop identity attached to a product's public detail view."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    shop_name: str | None
+    verified: bool
+    rating: float = Field(ge=0)
+    delivery_available: bool = False
+
+
+class ProductDetailOut(ProductOut):
+    """GET /marketplace/products/{id} — full product plus its shop."""
+
+    shop: ShopSummaryOut
+
+
+class ProductPageOut(BaseModel):
+    """Paginated public product-marketplace result."""
+
+    items: list[ProductOut] = Field(default_factory=list)
+    total: int = Field(ge=0)
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1)
+    pages: int = Field(ge=0)
 
 
 # SellerOut references ProductOut forward; resolve at import time.

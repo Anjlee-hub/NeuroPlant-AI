@@ -43,6 +43,16 @@ import type {
   CropListingStats,
   CropListingUpdate,
   ListingImagesResult,
+  Product,
+  ProductDetail,
+  ProductInput,
+  ProductPage,
+  ProductQuery,
+  ProductStats,
+  ProductUpdate,
+  SellerProfile,
+  SellerRegisterInput,
+  SellerUpdate,
 } from "@/types/marketplace";
 
 /** Editable profile fields (mirrors `UserUpdate` — name is the main one). */
@@ -344,6 +354,87 @@ export const api = {
       auth: true,
     });
   },
+
+  // ── Seller Portal (M4 Task 4) ─────────────────────────────────────────
+  /** Register / fill in the seller's agricultural shop profile. */
+  registerShop: (payload: SellerRegisterInput) =>
+    request<SellerProfile>("/marketplace/shop/register", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** The seller's own shop profile with its product catalog attached. */
+  getMyShop: () => request<SellerProfile>("/marketplace/shop/me", { auth: true }),
+  /** Partial edit of the shop profile (only sent fields change). */
+  updateShop: (payload: SellerUpdate) =>
+    request<SellerProfile>("/marketplace/shop/me", {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  /** Upload the shop logo or banner → storage URL for logo_url/banner_url. */
+  uploadShopImage: (kind: "logo" | "banner", file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<ListingImagesResult>(`/marketplace/shop/image?kind=${kind}`, {
+      method: "POST",
+      body: fd,
+      auth: true,
+    });
+  },
+  /** The seller's full product catalog (newest first). */
+  myProducts: () => request<Product[]>("/marketplace/shop/products", { auth: true }),
+  /** Dashboard counts over the seller's own catalog. */
+  getProductStats: () =>
+    request<ProductStats>("/marketplace/shop/products/stats", { auth: true }),
+  /** Add an agricultural input to the seller's catalog. */
+  createProduct: (payload: ProductInput) =>
+    request<Product>("/marketplace/shop/products", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Partial edit of one of the seller's own products. */
+  updateProduct: (productId: number, payload: ProductUpdate) =>
+    request<Product>(`/marketplace/shop/products/${productId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  /** Remove one of the seller's own products. */
+  deleteProduct: (productId: number) =>
+    request<void>(`/marketplace/shop/products/${productId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+  /** Upload product photos (multipart) → storage URLs for the images field. */
+  uploadProductImages: (files: File[]) => {
+    const fd = new FormData();
+    for (const file of files) fd.append("files", file);
+    return request<ListingImagesResult>("/marketplace/shop/products/images", {
+      method: "POST",
+      body: fd,
+      auth: true,
+    });
+  },
+
+  // ── Public product market (M4 Task 4) ─────────────────────────────────
+  /** Browse/search/filter the public product market — server-side pagination. */
+  browseProducts: (params: ProductQuery = {}) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        qs.set(key, String(value));
+      }
+    }
+    const query = qs.toString();
+    return request<ProductPage>(`/marketplace/products${query ? `?${query}` : ""}`, {
+      auth: true,
+    });
+  },
+  /** One product with its shop attached (public detail view). */
+  getProduct: (productId: number) =>
+    request<ProductDetail>(`/marketplace/products/${productId}`, { auth: true }),
 
   // ── Farmer Marketplace (M4 Task 2) ────────────────────────────────────
   /** The farmer's own listings (newest first) — dashboard table/cards. */

@@ -121,3 +121,161 @@ export const CROP_AVAILABILITY_OPTIONS: CropAvailability[] = [
   "sold_out",
   "archived",
 ];
+
+/**
+ * ── Seller Portal (M4 Task 4) ─────────────────────────────────────────────
+ * Mirrors `ProductOut` / `SellerOut` / `ProductPageOut` (backend
+ * app/schemas/marketplace.py). The seller surface is the shop profile + the
+ * product catalog (add/edit/delete/archive, stock toggle, stats, media); the
+ * public product market is browse/detail for any authenticated user.
+ */
+
+/** Product category vocabulary — `organic` is the M4 Task 4 additive value. */
+export type ProductCategory =
+  | "fertilizer"
+  | "pesticide"
+  | "seed"
+  | "tool"
+  | "organic";
+
+/** Products share the marketplace unit vocabulary (mirrors `UNITS`). */
+export type ProductUnit = CropUnit;
+
+/** Product availability — `archived` retires a product without deleting it. */
+export type ProductAvailability = "in_stock" | "out_of_stock" | "archived";
+
+/** One agricultural input as returned by the API (`ProductOut`). */
+export interface Product {
+  id: number;
+  seller_id: number;
+  name: string;
+  category: ProductCategory;
+  brand: string | null;
+  description: string | null;
+  price: number;
+  unit: ProductUnit;
+  stock_quantity: number | null;
+  images: string[] | null;
+  organic: boolean;
+  manufacturer: string | null;
+  usage_instructions: string | null;
+  availability: ProductAvailability;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Payload for creating a product (all fields). */
+export interface ProductInput {
+  name: string;
+  category: ProductCategory;
+  brand?: string | null;
+  description?: string | null;
+  price: number;
+  unit: ProductUnit;
+  stock_quantity?: number | null;
+  images?: string[] | null;
+  organic?: boolean;
+  manufacturer?: string | null;
+  usage_instructions?: string | null;
+  availability?: ProductAvailability;
+}
+
+/** Partial payload for editing a product (PATCH — only sent fields change). */
+export type ProductUpdate = Partial<ProductInput>;
+
+/** Dashboard summary counts for the seller's own catalog. */
+export interface ProductStats {
+  total: number;
+  active: number;
+  out_of_stock: number;
+  archived: number;
+}
+
+/** The agricultural shop profile (`SellerOut`). */
+export interface SellerProfile {
+  user_id: number;
+  owner_name: string;
+  shop_name: string | null;
+  address: string | null;
+  phone: string | null;
+  delivery_available: boolean;
+  rating: number;
+  verified: boolean;
+  created_at: string;
+  description: string | null;
+  opening_hours: string | null;
+  logo_url: string | null;
+  banner_url: string | null;
+  products: Product[];
+}
+
+/** Payload for registering / filling in the shop profile. */
+export interface SellerRegisterInput {
+  shop_name: string;
+  address?: string | null;
+  phone?: string | null;
+  delivery_available?: boolean;
+  description?: string | null;
+  opening_hours?: string | null;
+  logo_url?: string | null;
+  banner_url?: string | null;
+}
+
+/** Partial payload for editing the shop profile (PATCH /shop/me). */
+export type SellerUpdate = Partial<SellerRegisterInput>;
+
+/** Compact shop identity attached to a product's public detail view. */
+export interface ShopSummary {
+  user_id: number;
+  shop_name: string | null;
+  verified: boolean;
+  rating: number;
+  delivery_available: boolean;
+}
+
+/** One product with its shop attached (the detail endpoint's payload). */
+export interface ProductDetail extends Product {
+  shop: ShopSummary;
+}
+
+/** Paginated public product-market response — mirrors `ProductPageOut`. */
+export interface ProductPage {
+  items: Product[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+/** Products sort by the same keys as crop listings. */
+export type ProductSort = CropListingSort;
+
+/** Query parameters for the public product market (all optional). */
+export interface ProductQuery {
+  q?: string;
+  category?: ProductCategory;
+  organic?: boolean;
+  availability?: ProductAvailability;
+  min_price?: number;
+  max_price?: number;
+  brand?: string;
+  sort?: ProductSort;
+  page?: number;
+  page_size?: number;
+}
+
+/** The seller-facing product category options for the add/edit form. */
+export const PRODUCT_CATEGORY_OPTIONS: ProductCategory[] = [
+  "fertilizer",
+  "pesticide",
+  "seed",
+  "tool",
+  "organic",
+];
+
+/** The seller-facing availability options for the stock toggle. */
+export const PRODUCT_AVAILABILITY_OPTIONS: ProductAvailability[] = [
+  "in_stock",
+  "out_of_stock",
+  "archived",
+];
