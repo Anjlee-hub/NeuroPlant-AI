@@ -190,33 +190,39 @@ describe("ScanHistoryPage", () => {
     });
   });
 
-  it("requests the next page and disables buttons at the edges", async () => {
-    const user = userEvent.setup();
-    apiMock.listScans.mockResolvedValue({
-      items: [makeScan(), makeScan({ id: 2, disease_name: "Early Blight" })],
-      total: 40,
-      page: 1,
-      page_size: 12,
-      has_next: true,
-    });
+  it(
+    "requests the next page and disables buttons at the edges",
+    async () => {
+      const user = userEvent.setup();
+      apiMock.listScans.mockResolvedValue({
+        items: [makeScan(), makeScan({ id: 2, disease_name: "Early Blight" })],
+        total: 40,
+        page: 1,
+        page_size: 12,
+        has_next: true,
+      });
 
-    renderScans();
-    await screen.findByText("Late Blight");
+      renderScans();
+      await screen.findByText("Late Blight");
 
-    const next = screen.getByRole("button", { name: "Next" });
-    const prev = screen.getByRole("button", { name: "Previous" });
-    expect(prev).toBeDisabled();
-    expect(next).toBeEnabled();
+      const next = screen.getByRole("button", { name: "Next" });
+      const prev = screen.getByRole("button", { name: "Previous" });
+      expect(prev).toBeDisabled();
+      expect(next).toBeEnabled();
 
-    await user.click(next);
-    // Generous timeout: refetch latency varies under full-suite worker load.
-    await vi.waitFor(
-      () => {
-        expect(apiMock.listScans).toHaveBeenLastCalledWith(
-          expect.objectContaining({ page: 2 }),
-        );
-      },
-      { timeout: 5000 },
-    );
-  });
+      await user.click(next);
+      // Generous timeout: refetch latency varies under full-suite worker load,
+      // and the whole test can exceed the 5 s vitest default when 39 files run
+      // in parallel workers. Keep this a timing-only bump — no assertion changes.
+      await vi.waitFor(
+        () => {
+          expect(apiMock.listScans).toHaveBeenLastCalledWith(
+            expect.objectContaining({ page: 2 }),
+          );
+        },
+        { timeout: 5000 },
+      );
+    },
+    15000,
+  );
 });
