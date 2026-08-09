@@ -31,6 +31,15 @@ import type {
   SendMessageInput,
 } from "@/types/messages";
 import type { RecoveryLog, RecoveryLogInput, RecoveryTracker } from "@/types/recovery";
+import type {
+  Favourite,
+  FavouriteStatus,
+  Review,
+  ReviewCreateInput,
+  ReviewListParams,
+  ReviewPage,
+  ReviewUpdateInput,
+} from "@/types/trust";
 import type { SoilRecommendation } from "@/types/soil";
 import type {
   CropOption,
@@ -530,4 +539,58 @@ export const api = {
   },
   updateProfile: (payload: ProfileUpdateInput) =>
     request<User>("/users/me", { method: "PATCH", body: payload, auth: true }),
+
+  // ── Marketplace trust (M4 Task 6): favourites + reviews ────────────────
+  /** The caller's saved items, newest first (full listing/product attached). */
+  listFavourites: () => request<Favourite[]>("/marketplace/favorites", { auth: true }),
+  /** Is one item saved — the button's pressed state + the row to delete. */
+  favouriteStatus: (params: { listing_id?: number; product_id?: number }) => {
+    const qs = new URLSearchParams();
+    if (params.listing_id != null) qs.set("listing_id", String(params.listing_id));
+    if (params.product_id != null) qs.set("product_id", String(params.product_id));
+    const query = qs.toString();
+    return request<FavouriteStatus>(`/marketplace/favorites/status${query ? `?${query}` : ""}`, {
+      auth: true,
+    });
+  },
+  /** Save a listing or product (idempotent — returns the existing row). */
+  addFavourite: (payload: { listing_id?: number; product_id?: number }) =>
+    request<Favourite>("/marketplace/favorites", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Remove one of the caller's saved items (owner-only, 404 otherwise). */
+  removeFavourite: (favouriteId: number) =>
+    request<void>(`/marketplace/favorites/${favouriteId}`, { method: "DELETE", auth: true }),
+  /** Paginated reviews + rating summary for one item or seller. */
+  listReviews: (params: ReviewListParams) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value != null) qs.set(key, String(value));
+    }
+    const query = qs.toString();
+    return request<ReviewPage>(`/marketplace/reviews${query ? `?${query}` : ""}`, {
+      auth: true,
+    });
+  },
+  /** Every review the caller wrote (the My Reviews surface). */
+  listMyReviews: () => request<Review[]>("/marketplace/reviews/mine", { auth: true }),
+  /** Review a listing or product (409 duplicate / 400 self-review). */
+  createReview: (payload: ReviewCreateInput) =>
+    request<Review>("/marketplace/reviews", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  /** Edit one of the caller's own reviews (partial). */
+  updateReview: (reviewId: number, payload: ReviewUpdateInput) =>
+    request<Review>(`/marketplace/reviews/${reviewId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  /** Delete one of the caller's own reviews. */
+  deleteReview: (reviewId: number) =>
+    request<void>(`/marketplace/reviews/${reviewId}`, { method: "DELETE", auth: true }),
 };

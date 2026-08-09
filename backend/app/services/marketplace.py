@@ -50,6 +50,7 @@ from app.schemas.marketplace import (
     SellerUpdate,
     ShopSummaryOut,
 )
+from app.services.reviews import ReviewsService
 from app.services.storage import get_storage_service
 
 logger = get_logger(__name__)
@@ -282,17 +283,21 @@ class MarketplaceService:
         )
 
     async def listing_detail(self, listing_id: int) -> CropListingDetailOut:
-        """One listing with its farmer attached (for the detail view)."""
+        """One listing with its farmer attached (for the detail view). The
+        farmer's ``rating`` / ``review_count`` are review-driven (M4 Task 6)."""
         listing = await self.db.get(CropListing, listing_id)
         if listing is None:
             raise CropListingNotFoundError(f"crop listing {listing_id} not found")
         farmer = await self.db.get(User, listing.farmer_id)
+        reputation = await ReviewsService(self.db).rating_summary(listing.farmer_id)
         out = CropListingDetailOut(
             **CropListingOut.model_validate(listing).model_dump(),
             farmer=FarmerSummaryOut(
                 id=listing.farmer_id,
                 name=farmer.name if farmer is not None else "",
                 verified=farmer.verified if farmer is not None else False,
+                rating=reputation.average,
+                review_count=reputation.total,
             ),
         )
         return out
@@ -465,20 +470,22 @@ class MarketplaceService:
         )
 
     async def product_detail(self, product_id: int) -> ProductDetailOut:
-        """One product with its shop attached (for the public detail view)."""
+        """One product with its shop attached (for the public detail view). The
+        shop's ``rating`` is review-driven (M4 Task 6), computed live."""
         product = await self.db.get(Product, product_id)
         if product is None:
             raise ProductNotFoundError(f"product {product_id} not found")
         profile = await self.db.scalar(
             select(SellerProfile).where(SellerProfile.user_id == product.seller_id)
         )
+        reputation = await ReviewsService(self.db).rating_summary(product.seller_id)
         return ProductDetailOut(
             **ProductOut.model_validate(product).model_dump(),
             shop=ShopSummaryOut(
                 user_id=product.seller_id,
                 shop_name=profile.shop_name if profile is not None else None,
                 verified=profile.verified if profile is not None else False,
-                rating=profile.rating if profile is not None else 0.0,
+                rating=reputation.average,
                 delivery_available=profile.delivery_available if profile is not None else False,
             ),
         )
@@ -486,9 +493,12 @@ class MarketplaceService:
     # ── Internals ────────────────────────────────────────────────────────
 
     async def shop(self, user: User) -> SellerOut:
-        """Assemble the shop payload (profile + owner name + products)."""
+        """Assemble the shop payload (profile + owner name + products). The
+        ``rating`` is review-driven (M4 Task 6), computed live — the stored
+        ``profile.rating`` placeholder is never read as the source of truth."""
         profile = await self._profile_for_user(user.id)
         products = await self.shop_products(user)
+        reputation = await ReviewsService(self.db).rating_summary(user.id)
         return SellerOut(
             user_id=user.id,
             owner_name=user.name,
@@ -496,7 +506,7 @@ class MarketplaceService:
             address=profile.address,
             phone=profile.phone,
             delivery_available=profile.delivery_available,
-            rating=profile.rating,
+            rating=reputation.average,
             verified=profile.verified,
             created_at=profile.created_at,
             description=profile.description,

@@ -72,11 +72,17 @@ export interface ListingImagesResult {
   urls: string[];
 }
 
-/** Public farmer summary attached to a listing's detail view. */
+/** Public farmer summary attached to a listing's detail view.
+ *
+ * `rating` / `review_count` are the review-driven reputation summary (M4 Task 6)
+ * — 0 / 0 until the farmer has reviews across their listings.
+ */
 export interface FarmerSummary {
   id: number;
   name: string;
   verified: boolean;
+  rating: number;
+  review_count: number;
 }
 
 /** One listing with its farmer attached (the detail endpoint's payload). */

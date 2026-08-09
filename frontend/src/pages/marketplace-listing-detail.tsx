@@ -9,6 +9,7 @@ import { ContactSellerButton } from "@/components/messages/contact-seller-button
 import { CopyLinkButton } from "@/components/marketplace/copy-link-button";
 import { FavouriteButton } from "@/components/marketplace/favourite-button";
 import { ListingGallery } from "@/components/marketplace/listing-gallery";
+import { ReviewSection } from "@/components/marketplace/review-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,8 +24,9 @@ import type { CropListingDetail } from "@/types/marketplace";
  * Buyer listing detail (M4 Task 3) at /marketplace/listings/:id. Loads the
  * single listing with its farmer attached, shows the full photo gallery with a
  * lightbox, every field the seller entered, and the buyer actions — save to
- * favourites (localStorage), copy the shareable link, and Contact Farmer
- * (M4 Task 5) which opens a real message thread with the listing's farmer.
+ * favourites (server-backed, M4 Task 6), copy the shareable link, and Contact
+ * Farmer (M4 Task 5) which opens a real message thread with the listing's
+ * farmer. Ratings & reviews for the listing render below the detail grid.
  */
 
 export const MARKETPLACE_DETAIL_KEY = ["marketplace-listing-detail"] as const;
@@ -104,7 +106,8 @@ function ListingDetail({ listing }: { listing: CropListingDetail }) {
   const images = listing.images ?? [];
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div>
+      <div className="grid gap-8 lg:grid-cols-2">
       <ListingGallery images={images} name={listing.crop_name} />
 
       <div className="flex flex-col gap-4">
@@ -210,6 +213,9 @@ function ListingDetail({ listing }: { listing: CropListingDetail }) {
         </div>
       </div>
     </div>
+
+    <ReviewSection listingId={listing.id} />
+  </div>
   );
 }
 

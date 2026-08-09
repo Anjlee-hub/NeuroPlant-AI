@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   CloudUpload,
+  Heart,
   History,
   Home,
   Inbox,
@@ -9,6 +10,7 @@ import {
   MessageCircle,
   ScanLine,
   ShoppingBag,
+  Star,
   Stethoscope,
   Store,
   X,
@@ -46,6 +48,9 @@ const NAV_ITEMS: Array<{
   { to: "/marketplace/products", labelKey: "nav.productMarket", icon: ShoppingBag },
   // Buyer↔seller messaging (M4 T5): shared inbox.
   { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
+  // Marketplace trust (M4 T6): saved items + the caller's reviews.
+  { to: "/marketplace/favorites", labelKey: "nav.favourites", icon: Heart },
+  { to: "/marketplace/my-reviews", labelKey: "nav.myReviews", icon: Star },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {

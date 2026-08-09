@@ -9,9 +9,18 @@ import type { CropListingDetail } from "@/types/marketplace";
 const authMock = vi.hoisted(() => ({
   user: null as { id: number; name: string } | null,
 }));
+/** Simulated server-side saved state for listing id 1 (the fixture below). */
+const favState = vi.hoisted(() => ({
+  favorited: false,
+  favorite_id: null as number | null,
+}));
 const apiMock = vi.hoisted(() => ({
   getCropListing: vi.fn(),
   createConversation: vi.fn(),
+  favouriteStatus: vi.fn(),
+  addFavourite: vi.fn(),
+  removeFavourite: vi.fn(),
+  listReviews: vi.fn(),
   errorMessage: (err: Error) => err.message,
 }));
 
@@ -21,8 +30,6 @@ vi.mock("@/stores/auth", () => ({
 vi.mock("@/lib/api", () => ({ api: apiMock, errorMessage: apiMock.errorMessage }));
 
 import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail";
-
-const FAVOURITES_KEY = "neuroplant.favourites";
 
 /** One listing detail with sensible defaults; tests override fields. */
 function makeDetail(overrides: Partial<CropListingDetail> = {}): CropListingDetail {
@@ -43,7 +50,7 @@ function makeDetail(overrides: Partial<CropListingDetail> = {}): CropListingDeta
     availability: "available",
     created_at: "2026-07-01T09:00:00Z",
     updated_at: "2026-07-01T09:00:00Z",
-    farmer: { id: 5, name: "Kisan Kumar", verified: true },
+    farmer: { id: 5, name: "Kisan Kumar", verified: true, rating: 4.5, review_count: 3 },
     ...overrides,
   };
 }
@@ -77,9 +84,44 @@ function renderPage(id = 1) {
 describe("MarketplaceListingDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
     authMock.user = { id: 1, name: "Tester" };
     apiMock.getCropListing.mockResolvedValue(makeDetail());
+    // Favourite state for listing 1 starts unsaved; the POST/DELETE toggle it.
+    favState.favorited = false;
+    favState.favorite_id = null;
+    apiMock.favouriteStatus.mockImplementation(() =>
+      Promise.resolve({
+        favorited: favState.favorited,
+        favorite_id: favState.favorite_id,
+        listing_id: 1,
+        product_id: null,
+      }),
+    );
+    apiMock.addFavourite.mockImplementation(() => {
+      favState.favorited = true;
+      favState.favorite_id = 7;
+      return Promise.resolve({ id: 7 });
+    });
+    apiMock.removeFavourite.mockImplementation(() => {
+      favState.favorited = false;
+      favState.favorite_id = null;
+      return Promise.resolve(undefined);
+    });
+    // The ratings & reviews block loads below the grid — an empty page keeps
+    // the detail-focused tests from tripping over the review query.
+    apiMock.listReviews.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 5,
+      pages: 0,
+      summary: {
+        average: 0,
+        total: 0,
+        distribution: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+      },
+      my_review: null,
+    });
   });
 
   it("asks to sign in when no user is authenticated", async () => {
@@ -143,23 +185,63 @@ describe("MarketplaceListingDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Open photo" })).not.toBeInTheDocument();
   });
 
-  it("toggles the listing in and out of favourites", async () => {
+  it("toggles the listing in and out of favourites (server-backed)", async () => {
     renderPage();
-    const button = await screen.findByRole("button", { name: "Save to favourites" });
+    expect(
+      await screen.findByRole("button", { name: "Save to favourites" }),
+    ).toHaveAttribute("aria-pressed", "false");
 
-    await userEvent.click(button);
-    expect(screen.getByRole("button", { name: "Remove from favourites" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(JSON.parse(localStorage.getItem(FAVOURITES_KEY) ?? "[]")).toEqual([1]);
+    await userEvent.click(screen.getByRole("button", { name: "Save to favourites" }));
+
+    await vi.waitFor(() => {
+      expect(apiMock.addFavourite).toHaveBeenCalledWith({
+        listing_id: 1,
+        product_id: undefined,
+      });
+      expect(screen.getByRole("button", { name: "Remove from favourites" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Remove from favourites" }));
-    expect(screen.getByRole("button", { name: "Save to favourites" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
+
+    await vi.waitFor(() => {
+      expect(apiMock.removeFavourite).toHaveBeenCalledWith(7);
+      expect(screen.getByRole("button", { name: "Save to favourites" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+  });
+
+  it("shows an inline error when toggling a favourite fails", async () => {
+    apiMock.addFavourite.mockRejectedValue(new Error("Couldn't save"));
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Save to favourites" }),
     );
-    expect(JSON.parse(localStorage.getItem(FAVOURITES_KEY) ?? "[]")).toEqual([]);
+
+    expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
+  });
+
+  it("disables the button and shows an error when the saved state fails to load", async () => {
+    apiMock.favouriteStatus.mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    expect(
+      await screen.findByText("Couldn't update saved items. Please try again."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save to favourites" }),
+    ).toBeDisabled();
+  });
+
+  it("shows the ratings & reviews block below the listing", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Ratings & Reviews")).toBeInTheDocument();
   });
 
   it("copies the listing link to the clipboard", async () => {

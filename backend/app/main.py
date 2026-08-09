@@ -32,6 +32,7 @@ from app.services.calendar import (
     CalendarScheduleNotFoundError,
     CalendarTaskNotFoundError,
 )
+from app.services.favorites import FavoriteNotFoundError, FavoriteValidationError
 from app.services.marketplace import (
     CropListingNotFoundError,
     ListingImageUploadError,
@@ -49,6 +50,11 @@ from app.services.recommendations import (
     RecommendationNotFoundError,
 )
 from app.services.recovery import RecoveryLogNotFoundError
+from app.services.reviews import (
+    ReviewDuplicateError,
+    ReviewNotFoundError,
+    ReviewValidationError,
+)
 from app.services.scan_pipeline import ScanPipelineError
 from app.services.scans import ScanNotFoundError
 from app.services.soil import SoilCatalogUnavailableError, SoilNotFoundError
@@ -164,6 +170,17 @@ app.add_exception_handler(ListingImageUploadError, _error_handler(422))
 app.add_exception_handler(ConversationNotFoundError, _error_handler(404))
 app.add_exception_handler(ConversationClosedError, _error_handler(409))
 app.add_exception_handler(ConversationValidationError, _error_handler(400))
+
+# Favourites (M4 T6) — 404 when a saved row isn't the caller's (enumeration
+# guard), 400 for a bad/unknown favourite target.
+app.add_exception_handler(FavoriteNotFoundError, _error_handler(404))
+app.add_exception_handler(FavoriteValidationError, _error_handler(400))
+
+# Reviews (M4 T6) — 404 when a review isn't the caller's, 409 on a duplicate
+# review of the same item, 400 on a bad target / self-review / blank scope.
+app.add_exception_handler(ReviewNotFoundError, _error_handler(404))
+app.add_exception_handler(ReviewDuplicateError, _error_handler(409))
+app.add_exception_handler(ReviewValidationError, _error_handler(400))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

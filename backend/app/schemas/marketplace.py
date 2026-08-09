@@ -103,13 +103,19 @@ class CropListingOut(BaseModel):
 
 
 class FarmerSummaryOut(BaseModel):
-    """Compact farmer identity attached to a listing's detail view."""
+    """Compact farmer identity attached to a listing's detail view.
+
+    ``rating`` / ``review_count`` are the review-driven reputation summary (M4
+    Task 6) — 0.0 / 0 until the farmer has reviews across their listings.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
     verified: bool
+    rating: float = Field(ge=0)
+    review_count: int = Field(ge=0)
 
 
 class CropListingDetailOut(CropListingOut):

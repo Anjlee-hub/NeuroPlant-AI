@@ -11,10 +11,12 @@ from app.api.v1.endpoints import (
     auth,
     calendar,
     catalog,
+    favorites,
     marketplace,
     messaging,
     recommendations,
     recovery,
+    reviews,
     scans,
     soil,
     users,
@@ -42,6 +44,9 @@ api_router.include_router(assistant.router)
 api_router.include_router(marketplace.router)
 # M4 Task 5 — buyer↔seller communication (inquiry/chat system).
 api_router.include_router(messaging.router)
+# M4 Task 6 — marketplace trust: saved items (favourites) + reviews/ratings.
+api_router.include_router(favorites.router)
+api_router.include_router(reviews.router)
 
 # Routers are added milestone-by-milestone:
 # M4: voice, dataset, marketplace (in progress)

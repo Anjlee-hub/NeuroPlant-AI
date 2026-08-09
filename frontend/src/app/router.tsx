@@ -25,6 +25,8 @@ import { ProductMarketBrowsePage } from "@/pages/product-market-browse";
 import { ProductMarketDetailPage } from "@/pages/product-market-detail";
 import { MessagesDetailPage } from "@/pages/messages-detail";
 import { MessagesListPage } from "@/pages/messages-list";
+import { MarketplaceFavoritesPage } from "@/pages/marketplace-favorites";
+import { MyReviewsPage } from "@/pages/my-reviews";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -62,6 +64,9 @@ export const router = createBrowserRouter([
       // farmer's create/edit routes stay unambiguous.
       { path: "marketplace/browse", element: <MarketplaceBuyPage /> },
       { path: "marketplace/listings/:listingId", element: <MarketplaceListingDetailPage /> },
+      // Marketplace trust (M4 Task 6): saved items + the caller's reviews.
+      { path: "marketplace/favorites", element: <MarketplaceFavoritesPage /> },
+      { path: "marketplace/my-reviews", element: <MyReviewsPage /> },
       // Seller Portal (M4 T4): seller dashboard at /marketplace/shop, public
       // product market at /marketplace/products (browse + detail). Static segments
       // rank above :id, so "products" won't capture "products/new" etc. — we

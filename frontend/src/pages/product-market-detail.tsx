@@ -8,6 +8,8 @@ import { ProductAvailabilityBadge } from "@/components/marketplace/availability-
 import { ProductListingGallery } from "@/components/marketplace/product-listing-gallery";
 import { ContactSellerButton } from "@/components/messages/contact-seller-button";
 import { CopyLinkButton } from "@/components/marketplace/copy-link-button";
+import { FavouriteButton } from "@/components/marketplace/favourite-button";
+import { ReviewSection } from "@/components/marketplace/review-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,9 +23,10 @@ import type { ProductDetail } from "@/types/marketplace";
 /**
  * Public product market detail (M4 Task 4) at /marketplace/products/:id. Loads
  * the single product with its seller shop attached, shows the full photo gallery
- * with a lightbox, every field the seller entered, and buyer actions — copy the
- * shareable link and Contact Seller (M4 Task 5) which opens a real message
- * thread with the product's shop.
+ * with a lightbox, every field the seller entered, and buyer actions — save to
+ * favourites (M4 Task 6), copy the shareable link, and Contact Seller (M4 Task
+ * 5) which opens a real message thread with the product's shop. Ratings &
+ * reviews for the product render below the detail grid.
  */
 
 export const PRODUCT_MARKET_DETAIL_KEY = ["product-market-detail"] as const;
@@ -103,7 +106,8 @@ function ProductMarketDetail({ product }: { product: ProductDetail }) {
   const images = product.images ?? [];
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div>
+      <div className="grid gap-8 lg:grid-cols-2">
       <ProductListingGallery images={images} name={product.name} />
 
       <div className="flex flex-col gap-4">
@@ -204,6 +208,7 @@ function ProductMarketDetail({ product }: { product: ProductDetail }) {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <FavouriteButton productId={product.id} />
                 <CopyLinkButton url={window.location.href} />
                 <ContactSellerButton
                   label={t("productMarket.detail.contactSeller")}
@@ -214,6 +219,9 @@ function ProductMarketDetail({ product }: { product: ProductDetail }) {
           </Card>
         )}
       </div>
+      </div>
+
+      <ReviewSection productId={product.id} />
     </div>
   );
 }
