@@ -44,6 +44,10 @@ from app.services.messaging import (
     ConversationNotFoundError,
     ConversationValidationError,
 )
+from app.services.notifications import (
+    NotificationNotFoundError,
+    NotificationValidationError,
+)
 from app.services.otp import OtpError
 from app.services.recommendations import (
     CatalogUnavailableError,
@@ -192,6 +196,11 @@ app.add_exception_handler(ReviewValidationError, _error_handler(400))
 app.add_exception_handler(InvalidLocationError, _error_handler(400))
 app.add_exception_handler(CropNotFoundError, _error_handler(404))
 app.add_exception_handler(WeatherProviderError, _error_handler(502))
+
+# Notifications (M5 T2) — 404 for missing/foreign notification (enumeration
+# guard), 400 for validation errors (bad type, empty title/message).
+app.add_exception_handler(NotificationNotFoundError, _error_handler(404))
+app.add_exception_handler(NotificationValidationError, _error_handler(400))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

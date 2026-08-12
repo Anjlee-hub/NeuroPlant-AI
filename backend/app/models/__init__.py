@@ -20,6 +20,7 @@ from app.models.recommendation import DiseaseRecommendation, RecommendationCatal
 from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
+from app.models.notification import Notification, NotificationType
 from app.models.user import (
     MFA,
     Device,
@@ -53,6 +54,8 @@ __all__ = [
     "SoilRecommendation",
     "RecoveryLog",
     "Scan",
+    "Notification",
+    "NotificationType",
     "User",
     "FarmerProfile",
     "ExpertProfile",

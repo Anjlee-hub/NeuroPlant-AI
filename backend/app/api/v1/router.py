@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     favorites,
     marketplace,
     messaging,
+    notifications,
     recommendations,
     recovery,
     reviews,
@@ -51,7 +52,9 @@ api_router.include_router(reviews.router)
 
 # M5 — weather intelligence & disease-risk (Task 1: weather + risk foundation).
 api_router.include_router(weather.router)
+# M5 Task 2 — notifications foundation (in-app, no push yet).
+api_router.include_router(notifications.router)
 
 # Routers are added milestone-by-milestone:
-# M5: outbreaks, yield, prices, maps, notifications (in progress)
+# M5: outbreaks, yield, prices, maps (in progress)
 # ...
