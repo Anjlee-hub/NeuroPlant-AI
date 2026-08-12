@@ -59,6 +59,8 @@ from app.services.scan_pipeline import ScanPipelineError
 from app.services.scans import ScanNotFoundError
 from app.services.soil import SoilCatalogUnavailableError, SoilNotFoundError
 from app.services.storage import local_storage_root
+from app.services.weather import InvalidLocationError, WeatherProviderError
+from app.services.weather_risk import CropNotFoundError
 
 settings = get_settings()
 logger = get_logger("app.main")
@@ -181,6 +183,15 @@ app.add_exception_handler(FavoriteValidationError, _error_handler(400))
 app.add_exception_handler(ReviewNotFoundError, _error_handler(404))
 app.add_exception_handler(ReviewDuplicateError, _error_handler(409))
 app.add_exception_handler(ReviewValidationError, _error_handler(400))
+
+# Weather (M5 T1) — 400 for out-of-range coordinates, 404 for an unsupported
+# crop, 502 for an upstream weather failure (timeout / HTTP / malformed /
+# missing data) when no fallback source is configured. Subclasses of
+# WeatherProviderError all resolve here via MRO; the message is generic so
+# provider internals never leak.
+app.add_exception_handler(InvalidLocationError, _error_handler(400))
+app.add_exception_handler(CropNotFoundError, _error_handler(404))
+app.add_exception_handler(WeatherProviderError, _error_handler(502))
 
 # Scan pipeline — typed errors carry their own status_code + machine code.
 

@@ -100,6 +100,15 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"  # anthropic | openai | google
     llm_model: str = "claude-sonnet-5"  # used by LLMConversationProvider (M3.1)
 
+    # ── Weather (M5 Task 1) ─────────────────────────────────────────────
+    # Provider: "mock" (deterministic offline source — the native-dev default
+    # that needs no API key) or "openweather" (live source). When the live
+    # source fails and fallback is enabled, WeatherService degrades to the mock
+    # provider and marks the response ``is_fallback`` instead of erroring.
+    weather_provider: str = "mock"
+    weather_timeout_seconds: float = 5.0
+    weather_fallback_enabled: bool = True
+
     @field_validator("allowed_origins")
     @classmethod
     def _split_origins(cls, v: str) -> list[str]:

@@ -20,6 +20,7 @@ from app.api.v1.endpoints import (
     scans,
     soil,
     users,
+    weather,
 )
 
 api_router = APIRouter()
@@ -48,6 +49,9 @@ api_router.include_router(messaging.router)
 api_router.include_router(favorites.router)
 api_router.include_router(reviews.router)
 
+# M5 — weather intelligence & disease-risk (Task 1: weather + risk foundation).
+api_router.include_router(weather.router)
+
 # Routers are added milestone-by-milestone:
-# M4: voice, dataset, marketplace (in progress)
+# M5: outbreaks, yield, prices, maps, notifications (in progress)
 # ...
