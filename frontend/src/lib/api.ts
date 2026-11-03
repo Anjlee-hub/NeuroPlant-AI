@@ -42,6 +42,13 @@ import type {
 } from "@/types/trust";
 import type { SoilRecommendation } from "@/types/soil";
 import type {
+  EligibilityCheck,
+  EligibilityCheckInput,
+  GovernmentScheme,
+  GovernmentSchemePage,
+  SchemeFilters,
+} from "@/types/scheme";
+import type {
   CropOption,
   Scan,
   ScanExplain,
@@ -339,6 +346,23 @@ export const api = {
   deleteCalendarTask: (taskId: number) =>
     request<void>(`/calendar/tasks/${taskId}`, {
       method: "DELETE",
+      auth: true,
+    }),
+  // ── Government Schemes (M7) ─────────────────────────────────────────
+  listGovernmentSchemes: (filters: SchemeFilters = {}) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") params.set(key, String(value));
+    }
+    const query = params.size ? `?${params.toString()}` : "";
+    return request<GovernmentSchemePage>(`/schemes${query}`, { auth: true });
+  },
+  getGovernmentScheme: (schemeId: number) =>
+    request<GovernmentScheme>(`/schemes/${schemeId}`, { auth: true }),
+  checkSchemeEligibility: (schemeId: number, payload: EligibilityCheckInput) =>
+    request<EligibilityCheck>(`/schemes/${schemeId}/eligibility`, {
+      method: "POST",
+      body: payload,
       auth: true,
     }),
   // ── Voice AI Assistant (M3 T6 → M3.1 conversational) ──────────────────
