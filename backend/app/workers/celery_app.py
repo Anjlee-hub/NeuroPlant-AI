@@ -25,6 +25,20 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    include=["app.workers.tasks"],
 )
 
-celery_app.autodiscover_tasks(["app.workers.tasks"])
+celery_app.conf.beat_schedule = {
+    "dispatch-scheduled-notifications-every-minute": {
+        "task": "notifications.dispatch_scheduled",
+        "schedule": 60.0,
+    },
+    "create-calendar-reminders-every-15-minutes": {
+        "task": "notifications.create_calendar_reminders",
+        "schedule": 15 * 60.0,
+    },
+    "create-treatment-reminders-hourly": {
+        "task": "notifications.create_treatment_reminders",
+        "schedule": 60 * 60.0,
+    },
+}

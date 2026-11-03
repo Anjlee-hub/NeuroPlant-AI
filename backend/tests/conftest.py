@@ -8,10 +8,8 @@ import os
 import shutil
 from pathlib import Path
 
-os.environ.setdefault(
-    "DATABASE_URL",
-    "sqlite+aiosqlite:///./test-neuroplant.db",
-)
+# Keep concurrent pytest processes from dropping or recreating each other's schema.
+os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///./test-neuroplant-{os.getpid()}.db"
 os.environ.setdefault("ENVIRONMENT", "test")
 # Surface OTP codes via the API so the flow is testable without SMS.
 os.environ.setdefault("DEBUG", "true")

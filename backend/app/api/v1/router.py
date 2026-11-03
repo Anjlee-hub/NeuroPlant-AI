@@ -7,11 +7,13 @@ treatment/soil/calendar → M3, voice/assistant/dataset → M4, …).
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    analytics,
     assistant,
     auth,
     calendar,
     catalog,
     favorites,
+    market,
     marketplace,
     messaging,
     notifications,
@@ -19,9 +21,11 @@ from app.api.v1.endpoints import (
     recovery,
     reviews,
     scans,
+    schemes,
     soil,
     users,
     weather,
+    yield_estimation,
 )
 
 api_router = APIRouter()
@@ -54,6 +58,10 @@ api_router.include_router(reviews.router)
 api_router.include_router(weather.router)
 # M5 Task 2 — notifications foundation (in-app, no push yet).
 api_router.include_router(notifications.router)
+api_router.include_router(yield_estimation.router)
+api_router.include_router(market.router)
+api_router.include_router(schemes.router)
+api_router.include_router(analytics.router)
 
 # Routers are added milestone-by-milestone:
 # M5: outbreaks, yield, prices, maps (in progress)

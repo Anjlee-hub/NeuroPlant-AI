@@ -31,6 +31,38 @@ uvicorn app.main:app --reload        # → http://localhost:8000/docs
 pytest                              # run the test suite
 ```
 
+### Scheduled workers
+
+The API persists upcoming calendar/treatment reminders. With Redis available
+and `CELERY_TASK_ALWAYS_EAGER=false`, run one worker and exactly one Celery
+Beat scheduler in separate terminals:
+
+```bash
+celery -A app.workers.celery_app worker --loglevel=info
+celery -A app.workers.celery_app beat --loglevel=info
+```
+
+In the Docker Compose stack, the `worker` and `beat` services use these
+commands. Do not run multiple Beat schedulers against the same application
+unless a distributed scheduler/lock is configured.
+
+## M6–M9 data-backed APIs
+
+- `POST /api/v1/yield/estimates` estimates from the authenticated farmer's
+  prior actual harvests of the same crop. With no history it returns a null
+  estimate, not a generic yield figure. `POST/GET /api/v1/yield/harvests`
+  record and list farmer-owned actuals.
+- `GET /api/v1/market/prices` compares currently available farmer marketplace
+  offers, labeled as offers with source and update timestamps. It is not an
+  official mandi feed; there is no historical-price dataset configured.
+- `GET /api/v1/schemes` filters curated scheme records. No scheme data is
+  seeded. Only administrator-created, source-attributed records appear;
+  unverified records do not expose subsidy details or application links.
+- `/api/v1/analytics/agriculture` and `/api/v1/analytics/schemes` aggregate
+  records for the authenticated user. Applications, historical weather risk,
+  and soil test measurements are explicitly reported as unavailable because
+  those records are not tracked by the current application.
+
 ## Quality gates
 
 ```bash
@@ -40,8 +72,8 @@ ruff format --check .        # formatting
 mypy app                     # static types
 ```
 
-Migrations live in `alembic/versions/` (head: `e7a4341cf99e`). API docs are
-served at `/docs` and `/api/v1/openapi.json`.
+Migrations live in `alembic/versions/`. API docs are served at `/docs` and
+`/api/v1/openapi.json`.
 
 Native dev uses **SQLite** (`DATABASE_URL=sqlite+aiosqlite:///./neuroplant.db`) and
 **Celery eager mode** so the stack runs with zero external services. Production

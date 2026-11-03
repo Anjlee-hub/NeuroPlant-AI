@@ -6,21 +6,23 @@ scheduled_at seam), paginated listing with unread counts, mark-one / mark-all
 read, and OpenAPI regression.
 """
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
-
 from app.db.session import async_session_factory
 from app.main import app
+from app.models.calendar import CalendarTask, CropSchedule
+from app.models.catalog import Crop
 from app.models.notification import Notification, NotificationType
+from app.models.recovery import RecoveryLog
+from app.models.scan import Scan
+from app.services.notification_triggers import NotificationTriggerService
 from app.services.notifications import (
-    NotificationNotFoundError,
     NotificationService,
-    NotificationTransport,
     NotificationValidationError,
 )
-
+from sqlalchemy import func, select
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -97,9 +99,7 @@ async def test_create_accepts_enum_and_string_types():
 async def test_create_rejects_invalid_type():
     async with async_session_factory() as db:
         with pytest.raises(NotificationValidationError):
-            await NotificationService(db).create(
-                1, type="not_a_real_type", title="x", message="y"
-            )
+            await NotificationService(db).create(1, type="not_a_real_type", title="x", message="y")
 
 
 async def test_create_rejects_blank_title_and_message():
@@ -298,8 +298,8 @@ async def test_scheduling_seam_dispatches_due_notifications():
     """dispatch_scheduled delivers due notifications and marks sent_at."""
     from app.db.session import async_session_factory
     from app.models.user import User
-    from sqlalchemy import select
     from app.services.auth import register_user
+    from sqlalchemy import select
 
     # Create a user for this test
     async with async_session_factory() as db:
@@ -307,13 +307,17 @@ async def test_scheduling_seam_dispatches_due_notifications():
         user = await db.scalar(select(User).where(User.id == 1))
         if user is None:
             # Create user 1 if it doesn't exist
-            user = await register_user(db, phone="+919999999991", name="Test", role="farmer", password="secret123")
+            user = await register_user(
+                db, phone="+919999999991", name="Test", role="farmer", password="secret123"
+            )
 
     user_id = user.id if user else 1
     past = datetime.now(UTC) - timedelta(minutes=5)
     future = datetime.now(UTC) + timedelta(hours=1)
     due = await _create_for(user_id, type="task_reminder", title="due", scheduled_at=past, count=1)
-    not_due = await _create_for(user_id, type="task_reminder", title="later", scheduled_at=future, count=1)
+    not_due = await _create_for(
+        user_id, type="task_reminder", title="later", scheduled_at=future, count=1
+    )
 
     transport = _RecordingTransport()
     async with async_session_factory() as db:
@@ -334,13 +338,15 @@ async def test_scheduling_seam_does_not_repeat_dispatch():
     """A sent notification is not dispatched again on the next tick."""
     from app.db.session import async_session_factory
     from app.models.user import User
-    from sqlalchemy import select
     from app.services.auth import register_user
+    from sqlalchemy import select
 
     async with async_session_factory() as db:
         user = await db.scalar(select(User).where(User.id == 1))
         if user is None:
-            user = await register_user(db, phone="+919999999991", name="Test", role="farmer", password="secret123")
+            user = await register_user(
+                db, phone="+919999999991", name="Test", role="farmer", password="secret123"
+            )
 
     user_id = user.id if user else 1
     past = datetime.now(UTC) - timedelta(minutes=5)
@@ -354,6 +360,230 @@ async def test_scheduling_seam_does_not_repeat_dispatch():
     assert first == 1
     assert second == 0
     assert len(transport.delivered) == 1
+
+
+async def test_failed_scheduled_delivery_remains_retryable(client):
+    user_id, _ = await _register_and_get_id(client, "+919000000425")
+    due = datetime.now(UTC) - timedelta(minutes=5)
+
+    class FailOnceTransport:
+        def __init__(self) -> None:
+            self.attempts = 0
+            self.delivered: list[int] = []
+
+        async def send(self, user, notification) -> None:
+            self.attempts += 1
+            if self.attempts == 1:
+                raise RuntimeError("temporary transport failure")
+            self.delivered.append(notification.id)
+
+    transport = FailOnceTransport()
+    async with async_session_factory() as db:
+        notification = await NotificationService(db).create(
+            user_id,
+            type="task_reminder",
+            title="Retry me",
+            message="Temporary failure test",
+            scheduled_at=due,
+        )
+        service = NotificationService(db, transport=transport)
+        with pytest.raises(RuntimeError, match="temporary transport failure"):
+            await service.dispatch_scheduled()
+        assert await service.dispatch_scheduled() == 1
+
+    assert transport.attempts == 2
+    assert transport.delivered == [notification.id]
+    async with async_session_factory() as db:
+        stored = await db.get(Notification, notification.id)
+        assert stored is not None
+        assert stored.sent_at is not None
+
+
+async def test_scheduled_notification_is_hidden_and_not_delivered_early(client):
+    user_id, _ = await _register_and_get_id(client, "+919000000420")
+    future = datetime.now(UTC) + timedelta(hours=1)
+    transport = _RecordingTransport()
+    async with async_session_factory() as db:
+        notification = await NotificationService(db, transport=transport).create(
+            user_id,
+            type="task_reminder",
+            title="Future reminder",
+            message="Not yet",
+            scheduled_at=future,
+        )
+        items, total, unread = await NotificationService(db).list(user_id)
+        assert (items, total, unread) == ([], 0, 0)
+        assert await NotificationService(db, transport=transport).dispatch_scheduled() == 0
+
+    assert transport.delivered == []
+    async with async_session_factory() as db:
+        stored = await db.get(Notification, notification.id)
+        assert stored is not None
+        stored.scheduled_at = datetime.now(UTC) - timedelta(minutes=1)
+        await db.commit()
+        assert await NotificationService(db, transport=transport).dispatch_scheduled() == 1
+
+    assert transport.delivered == [notification.id]
+    async with async_session_factory() as db:
+        items, total, unread = await NotificationService(db).list(user_id)
+        assert [item.id for item in items] == [notification.id]
+        assert (total, unread) == (1, 1)
+
+
+async def test_notification_idempotency_key_prevents_duplicate_rows(client):
+    user_id, _ = await _register_and_get_id(client, "+919000000421")
+    async with async_session_factory() as db:
+        service = NotificationService(db)
+        first = await service.create(
+            user_id,
+            type="task_reminder",
+            title="Reminder",
+            message="Once",
+            idempotency_key="test-reminder:unique",
+        )
+        second = await service.create(
+            user_id,
+            type="task_reminder",
+            title="Reminder",
+            message="Once",
+            idempotency_key="test-reminder:unique",
+        )
+        assert first.id == second.id
+        assert (
+            await db.scalar(
+                select(func.count()).where(Notification.idempotency_key == "test-reminder:unique")
+            )
+            == 1
+        )
+
+
+async def test_treatment_followup_handles_sqlite_naive_utc_and_is_idempotent(client):
+    user_id, _ = await _register_and_get_id(client, "+919000000423")
+    from app.db.seed import seed_catalog
+
+    async with async_session_factory() as db:
+        await seed_catalog(db)
+        crop = await db.scalar(select(Crop).where(Crop.name == "tomato"))
+        assert crop is not None
+        scan = Scan(
+            client_scan_id=str(uuid.uuid4()),
+            user_id=user_id,
+            media_items=[],
+            image_path="test.jpg",
+            crop_id=crop.id,
+            disease_name="Leaf spot",
+            confidence=0.9,
+            provider="test",
+            ai_metadata={},
+        )
+        db.add(scan)
+        await db.flush()
+        db.add(
+            RecoveryLog(
+                scan_id=scan.id,
+                user_id=user_id,
+                treatment_applied="Recorded treatment",
+                progress="improving",
+                applied_at=(datetime.now(UTC) - timedelta(days=6)).replace(tzinfo=None),
+            )
+        )
+        await db.commit()
+        first = await NotificationTriggerService(db).maybe_notify_treatment_reminder(
+            user_id, scan.id
+        )
+        second = await NotificationTriggerService(db).maybe_notify_treatment_reminder(
+            user_id, scan.id
+        )
+        assert first is not None
+        assert first.id == second.id
+        assert first.payload["next_due_at"].endswith("+00:00")
+        assert first.payload["recovery_log_id"] > 0
+
+
+async def test_system_notifications_dedupe_by_content_not_empty_payload(client):
+    user_id, _ = await _register_and_get_id(client, "+919000000424")
+    async with async_session_factory() as db:
+        triggers = NotificationTriggerService(db)
+        first = await triggers.notify_system(user_id, "Notice A", "Message A")
+        second = await triggers.notify_system(user_id, "Notice B", "Message B")
+        duplicate = await triggers.notify_system(user_id, "Notice A", "Message A")
+        assert first is not None and second is not None
+        assert duplicate is not None
+        assert first.id != second.id
+        assert first.id == duplicate.id
+
+
+async def test_calendar_reminders_use_owned_upcoming_incomplete_tasks(client):
+    from app.db.seed import seed_catalog, seed_crop_calendar
+
+    user_id, _ = await _register_and_get_id(client, "+919000000422")
+    async with async_session_factory() as db:
+        await seed_catalog(db)
+        await seed_crop_calendar(db)
+        crop = await db.scalar(select(Crop).where(Crop.name == "tomato"))
+        assert crop is not None
+        schedule = CropSchedule(
+            user_id=user_id,
+            crop_id=crop.id,
+            planting_date=datetime.now(UTC).date(),
+        )
+        db.add(schedule)
+        await db.flush()
+        now = datetime.now(UTC)
+        due_task = CalendarTask(
+            schedule_id=schedule.id,
+            kind="watering",
+            title="Water crop",
+            due_at=now + timedelta(hours=1),
+        )
+        db.add_all(
+            [
+                due_task,
+                CalendarTask(
+                    schedule_id=schedule.id,
+                    kind="watering",
+                    title="Completed task",
+                    due_at=now + timedelta(hours=1),
+                    completed_at=now,
+                ),
+                CalendarTask(
+                    schedule_id=schedule.id,
+                    kind="watering",
+                    title="Outside reminder window",
+                    due_at=now + timedelta(days=2),
+                ),
+            ]
+        )
+        await db.commit()
+        created = await NotificationTriggerService(db).maybe_notify_task_reminder(
+            user_id, schedule.id
+        )
+        repeated = await NotificationTriggerService(db).maybe_notify_task_reminder(
+            user_id, schedule.id
+        )
+        assert len(created) == len(repeated) == 1
+        assert created[0].id == repeated[0].id
+        assert created[0].payload["task_id"] == due_task.id
+        assert (
+            await NotificationTriggerService(db).maybe_notify_task_reminder(
+                user_id + 1000, schedule.id
+            )
+            == []
+        )
+
+
+async def test_notification_beat_jobs_are_registered():
+    import app.workers.tasks  # noqa: F401
+    from app.workers.celery_app import celery_app
+
+    assert (
+        celery_app.conf.beat_schedule["dispatch-scheduled-notifications-every-minute"]["task"]
+        == "notifications.dispatch_scheduled"
+    )
+    assert "notifications.dispatch_scheduled" in celery_app.tasks
+    assert celery_app.tasks["notifications.dispatch_scheduled"].max_retries == 3
+    assert "notifications.create_calendar_reminders" in celery_app.tasks
+    assert "notifications.create_treatment_reminders" in celery_app.tasks
 
 
 # ── Transport interface (push seam) ────────────────────────────────────────

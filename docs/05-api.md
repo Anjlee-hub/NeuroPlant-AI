@@ -77,8 +77,8 @@ Interactive docs: `GET /docs` (Swagger UI) · OpenAPI: `GET /api/v1/openapi.json
 | GET | `/calendar/plans` | list plans |
 | PATCH | `/calendar/events/{id}` | mark done / reschedule |
 | GET | `/calendar/upcoming` | next reminders |
-| POST | `/yield/predict` | predict yield/income/profit/harvest date |
-| GET | `/yield/predictions` | saved predictions |
+| POST | `/yield/estimates` | estimate from this farmer's prior actual harvests; returns null when no baseline exists |
+| POST/GET | `/yield/harvests` | record/list actual harvests owned by the farmer |
 
 ## Assistant, Voice (M4)
 
@@ -102,11 +102,17 @@ Interactive docs: `GET /docs` (Swagger UI) · OpenAPI: `GET /api/v1/openapi.json
 | GET | `/outbreaks/map?district=&state=` | aggregated heatmap data |
 | GET | `/outbreaks/nearby?lat=&lng=&r=` | nearby reports |
 | POST | `/outbreaks/{id}/verify` | expert verify/reject |
-| GET | `/prices/live?crop_id=&market_id=` | live prices |
-| GET | `/prices/history` | price time series |
-| GET | `/prices/predict` | price prediction |
-| GET | `/markets?near=lat,lng` | nearby markets |
-| GET | `/schemes?state=&category=` | govt schemes |
+| GET | `/market/prices?crop_name=&location=&page=&page_size=` | compare current farmer marketplace offers, with source and last-updated time |
+| GET | `/schemes?state_code=&crop_name=&farmer_category=&category=` | filter curated, source-attributed scheme records |
+| GET | `/schemes/{id}` | scheme details |
+| POST | `/schemes/{id}/eligibility` | compare supplied facts against recorded rules; not a legal determination |
+| POST | `/schemes` | add a source-attributed scheme record (admin only) |
+
+Market prices currently come from farmer listings, not an official mandi feed;
+historical market observations are not stored. Government schemes are not
+seeded with sample data; the API reports an empty catalog until verified
+records are curated. Unverified scheme records do not expose subsidy details
+or application links.
 
 ## Dataset Platform (M4)
 
@@ -165,11 +171,17 @@ Interactive docs: `GET /docs` (Swagger UI) · OpenAPI: `GET /api/v1/openapi.json
 |---|---|---|
 | GET | `/notifications` | my notifications |
 | PATCH | `/notifications/{id}/read` | mark read |
-| POST | `/notifications/token` | register push token |
-| GET | `/analytics/farmer/dashboard` | smart-farm dashboard payload |
-| GET | `/analytics/admin/overview` · `/analytics/admin/{domain}` | admin metrics |
+| GET | `/notifications/unread-count` | unread count |
+| PATCH | `/notifications/read-all` | mark all visible notifications read |
+| GET | `/analytics/agriculture?period_start=&period_end=&crop_id=` | farmer-scoped crop, disease, treatment, calendar, and yield analytics |
+| GET | `/analytics/agriculture/export.csv` | export the filtered agricultural report |
+| GET | `/analytics/schemes?period_start=&period_end=&crop_name=&state_code=` | farmer-scoped views and eligibility-check aggregates |
 | GET/PATCH/POST | `/admin/{users|experts|products|diseases|crops|orders|reports}` | admin CRUD |
 | GET | `/admin/audit-log` | admin activity log |
+
+Scheme application status is not tracked. Weather-risk history and measured
+soil test results are not persisted, so analytics identify those statistics as
+unavailable rather than returning fabricated values.
 
 ## WebSocket
 

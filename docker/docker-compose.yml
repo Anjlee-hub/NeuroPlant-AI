@@ -54,12 +54,12 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
+  migrate:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
       target: api
-    env_file: .env.example
+    env_file: .env
     environment: &backend-env
       ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-neuroplant}:${POSTGRES_PASSWORD:-neuroplant}@db:5432/${POSTGRES_DB:-neuroplant}
@@ -72,6 +72,18 @@ services:
       S3_BUCKET: ${S3_BUCKET:-neuroplant}
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-neuroplant}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-neuroplant-minio}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+      target: api
+    env_file: .env
+    environment: *backend-env
     depends_on:
       db:
         condition: service_healthy
@@ -79,6 +91,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
 
@@ -87,13 +101,31 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.api
       target: worker
-    env_file: .env.example
+    env_file: .env
     environment: *backend-env
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+      target: worker
+    env_file: .env
+    environment: *backend-env
+    command: ["celery", "-A", "app.workers.celery_app", "beat", "--loglevel=info"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
