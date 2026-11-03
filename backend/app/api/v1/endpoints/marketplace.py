@@ -29,6 +29,9 @@ from app.db.session import get_db
 from app.models.base import UserRole
 from app.models.user import User
 from app.schemas.marketplace import (
+    CartItemIn,
+    CartOut,
+    CheckoutIn,
     CropListingDetailOut,
     CropListingIn,
     CropListingOut,
@@ -36,6 +39,7 @@ from app.schemas.marketplace import (
     CropListingStatsOut,
     CropListingUpdate,
     ListingImagesOut,
+    OrderOut,
     ProductDetailOut,
     ProductIn,
     ProductOut,
@@ -339,3 +343,34 @@ async def get_product(product_id: int, user: CurrentUser, db: Db) -> ProductDeta
     """One product with its shop attached (public detail view, M4, Task 4).
     ``404`` when the product doesn't exist."""
     return await MarketplaceService(db).product_detail(product_id)
+
+
+@router.get("/cart", response_model=CartOut)
+async def get_cart(user: CurrentUser, db: Db) -> CartOut:
+    return await MarketplaceService(db).get_cart(user)
+
+
+@router.post("/cart/items", response_model=CartOut)
+async def add_cart_item(
+    payload: CartItemIn, user: CurrentUser, db: Db
+) -> CartOut:
+    return await MarketplaceService(db).add_to_cart(user, payload)
+
+
+@router.delete("/cart/items/{item_id}", response_model=CartOut)
+async def remove_cart_item(
+    item_id: int, user: CurrentUser, db: Db
+) -> CartOut:
+    return await MarketplaceService(db).remove_from_cart(user, item_id)
+
+
+@router.post("/checkout", response_model=OrderOut, status_code=201)
+async def checkout(
+    payload: CheckoutIn, user: CurrentUser, db: Db
+) -> OrderOut:
+    return await MarketplaceService(db).checkout(user, payload)
+
+
+@router.get("/orders", response_model=list[OrderOut])
+async def get_orders(user: CurrentUser, db: Db) -> list[OrderOut]:
+    return await MarketplaceService(db).get_orders(user)

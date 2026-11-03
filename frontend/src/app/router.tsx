@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-
+import Maps from "@/pages/maps";
 import { ErrorBoundary } from "@/app/error-boundary";
 import { RootLayout } from "@/components/layout/root-layout";
 import { HomePage } from "@/pages/home";
@@ -79,6 +79,7 @@ export const router = createBrowserRouter([
       { path: "marketplace/messages/:conversationId", element: <MessagesDetailPage /> },
       // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
       { path: "assistant", element: <AssistantPage /> },
+      { path: "maps", element: <Maps /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

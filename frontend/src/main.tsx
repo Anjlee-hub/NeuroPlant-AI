@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import "leaflet/dist/leaflet.css";
 import { createRoot } from "react-dom/client";
 
 // Initializes i18next before first render so the shell renders translated.

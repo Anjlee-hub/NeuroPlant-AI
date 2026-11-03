@@ -31,6 +31,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -108,3 +109,55 @@ class Product(Base, TimestampMixin):
     availability: Mapped[str] = mapped_column(
         String(20), default="in_stock", server_default=text("'in_stock'"), nullable=False
     )
+
+
+class CartItem(Base, TimestampMixin):
+    """One product and quantity saved in a buyer's cart."""
+
+    __tablename__ = "cart_items"
+    __table_args__ = (
+        UniqueConstraint("user_id", "product_id", name="uq_cart_user_product"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    quantity: Mapped[float] = mapped_column(Float, default=1, nullable=False)
+
+
+class Order(Base, TimestampMixin):
+    """A buyer's placed order."""
+
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(30), default="placed", nullable=False
+    )
+    total_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    shipping_address: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class OrderItem(Base):
+    """Product and price snapshot belonging to an order."""
+
+    __tablename__ = "order_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="RESTRICT"), nullable=False
+    )
+    product_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    unit_price: Mapped[float] = mapped_column(Float, nullable=False)
+    subtotal: Mapped[float] = mapped_column(Float, nullable=False)

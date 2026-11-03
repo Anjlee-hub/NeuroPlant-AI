@@ -90,6 +90,32 @@ export interface ScanUploadInput {
   deviceId?: string;
 }
 
+type CartResponse = {
+  items: {
+    id: number;
+    product_id: number;
+    quantity: number;
+    product: Product;
+    subtotal: number;
+  }[];
+  total_amount: number;
+};
+
+type OrderResponse = {
+  id: number;
+  status: string;
+  total_amount: number;
+  shipping_address: string;
+  created_at: string;
+  items: {
+    product_id: number;
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+  }[];
+};
+
 /**
  * Thin typed client for the FastAPI backend. Responses are the domain
  * models directly (no envelope); errors arrive as
@@ -452,6 +478,27 @@ export const api = {
   /** One product with its shop attached (public detail view). */
   getProduct: (productId: number) =>
     request<ProductDetail>(`/marketplace/products/${productId}`, { auth: true }),
+  getCart: () =>
+    request<CartResponse>("/marketplace/cart", { auth: true }),
+  addToCart: (productId: number, quantity: number) =>
+    request<CartResponse>("/marketplace/cart/items", {
+      method: "POST",
+      body: { product_id: productId, quantity },
+      auth: true,
+    }),
+  removeFromCart: (itemId: number) =>
+    request<CartResponse>(`/marketplace/cart/items/${itemId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+  checkout: (shippingAddress: string) =>
+    request<OrderResponse>("/marketplace/checkout", {
+      method: "POST",
+      body: { shipping_address: shippingAddress },
+      auth: true,
+    }),
+  getOrders: () =>
+    request<OrderResponse[]>("/marketplace/orders", { auth: true }),
 
   // ── Farmer Marketplace (M4 Task 2) ────────────────────────────────────
   /** The farmer's own listings (newest first) — dashboard table/cards. */

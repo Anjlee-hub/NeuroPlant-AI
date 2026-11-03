@@ -323,3 +323,42 @@ class ProductPageOut(BaseModel):
 
 # SellerOut references ProductOut forward; resolve at import time.
 SellerOut.model_rebuild()
+
+
+class CartItemIn(BaseModel):
+    product_id: int
+    quantity: float = Field(gt=0)
+
+
+class CartItemOut(BaseModel):
+    id: int
+    product_id: int
+    quantity: float
+    product: ProductOut
+    subtotal: float
+
+
+class CartOut(BaseModel):
+    items: list[CartItemOut] = Field(default_factory=list)
+    total_amount: float = 0
+
+
+class CheckoutIn(BaseModel):
+    shipping_address: str = Field(min_length=5, max_length=2000)
+
+
+class OrderItemOut(BaseModel):
+    product_id: int
+    product_name: str
+    quantity: float
+    unit_price: float
+    subtotal: float
+
+
+class OrderOut(BaseModel):
+    id: int
+    status: str
+    total_amount: float
+    shipping_address: str
+    items: list[OrderItemOut] = Field(default_factory=list)
+    created_at: datetime

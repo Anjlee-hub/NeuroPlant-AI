@@ -13,7 +13,7 @@ semantics. Three roles feed it:
 
 Ownership guards mirror the rest of the platform: a row that isn't yours
 (and any missing row) answers ``404`` so ids can't be enumerated, the same
-guard scans/recovery/calendar use. Browse/search share one query builder so
+guard scans/raecovery/calendar use. Browse/search share one query builder so
 filter semantics never diverge between the two endpoints.
 """
 
@@ -23,15 +23,19 @@ import io
 from datetime import date, datetime, time
 from math import ceil
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from PIL import Image
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.models.marketplace import CropListing, Product
+from app.models.marketplace import CartItem, CropListing, Order, OrderItem, Product
 from app.models.user import SellerProfile, User
 from app.schemas.marketplace import (
+    CartItemIn,
+    CartItemOut,
+    CartOut,
+    CheckoutIn,
     CropListingDetailOut,
     CropListingIn,
     CropListingOut,
@@ -39,6 +43,8 @@ from app.schemas.marketplace import (
     CropListingStatsOut,
     CropListingUpdate,
     FarmerSummaryOut,
+    OrderItemOut,
+    OrderOut,
     ProductDetailOut,
     ProductIn,
     ProductOut,
@@ -489,6 +495,188 @@ class MarketplaceService:
                 delivery_available=profile.delivery_available if profile is not None else False,
             ),
         )
+
+    # ── Customer cart ────────────────────────────────────────────────────
+
+    async def get_cart(self, user: User) -> CartOut:
+        rows = await self.db.execute(
+            select(CartItem, Product)
+            .join(Product, Product.id == CartItem.product_id)
+            .where(CartItem.user_id == user.id)
+            .order_by(CartItem.id)
+        )
+        items: list[CartItemOut] = []
+        total = 0.0
+        for item, product in rows.all():
+            subtotal = item.quantity * product.price
+            total += subtotal
+            items.append(
+                CartItemOut(
+                    id=item.id,
+                    product_id=item.product_id,
+                    quantity=item.quantity,
+                    product=ProductOut.model_validate(product),
+                    subtotal=subtotal,
+                )
+            )
+        return CartOut(items=items, total_amount=total)
+
+    async def add_to_cart(self, user: User, payload: CartItemIn) -> CartOut:
+        product = await self.db.get(Product, payload.product_id)
+        if product is None or product.availability != "in_stock":
+            raise HTTPException(status_code=404, detail="Product unavailable")
+        if (
+            product.stock_quantity is not None
+            and payload.quantity > product.stock_quantity
+        ):
+            raise HTTPException(status_code=400, detail="Insufficient stock")
+        item = await self.db.scalar(
+            select(CartItem).where(
+                CartItem.user_id == user.id,
+                CartItem.product_id == payload.product_id,
+            )
+        )
+        new_quantity = payload.quantity + (item.quantity if item else 0)
+        if (
+            product.stock_quantity is not None
+            and new_quantity > product.stock_quantity
+        ):
+            raise HTTPException(status_code=400, detail="Insufficient stock")
+        if item:
+            item.quantity = new_quantity
+        else:
+            self.db.add(
+                CartItem(
+                    user_id=user.id,
+                    product_id=payload.product_id,
+                    quantity=payload.quantity,
+                )
+            )
+        await self.db.commit()
+        return await self.get_cart(user)
+
+    async def remove_from_cart(self, user: User, item_id: int) -> CartOut:
+        item = await self.db.scalar(
+            select(CartItem).where(
+                CartItem.id == item_id,
+                CartItem.user_id == user.id,
+            )
+        )
+        if item is None:
+            raise HTTPException(status_code=404, detail="Cart item not found")
+        await self.db.delete(item)
+        await self.db.commit()
+        return await self.get_cart(user)
+
+    async def checkout(self, user: User, payload: CheckoutIn) -> OrderOut:
+        rows = await self.db.execute(
+            select(CartItem, Product)
+            .join(Product, Product.id == CartItem.product_id)
+            .where(CartItem.user_id == user.id)
+            .order_by(CartItem.id)
+        )
+        cart_items = rows.all()
+        if not cart_items:
+            raise HTTPException(status_code=400, detail="Cart is empty")
+
+        for cart_item, product in cart_items:
+            if product.availability != "in_stock":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Product unavailable: {product.name}",
+                )
+            if (
+                product.stock_quantity is not None
+                and cart_item.quantity > product.stock_quantity
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient stock for {product.name}",
+                )
+
+        total = 0.0
+        order_items: list[OrderItem] = []
+        for cart_item, product in cart_items:
+            if product.stock_quantity is not None:
+                product.stock_quantity -= cart_item.quantity
+            subtotal = cart_item.quantity * product.price
+            total += subtotal
+            order_items.append(
+                OrderItem(
+                    product_id=product.id,
+                    product_name=product.name,
+                    quantity=cart_item.quantity,
+                    unit_price=product.price,
+                    subtotal=subtotal,
+                )
+            )
+
+        order = Order(
+            user_id=user.id,
+            status="placed",
+            total_amount=total,
+            shipping_address=payload.shipping_address,
+        )
+        self.db.add(order)
+        await self.db.flush()
+        for item in order_items:
+            item.order_id = order.id
+            self.db.add(item)
+        for cart_item, _ in cart_items:
+            await self.db.delete(cart_item)
+        await self.db.commit()
+        await self.db.refresh(order)
+        return OrderOut(
+            id=order.id,
+            status=order.status,
+            total_amount=order.total_amount,
+            shipping_address=order.shipping_address,
+            items=[
+                OrderItemOut(
+                    product_id=item.product_id,
+                    product_name=item.product_name,
+                    quantity=item.quantity,
+                    unit_price=item.unit_price,
+                    subtotal=item.subtotal,
+                )
+                for item in order_items
+            ],
+            created_at=order.created_at,
+        )
+
+    async def get_orders(self, user: User) -> list[OrderOut]:
+        result = await self.db.scalars(
+            select(Order)
+            .where(Order.user_id == user.id)
+            .order_by(Order.created_at.desc())
+        )
+        orders = result.all()
+        output: list[OrderOut] = []
+        for order in orders:
+            items_result = await self.db.scalars(
+                select(OrderItem).where(OrderItem.order_id == order.id)
+            )
+            items = items_result.all()
+            output.append(
+                OrderOut(
+                    id=order.id,
+                    status=order.status,
+                    total_amount=order.total_amount,
+                    shipping_address=order.shipping_address,
+                    created_at=order.created_at,
+                    items=[
+                        OrderItemOut(
+                            product_id=item.product_id,
+                            product_name=item.product_name,
+                            quantity=item.quantity,
+                            unit_price=item.unit_price,
+                            subtotal=item.subtotal,
+                        )
+                        for item in items
+                    ],
+                )
+            )
+        return output
 
     # ── Internals ────────────────────────────────────────────────────────
 
