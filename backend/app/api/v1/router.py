@@ -22,6 +22,9 @@ from app.api.v1.endpoints import (
     soil,
     users,
     weather,
+    community,
+    experts,
+    consultations
 )
 
 api_router = APIRouter()
@@ -58,3 +61,6 @@ api_router.include_router(notifications.router)
 # Routers are added milestone-by-milestone:
 # M5: outbreaks, yield, prices, maps (in progress)
 # ...
+api_router.include_router(community.router)
+api_router.include_router(experts.router)
+api_router.include_router(consultations.router)
