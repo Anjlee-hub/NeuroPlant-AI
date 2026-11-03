@@ -18,6 +18,9 @@ second "Contact Seller" click never stacks a new conversation.
 No WebSocket layer exists yet by design (M4 Task 5 is API-based); the methods
 are shaped so a real-time adapter can ride on top later without changing the
 read/write surface.
+
+M5 Task 3: integration with NotificationTriggerService for marketplace_message
+notifications.
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ from app.schemas.messaging import (
     ProductRefOut,
     ReadResultOut,
 )
+from app.services.notification_triggers import NotificationTriggerService
 
 logger = get_logger(__name__)
 
@@ -172,6 +176,19 @@ class MessagingService:
         await self.db.commit()
         await self.db.refresh(message)
         logger.info("message_sent", conversation_id=conversation.id, sender_id=user.id)
+
+        # M5 Task 3: notify the other participant
+        recipient_id = conversation.buyer_id if conversation.seller_id == user.id else conversation.seller_id
+        triggers = NotificationTriggerService(self.db)
+        await triggers.notify_marketplace_message(
+            recipient_id=recipient_id,
+            conversation_id=conversation.id,
+            sender_id=user.id,
+            sender_name=user.name,
+            listing_id=conversation.listing_id,
+            product_id=conversation.product_id,
+        )
+
         return MessageOut(
             id=message.id,
             conversation_id=message.conversation_id,

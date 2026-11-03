@@ -6,6 +6,9 @@ current weather. Both are authenticated (any role, consistent with the
 read-only catalog/soil endpoints) and provider-independent: the response never
 exposes an upstream source beyond the normalized ``provider``/``is_fallback``
 flags.
+
+M5 Task 3: ``GET /weather/risk`` triggers a weather/disease-risk notification
+when the risk crosses the high/critical threshold (idempotent per user+crop+location).
 """
 
 from typing import Annotated
@@ -19,6 +22,7 @@ from app.models.user import User
 from app.schemas.weather import WeatherOut, WeatherRiskOut
 from app.services.weather import WeatherService, weather_to_out
 from app.services.weather_risk import DiseaseRiskService
+from app.services.notification_triggers import NotificationTriggerService
 
 router = APIRouter(prefix="/weather", tags=["weather"])
 
@@ -52,7 +56,7 @@ async def get_disease_risk(
     crop_id: int,
     lat: Latitude,
     lng: Longitude,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     db: Db,
 ) -> WeatherRiskOut:
     """Per-crop disease risk under the current weather.
@@ -61,8 +65,19 @@ async def get_disease_risk(
     constants keyed by the disease's pathogen class (see
     :mod:`app.services.weather_risk`). 404 when the crop is not in the catalog
     (unsupported crop).
+
+    M5 Task 3: if the risk crosses ``high``/``critical``, a notification is
+    raised for the authenticated user (idempotent per user + crop + location).
     """
     result = await WeatherService().get_current(lat, lng)
-    return await DiseaseRiskService(db).assess_crop(
+    out = await DiseaseRiskService(db).assess_crop(
         crop_id, result.data, is_fallback=result.is_fallback
     )
+
+    # M5 Task 3: trigger notification for high/critical risk
+    triggers = NotificationTriggerService(db)
+    await triggers.maybe_notify_weather_risk(
+        user_id=current_user.id, crop_id=crop_id, lat=lat, lng=lng
+    )
+
+    return out
