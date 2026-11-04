@@ -11,6 +11,9 @@ from app.api.v1.endpoints import (
     auth,
     calendar,
     catalog,
+    community,
+    consultations,
+    experts,
     favorites,
     marketplace,
     messaging,
@@ -22,9 +25,6 @@ from app.api.v1.endpoints import (
     soil,
     users,
     weather,
-    community,
-    experts,
-    consultations
 )
 
 api_router = APIRouter()

@@ -1,14 +1,13 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.api.v1.deps import get_current_user
+from app.db.session import get_db
 from app.models.user import User
 from app.schemas.consultation import (
     ConsultationCreate,
-    ConsultationUpdate,
     ConsultationResponse,
+    ConsultationUpdate,
 )
 from app.services import consultations
 
@@ -48,9 +47,7 @@ async def update_consultation(
     if user.role != "expert":
         raise HTTPException(403, "Only experts can update consultations")
 
-    result = await consultations.update_consultation(
-        db, consultation_id, user.id, data
-    )
+    result = await consultations.update_consultation(db, consultation_id, user.id, data)
     if result is None:
         raise HTTPException(404, "Consultation not found or invalid update")
     return result

@@ -1,9 +1,8 @@
-
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consultation import Consultation
-from app.models.user import User, ExpertProfile
+from app.models.user import ExpertProfile, User
 
 
 async def create_consultation(db: AsyncSession, farmer_id: int, data):
@@ -24,12 +23,14 @@ async def create_consultation(db: AsyncSession, farmer_id: int, data):
 
 async def get_user_consultations(db: AsyncSession, user_id: int):
     result = await db.execute(
-        select(Consultation).where(
+        select(Consultation)
+        .where(
             or_(
                 Consultation.farmer_id == user_id,
                 Consultation.expert_id == user_id,
             )
-        ).order_by(Consultation.id.desc())
+        )
+        .order_by(Consultation.id.desc())
     )
     return result.scalars().all()
 
@@ -42,9 +43,7 @@ async def update_consultation(db: AsyncSession, consultation_id: int, expert_id:
 
     updates = data.model_dump(exclude_unset=True)
 
-    if updates.get("status") not in (
-        None, "pending", "accepted", "rejected", "completed"
-    ):
+    if updates.get("status") not in (None, "pending", "accepted", "rejected", "completed"):
         return None
 
     for key, value in updates.items():

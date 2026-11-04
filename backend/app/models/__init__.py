@@ -12,15 +12,21 @@ from app.models.calendar import (
     CropSchedule,
 )
 from app.models.catalog import Crop, Disease
+from app.models.community import (
+    CommunityComment,
+    CommunityPost,
+    CommunityVote,
+)
+from app.models.consultation import Consultation
 from app.models.conversation import ConversationMessage
 from app.models.marketplace import CropListing, Product
 from app.models.marketplace_trust import MarketplaceFavorite, MarketplaceReview
 from app.models.messaging import MarketplaceConversation, MarketplaceMessage
+from app.models.notification import Notification, NotificationType
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
-from app.models.notification import Notification, NotificationType
 from app.models.user import (
     MFA,
     Device,
@@ -41,6 +47,10 @@ __all__ = [
     "CropSchedule",
     "Crop",
     "Disease",
+    "CommunityComment",
+    "CommunityPost",
+    "CommunityVote",
+    "Consultation",
     "ConversationMessage",
     "CropListing",
     "Product",
@@ -48,14 +58,14 @@ __all__ = [
     "MarketplaceReview",
     "MarketplaceConversation",
     "MarketplaceMessage",
+    "Notification",
+    "NotificationType",
     "RecommendationCatalog",
     "DiseaseRecommendation",
     "SoilRecommendationCatalog",
     "SoilRecommendation",
     "RecoveryLog",
     "Scan",
-    "Notification",
-    "NotificationType",
     "User",
     "FarmerProfile",
     "ExpertProfile",
@@ -66,9 +76,3 @@ __all__ = [
     "RefreshToken",
     "OtpCode",
 ]
-from app.models.community import (
-    CommunityPost,
-    CommunityComment,
-    CommunityVote,
-)
-from app.models.consultation import Consultation

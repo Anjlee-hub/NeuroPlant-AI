@@ -1,10 +1,9 @@
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.community import (
-    CommunityPost,
     CommunityComment,
+    CommunityPost,
     CommunityVote,
 )
 
@@ -19,9 +18,7 @@ async def create_post(db: AsyncSession, user_id: int, data):
 
 async def get_posts(db: AsyncSession):
     result = await db.execute(
-        select(CommunityPost)
-        .where(CommunityPost.is_active == True)
-        .order_by(CommunityPost.id.desc())
+        select(CommunityPost).where(CommunityPost.is_active).order_by(CommunityPost.id.desc())
     )
     return result.scalars().all()
 
