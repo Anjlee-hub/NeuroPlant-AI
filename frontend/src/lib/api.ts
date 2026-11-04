@@ -122,7 +122,6 @@ type OrderResponse = {
  * `{ "error": { "message" } }` (mapped domain exceptions) or FastAPI
  * `{ "detail" }` (validation). Dev-only: vite proxies `/api` to :8000.
  */
-
 const API_BASE = "/api/v1";
 
 const ACCESS_KEY = "neuroplant.access";

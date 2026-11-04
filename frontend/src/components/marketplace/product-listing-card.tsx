@@ -1,9 +1,13 @@
-import { ArrowRight, Leaf } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Leaf, ShoppingCart } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { ProductAvailabilityBadge } from "@/components/marketplace/availability-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { api, errorMessage } from "@/lib/api";
 import type { Product } from "@/types/marketplace";
 
 /**
@@ -16,7 +20,16 @@ import type { Product } from "@/types/marketplace";
  */
 export function ProductListingCard({ product }: { product: Product }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [addError, setAddError] = useState<string | null>(null);
   const unitLabel = t(`marketplace.units.${product.unit}`);
+  const addToCart = useMutation({
+    mutationFn: () => api.addToCart(product.id, 1),
+    onSuccess: (cart) => {
+      queryClient.setQueryData(["cart"], cart);
+    },
+    onError: (error) => setAddError(errorMessage(error)),
+  });
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-lg border bg-card transition-shadow hover:shadow-md">
@@ -78,6 +91,25 @@ export function ProductListingCard({ product }: { product: Product }) {
           </span>
         </div>
       </Link>
+      <div className="flex flex-col items-start gap-2 px-3 pb-3">
+        <Button
+          size="sm"
+          disabled={product.availability !== "in_stock" || addToCart.isPending}
+          aria-busy={addToCart.isPending}
+          onClick={() => {
+            setAddError(null);
+            addToCart.mutate();
+          }}
+        >
+          <ShoppingCart aria-hidden />
+          {addToCart.isPending ? "Adding..." : "Add to Cart"}
+        </Button>
+        {addError && (
+          <p role="alert" className="text-sm text-destructive">
+            {addError}
+          </p>
+        )}
+      </div>
     </article>
   );
 }
