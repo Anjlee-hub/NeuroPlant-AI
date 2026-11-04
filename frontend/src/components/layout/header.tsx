@@ -13,6 +13,7 @@ import {
   Star,
   Stethoscope,
   Store,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const PRIMARY_NAV_ITEMS: Array<{
   { to: "/", labelKey: "nav.home", icon: Home, end: true },
   { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { to: "/assistant", labelKey: "nav.assistant", icon: MessageCircle },
+  { to: "/community", labelKey: "nav.community", icon: Users },
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
   { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
 ];

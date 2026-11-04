@@ -1,4 +1,13 @@
 import type {
+  CommunityPost,
+  CreatePostInput,
+  CommunityComment,
+  CreateCommentInput,
+  Expert,
+  Consultation,
+  CreateConsultationInput,
+} from "@/types/community";
+import type {
   MfaChallengeResponse,
   MfaCodesResponse,
   MfaSetupResponse,
@@ -593,4 +602,57 @@ export const api = {
   /** Delete one of the caller's own reviews. */
   deleteReview: (reviewId: number) =>
     request<void>(`/marketplace/reviews/${reviewId}`, { method: "DELETE", auth: true }),
+  // Farmer Community
+  listCommunityPosts: () =>
+    request<CommunityPost[]>("/community/posts", { auth: true }),
+
+  createCommunityPost: (payload: CreatePostInput) =>
+    request<CommunityPost>("/community/posts", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+
+  listPostComments: (postId: number) =>
+    request<CommunityComment[]>(`/community/posts/${postId}/comments`, {
+      auth: true,
+    }),
+
+  addPostComment: (postId: number, payload: CreateCommentInput) =>
+    request<CommunityComment>(`/community/posts/${postId}/comments`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+
+  voteForPost: (postId: number) =>
+    request<{ message: string }>(`/community/posts/${postId}/vote`, {
+      method: "POST",
+      auth: true,
+    }),
+
+  // Expert Ecosystem
+  listExperts: () =>
+    request<Expert[]>("/experts/", { auth: true }),
+
+  // Consultations
+  listConsultations: () =>
+    request<Consultation[]>("/consultations/", { auth: true }),
+
+  requestConsultation: (payload: CreateConsultationInput) =>
+    request<Consultation>("/consultations/", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+
+  updateConsultation: (
+    consultationId: number,
+    payload: { status?: string; expert_response?: string },
+  ) =>
+    request<Consultation>(`/consultations/${consultationId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
 };

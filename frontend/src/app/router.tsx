@@ -16,6 +16,7 @@ import { ScanDoctorPage } from "@/pages/scan-doctor";
 import { ScanHistoryPage } from "@/pages/scan-history";
 import { FarmerCalendarPage } from "@/pages/farmer-calendar";
 import { AssistantPage } from "@/pages/assistant";
+import { CommunityPage } from "@/pages/community";
 import { MarketplaceDashboardPage } from "@/pages/marketplace-dashboard";
 import { MarketplaceListingFormPage } from "@/pages/marketplace-listing-form";
 import { MarketplaceBuyPage } from "@/pages/marketplace-buy";
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
       { path: "marketplace/messages/:conversationId", element: <MessagesDetailPage /> },
       // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
       { path: "assistant", element: <AssistantPage /> },
+      { path: "community", element: <CommunityPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
