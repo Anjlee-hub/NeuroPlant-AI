@@ -73,3 +73,9 @@ __all__ = [
     "RefreshToken",
     "OtpCode",
 ]
+from app.models.community import (
+    CommunityPost,
+    CommunityComment,
+    CommunityVote,
+)
+from app.models.consultation import Consultation

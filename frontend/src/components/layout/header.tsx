@@ -15,12 +15,14 @@
   Star,
   Stethoscope,
   Store,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink } from "react-router-dom";
+import { MapPin, Users } from "lucide-react";
 
 import { AuthNav } from "@/components/layout/auth-nav";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -39,6 +41,7 @@ const PRIMARY_NAV_ITEMS: Array<{
   { to: "/assistant", labelKey: "nav.assistant", icon: MessageCircle },
   // Maps and nearby agricultural services
   { to: "/maps", labelKey: "Maps", icon: MapPin },
+  { to: "/community", labelKey: "nav.community", icon: Users },
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
   { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
 ];
