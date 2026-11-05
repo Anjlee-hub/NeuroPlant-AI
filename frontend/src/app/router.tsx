@@ -29,6 +29,7 @@ import { MessagesDetailPage } from "@/pages/messages-detail";
 import { MessagesListPage } from "@/pages/messages-list";
 import { MarketplaceFavoritesPage } from "@/pages/marketplace-favorites";
 import { MyReviewsPage } from "@/pages/my-reviews";
+import { GovernmentSchemesPage } from "@/pages/government-schemes";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
       // list so the user picks a scan to open its dashboard.
       { path: "doctor", element: <Navigate to="/scans" replace /> },
       { path: "calendar", element: <FarmerCalendarPage /> },
+      { path: "schemes", element: <GovernmentSchemesPage /> },
       // Farmer Crop Listings (M4 T2): dashboard + create/edit surface. The
       // create route is declared before the edit route for clarity, though
       // React Router ranks static segments above `:id` automatically.

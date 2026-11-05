@@ -204,7 +204,10 @@ async def test_schedule_happy_path(client, db):
     assert body["progress"] == 0.0
 
 
-async def test_schedule_defaults_to_next_window_start(client):
+async def test_schedule_defaults_to_next_window_start(client, monkeypatch):
+    from app.services import calendar as calendar_service
+
+    monkeypatch.setattr(calendar_service, "_now", lambda: datetime(2026, 8, 1))
     await _seed()
     headers = await _register(client, "+919300000003")
     # Wheat window is Oct–Dec; August is outside → planting on Oct 1.

@@ -178,13 +178,16 @@ class MessagingService:
         logger.info("message_sent", conversation_id=conversation.id, sender_id=user.id)
 
         # M5 Task 3: notify the other participant
-        recipient_id = conversation.buyer_id if conversation.seller_id == user.id else conversation.seller_id
+        recipient_id = (
+            conversation.buyer_id if conversation.seller_id == user.id else conversation.seller_id
+        )
         triggers = NotificationTriggerService(self.db)
         await triggers.notify_marketplace_message(
             recipient_id=recipient_id,
             conversation_id=conversation.id,
             sender_id=user.id,
             sender_name=user.name,
+            message_id=message.id,
             listing_id=conversation.listing_id,
             product_id=conversation.product_id,
         )
