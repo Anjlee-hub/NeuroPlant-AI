@@ -1,4 +1,5 @@
 ﻿import {
+  Activity,
   CalendarDays,
   CloudUpload,
   Heart,
@@ -10,10 +11,13 @@
   Menu,
   MessageCircle,
   ScanLine,
+  ShieldCheck,
   ShoppingBag,
+  Sprout,
   Star,
   Stethoscope,
   Store,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +30,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/stores/auth";
 
 const PRIMARY_NAV_ITEMS: Array<{
   to: string;
@@ -59,6 +64,16 @@ const MORE_NAV_ITEMS: Array<{
   { to: "/marketplace/my-reviews", labelKey: "nav.myReviews", icon: Star },
 ];
 
+const ADMIN_NAV_ITEMS: Array<{
+  to: string;
+  labelKey: string;
+  icon: LucideIcon;
+  end?: boolean;
+}> = [
+  { to: "/admin", labelKey: "Admin Dashboard", icon: ShieldCheck },
+  { to: "/admin/platform", labelKey: "Platform Management", icon: Users },
+];
+
 function navClass({ isActive }: { isActive: boolean }) {
   return cn(
     "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -76,6 +91,11 @@ export function Header() {
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const isAdmin = useAuth((state) => state.user?.role === "admin");
+
+  const moreNavItems = isAdmin
+    ? [...MORE_NAV_ITEMS, ...ADMIN_NAV_ITEMS]
+    : MORE_NAV_ITEMS;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
@@ -113,6 +133,24 @@ export function Header() {
               {t(item.labelKey)}
             </NavLink>
           ))}
+
+          <Link
+            to="/plants/register"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+            onClick={() => setMoreOpen(false)}
+          >
+            <Sprout size={18} />
+            Plant Registration
+          </Link>
+
+          <Link
+            to="/plants/monitoring"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+            onClick={() => setMoreOpen(false)}
+          >
+            <Activity size={18} />
+            Plant Monitoring
+          </Link>
 
           {/* More menu */}
           <div className="relative">
@@ -159,7 +197,7 @@ export function Header() {
                   </div>
 
                   <div className="grid gap-1">
-                    {MORE_NAV_ITEMS.map((item) => (
+                    {moreNavItems.map((item) => (
                       <NavLink
                         key={item.to}
                         to={item.to}
@@ -223,6 +261,24 @@ export function Header() {
                 {t(item.labelKey)}
               </NavLink>
             ))}
+
+            <Link
+              to="/plants/register"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Sprout size={18} />
+              Plant Registration
+            </Link>
+
+            <Link
+              to="/plants/monitoring"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Activity size={18} />
+              Plant Monitoring
+            </Link>
           </div>
 
           {/* More features */}
@@ -232,7 +288,7 @@ export function Header() {
             </p>
 
             <div className="grid gap-1">
-              {MORE_NAV_ITEMS.map((item) => (
+              {moreNavItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}

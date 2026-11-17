@@ -1,6 +1,13 @@
 ﻿import OrderHistory from "@/pages/OrderHistory";
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import { AdminRoute } from "@/components/auth/admin-route";
 import Maps from "@/pages/maps";
+import CropDoctor from "@/pages/CropDoctor";
+import PlantHealthReport from "@/pages/PlantHealthReport";
+import PlantRegistration from "@/pages/PlantRegistration";
+import PlantMonitoring from "@/pages/PlantMonitoring";
+import AdminDashboard from "@/pages/AdminDashboard";
+import PlatformManagement from "@/pages/PlatformManagement";
 import Cart from "@/pages/Cart";
 import { ErrorBoundary } from "@/app/error-boundary";
 import { RootLayout } from "@/components/layout/root-layout";
@@ -51,12 +58,44 @@ export const router = createBrowserRouter([
       { path: "scans", element: <ScanHistoryPage /> },
       { path: "scans/:scanId", element: <ScanDetailPage /> },
       { path: "scans/:scanId/doctor", element: <ScanDoctorPage /> },
+      {
+        path: "/crop-doctor",
+        element: <CropDoctor />,
+      },
+      {
+        path: "/plant-health-report",
+        element: <PlantHealthReport />,
+      },
+      {
+        path: "/admin",
+        element: (
+          <AdminRoute>
+            <AdminDashboard />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "/admin/platform",
+        element: (
+          <AdminRoute>
+            <PlatformManagement />
+          </AdminRoute>
+        ),
+      },
       { path: "offline", element: <OfflineQueuePage /> },
       { path: "detect", element: <ScanCropPage /> },
       // Crop Doctor is live per-scan (M3 T4): the nav hub lands on the scan
       // list so the user picks a scan to open its dashboard.
       { path: "doctor", element: <Navigate to="/scans" replace /> },
       { path: "calendar", element: <FarmerCalendarPage /> },
+      {
+        path: "/plants/register",
+        element: <PlantRegistration />,
+      },
+      {
+        path: "/plants/monitoring",
+        element: <PlantMonitoring />,
+      },
       // Farmer Crop Listings (M4 T2): dashboard + create/edit surface. The
       // create route is declared before the edit route for clarity, though
       // React Router ranks static segments above `:id` automatically.

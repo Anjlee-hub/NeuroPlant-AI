@@ -8,6 +8,8 @@ interface AuthState {
   user: User | null;
   /** True during any in-flight auth call (form buttons show spinners). */
   loading: boolean;
+  /** True after the stored session has been checked on app boot. */
+  hydrated: boolean;
   /** Pending MFA challenge handed back by /auth/login. */
   challenge: string | null;
 
@@ -30,6 +32,7 @@ async function loadUser(): Promise<User> {
 export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   loading: false,
+  hydrated: false,
   challenge: null,
 
   register: async (input) => {
@@ -102,16 +105,19 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   hydrate: async () => {
-    if (!getAccessToken()) return;
+    if (!getAccessToken()) {
+      set({ hydrated: true });
+      return;
+    }
+
     set({ loading: true });
     try {
       set({ user: await loadUser() });
     } catch {
-      // Expired/revoked token — drop the stored session.
       setTokens(null);
       set({ user: null });
     } finally {
-      set({ loading: false });
+      set({ loading: false, hydrated: true });
     }
   },
 
