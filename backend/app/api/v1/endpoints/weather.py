@@ -20,9 +20,9 @@ from app.api.v1.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.weather import WeatherOut, WeatherRiskOut
+from app.services.notification_triggers import NotificationTriggerService
 from app.services.weather import WeatherService, weather_to_out
 from app.services.weather_risk import DiseaseRiskService
-from app.services.notification_triggers import NotificationTriggerService
 
 router = APIRouter(prefix="/weather", tags=["weather"])
 

@@ -112,11 +112,21 @@ def main() -> None:
     r = client.get("/marketplace/shop/me", headers=farmer)
     check("A12 farmer blocked from seller portal → 403", r.status_code == 403, f"{r.status_code}")
     r = client.post("/marketplace/crops", json={}, headers=buyer1)
-    check("A12 customer blocked from creating listings → 403", r.status_code == 403, f"{r.status_code}")
+    check(
+        "A12 customer blocked from creating listings → 403",
+        r.status_code == 403,
+        f"{r.status_code}",
+    )
     r = client.post("/marketplace/shop/products", json={}, headers=buyer1)
-    check("A12 customer blocked from creating products → 403", r.status_code == 403, f"{r.status_code}")
+    check(
+        "A12 customer blocked from creating products → 403",
+        r.status_code == 403,
+        f"{r.status_code}",
+    )
     r = client.get("/marketplace/crops/mine", headers=buyer1)
-    check("A12 customer blocked from farmer dashboard → 403", r.status_code == 403, f"{r.status_code}")
+    check(
+        "A12 customer blocked from farmer dashboard → 403", r.status_code == 403, f"{r.status_code}"
+    )
 
     # ══════════════════════════════════════════════════════════════════════
     # A1 Farmer crop listings (+ A3 detail, A11 seller reputation seed)
@@ -153,12 +163,22 @@ def main() -> None:
         },
         headers=farmer,
     )
-    check("A1 create second listing (201)", r.status_code == 201, f"{r.status_code}: {r.text[:200]}")
-    listing2_id = r.json()["id"]
+    check(
+        "A1 create second listing (201)", r.status_code == 201, f"{r.status_code}: {r.text[:200]}"
+    )
+    check(
+        "A1 second listing returns id",
+        bool(r.json().get("id")),
+        r.json(),
+    )
 
     files = {"files": ("tomato.png", _tiny_png(), "image/png")}
     r = client.post("/marketplace/crops/images", files=files, headers=farmer)
-    check("A1 upload listing image (200 urls)", r.status_code == 200 and r.json()["urls"], f"{r.text[:200]}")
+    check(
+        "A1 upload listing image (200 urls)",
+        r.status_code == 200 and r.json()["urls"],
+        f"{r.text[:200]}",
+    )
     img_url = r.json()["urls"][0]
 
     r = client.patch(
@@ -169,12 +189,18 @@ def main() -> None:
     check("A1 patch listing (200)", r.status_code == 200, f"{r.status_code}: {r.text[:200]}")
     check(
         "A1 patch persisted fields",
-        r.json()["price"] == 42 and r.json()["images"] == [img_url] and r.json()["availability"] == "limited",
+        r.json()["price"] == 42
+        and r.json()["images"] == [img_url]
+        and r.json()["availability"] == "limited",
         r.json(),
     )
 
     r = client.get("/marketplace/crops/mine", headers=farmer)
-    check("A1 farmer listing list = 2", r.status_code == 200 and len(r.json()) == 2, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A1 farmer listing list = 2",
+        r.status_code == 200 and len(r.json()) == 2,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     r = client.get("/marketplace/crops/stats", headers=farmer)
     check(
         "A1 listing stats (total 2, active 1, sold 1)",
@@ -187,7 +213,11 @@ def main() -> None:
 
     r = client.get(f"/marketplace/crops/{listing_id}", headers=buyer1)
     body = r.json()
-    check("A3 listing detail (200)", r.status_code == 200 and body["id"] == listing_id, f"{r.status_code}")
+    check(
+        "A3 listing detail (200)",
+        r.status_code == 200 and body["id"] == listing_id,
+        f"{r.status_code}",
+    )
     check(
         "A3 farmer summary present (name/verified/rating/review_count)",
         body["farmer"]["name"] == "Farmer Trust"
@@ -202,18 +232,29 @@ def main() -> None:
     # A2 Buyer marketplace — browse / search / filter / sort / pagination
     # ══════════════════════════════════════════════════════════════════════
     r = client.get("/marketplace/crops", headers=buyer1)
-    check("A2 browse crops (200)", r.status_code == 200 and r.json()["total"] == 2, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A2 browse crops (200)",
+        r.status_code == 200 and r.json()["total"] == 2,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     r = client.get("/marketplace/crops?category=vegetable", headers=buyer1)
-    check("A2 filter by category (1 tomato)", r.status_code == 200 and r.json()["total"] == 1, r.json()["total"])
+    check(
+        "A2 filter by category (1 tomato)",
+        r.status_code == 200 and r.json()["total"] == 1,
+        r.json()["total"],
+    )
     r = client.get("/marketplace/crops?q=tomato", headers=buyer1)
-    check("A2 search 'tomato' (1)", r.status_code == 200 and r.json()["total"] == 1, r.json()["total"])
+    check(
+        "A2 search 'tomato' (1)", r.status_code == 200 and r.json()["total"] == 1, r.json()["total"]
+    )
     r = client.get("/marketplace/crops?organic=true", headers=buyer1)
-    check("A2 filter organic (1)", r.status_code == 200 and r.json()["total"] == 1, r.json()["total"])
+    check(
+        "A2 filter organic (1)", r.status_code == 200 and r.json()["total"] == 1, r.json()["total"]
+    )
     r = client.get("/marketplace/crops?sort=price_asc", headers=buyer1)
     check(
         "A2 sort by price ascending",
-        r.status_code == 200
-        and r.json()["items"][0]["price"] <= r.json()["items"][-1]["price"],
+        r.status_code == 200 and r.json()["items"][0]["price"] <= r.json()["items"][-1]["price"],
         r.text[:200],
     )
     r = client.get("/marketplace/crops?page=1&page_size=1", headers=buyer1)
@@ -238,11 +279,19 @@ def main() -> None:
     # ══════════════════════════════════════════════════════════════════════
     r = client.post(
         "/marketplace/shop/register",
-        json={"shop_name": "Green Agri Supplies", "delivery_available": True, "description": "Organic inputs"},
+        json={
+            "shop_name": "Green Agri Supplies",
+            "delivery_available": True,
+            "description": "Organic inputs",
+        },
         headers=seller,
     )
     check("A4 shop register (200)", r.status_code == 200, f"{r.status_code}: {r.text[:200]}")
-    shop_user_id = r.json()["user_id"]
+    check(
+        "A4 shop registration returns user id",
+        bool(r.json().get("user_id")),
+        r.json(),
+    )
 
     r = client.patch(
         "/marketplace/shop/me",
@@ -270,22 +319,52 @@ def main() -> None:
 
     files = {"files": ("neem.png", _tiny_png(), "image/png")}
     r = client.post("/marketplace/shop/products/images", files=files, headers=seller)
-    check("A5 upload product image (200 urls)", r.status_code == 200 and r.json()["urls"], f"{r.text[:200]}")
+    check(
+        "A5 upload product image (200 urls)",
+        r.status_code == 200 and r.json()["urls"],
+        f"{r.text[:200]}",
+    )
 
     r = client.get("/marketplace/shop/products/stats", headers=seller)
-    check("A5 product stats (total 1, active 1)", r.status_code == 200 and r.json()["total"] == 1 and r.json()["active"] == 1, r.json())
+    check(
+        "A5 product stats (total 1, active 1)",
+        r.status_code == 200 and r.json()["total"] == 1 and r.json()["active"] == 1,
+        r.json(),
+    )
 
-    r = client.patch(f"/marketplace/shop/products/{product_id}", json={"price": 240}, headers=seller)
-    check("A5 patch product (200)", r.status_code == 200 and r.json()["price"] == 240, f"{r.status_code}: {r.text[:200]}")
-    r = client.patch(f"/marketplace/shop/products/{product_id}", json={"availability": "out_of_stock"}, headers=seller)
-    check("A5 product out-of-stock toggle", r.status_code == 200 and r.json()["availability"] == "out_of_stock", r.text[:200])
+    r = client.patch(
+        f"/marketplace/shop/products/{product_id}", json={"price": 240}, headers=seller
+    )
+    check(
+        "A5 patch product (200)",
+        r.status_code == 200 and r.json()["price"] == 240,
+        f"{r.status_code}: {r.text[:200]}",
+    )
+    r = client.patch(
+        f"/marketplace/shop/products/{product_id}",
+        json={"availability": "out_of_stock"},
+        headers=seller,
+    )
+    check(
+        "A5 product out-of-stock toggle",
+        r.status_code == 200 and r.json()["availability"] == "out_of_stock",
+        r.text[:200],
+    )
 
     # A6 product marketplace (public browse within auth)
     r = client.get("/marketplace/products", headers=buyer1)
-    check("A6 browse products (200, total 1)", r.status_code == 200 and r.json()["total"] == 1, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A6 browse products (200, total 1)",
+        r.status_code == 200 and r.json()["total"] == 1,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     r = client.get(f"/marketplace/products/{product_id}", headers=buyer1)
     body = r.json()
-    check("A6 product detail (200)", r.status_code == 200 and body["id"] == product_id, f"{r.status_code}")
+    check(
+        "A6 product detail (200)",
+        r.status_code == 200 and body["id"] == product_id,
+        f"{r.status_code}",
+    )
     check(
         "A6 shop summary on product detail",
         body["shop"]["shop_name"] == "Green Agri Supplies" and body["shop"]["rating"] == 0.0,
@@ -295,23 +374,45 @@ def main() -> None:
     # S3 Seller ownership — another seller cannot touch this seller's catalog
     seller2 = _register(client, "seller", "Seller Two")
     r = client.get("/marketplace/shop/products", headers=seller2)
-    check("S3 second seller catalog is empty", r.status_code == 200 and r.json() == [], r.text[:200])
+    check(
+        "S3 second seller catalog is empty", r.status_code == 200 and r.json() == [], r.text[:200]
+    )
     r = client.patch(f"/marketplace/shop/products/{product_id}", json={"price": 1}, headers=seller2)
     check("S3 second seller cannot patch product → 404", r.status_code == 404, f"{r.status_code}")
     r = client.delete(f"/marketplace/shop/products/{product_id}", headers=seller2)
     check("S3 second seller cannot delete product → 404", r.status_code == 404, f"{r.status_code}")
     # Wrong-role callers are cut by RBAC (403) before any ownership check…
     r = client.patch(f"/marketplace/crops/{listing_id}", json={"price": 1}, headers=seller)
-    check("S3 seller (wrong role) blocked from farmer listing → 403", r.status_code == 403, f"{r.status_code}")
+    check(
+        "S3 seller (wrong role) blocked from farmer listing → 403",
+        r.status_code == 403,
+        f"{r.status_code}",
+    )
     r = client.delete(f"/marketplace/crops/{listing_id}", headers=buyer1)
-    check("S3 buyer (wrong role) blocked from farmer listing → 403", r.status_code == 403, f"{r.status_code}")
+    check(
+        "S3 buyer (wrong role) blocked from farmer listing → 403",
+        r.status_code == 403,
+        f"{r.status_code}",
+    )
     # …while a same-role farmer who isn't the owner gets the 404 enumeration guard.
     r = client.patch(f"/marketplace/crops/{listing_id}", json={"price": 1}, headers=farmer2)
-    check("S3 second farmer cannot patch farmer's listing → 404", r.status_code == 404, f"{r.status_code}")
+    check(
+        "S3 second farmer cannot patch farmer's listing → 404",
+        r.status_code == 404,
+        f"{r.status_code}",
+    )
     r = client.delete(f"/marketplace/crops/{listing_id}", headers=farmer2)
-    check("S3 second farmer cannot delete farmer's listing → 404", r.status_code == 404, f"{r.status_code}")
+    check(
+        "S3 second farmer cannot delete farmer's listing → 404",
+        r.status_code == 404,
+        f"{r.status_code}",
+    )
     r = client.get("/marketplace/crops/mine", headers=farmer2)
-    check("S2 second farmer's listing dashboard is empty", r.status_code == 200 and r.json() == [], r.text[:200])
+    check(
+        "S2 second farmer's listing dashboard is empty",
+        r.status_code == 200 and r.json() == [],
+        r.text[:200],
+    )
 
     # S6 IDOR attempts — bogus ids never leak
     r = client.get("/marketplace/crops/999999", headers=buyer1)
@@ -326,37 +427,65 @@ def main() -> None:
     check("A9 save listing (201)", r.status_code == 201, f"{r.status_code}: {r.text[:200]}")
     favorite_id = r.json()["id"]
     r = client.post("/marketplace/favorites", json={"listing_id": listing_id}, headers=buyer1)
-    check("A9 duplicate save is idempotent (same row)", r.status_code == 201 and r.json()["id"] == favorite_id, f"{r.status_code}")
+    check(
+        "A9 duplicate save is idempotent (same row)",
+        r.status_code == 201 and r.json()["id"] == favorite_id,
+        f"{r.status_code}",
+    )
     r = client.post("/marketplace/favorites", json={"product_id": product_id}, headers=buyer1)
     check("A9 save product (201)", r.status_code == 201, f"{r.status_code}: {r.text[:200]}")
 
     r = client.get("/marketplace/favorites/status?listing_id=" + str(listing_id), headers=buyer1)
     check(
         "A9 favourite status (saved, id attached)",
-        r.status_code == 200 and r.json()["favorited"] is True and r.json()["favorite_id"] == favorite_id,
+        r.status_code == 200
+        and r.json()["favorited"] is True
+        and r.json()["favorite_id"] == favorite_id,
         r.json(),
     )
     r = client.get("/marketplace/favorites/status?listing_id=" + str(listing_id), headers=buyer2)
-    check("A9 status scoped per user (not saved for buyer2)", r.status_code == 200 and r.json()["favorited"] is False, r.json())
+    check(
+        "A9 status scoped per user (not saved for buyer2)",
+        r.status_code == 200 and r.json()["favorited"] is False,
+        r.json(),
+    )
 
     r = client.get("/marketplace/favorites", headers=buyer1)
-    check("A9 favourites list = 2 (listing + product)", r.status_code == 200 and len(r.json()) == 2, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A9 favourites list = 2 (listing + product)",
+        r.status_code == 200 and len(r.json()) == 2,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     r = client.get("/marketplace/favorites", headers=outsider)
-    check("S2 outsider favourites list is empty", r.status_code == 200 and r.json() == [], r.text[:200])
+    check(
+        "S2 outsider favourites list is empty",
+        r.status_code == 200 and r.json() == [],
+        r.text[:200],
+    )
 
     r = client.delete(f"/marketplace/favorites/{favorite_id}", headers=buyer2)
     check("S5 other user cannot delete favourite → 404", r.status_code == 404, f"{r.status_code}")
     r = client.delete(f"/marketplace/favorites/{favorite_id}", headers=buyer1)
     check("A9 remove favourite (204)", r.status_code == 204, f"{r.status_code}")
     r = client.get("/marketplace/favorites/status?listing_id=" + str(listing_id), headers=buyer1)
-    check("A9 status after remove (not saved)", r.status_code == 200 and r.json()["favorited"] is False, r.json())
+    check(
+        "A9 status after remove (not saved)",
+        r.status_code == 200 and r.json()["favorited"] is False,
+        r.json(),
+    )
     r = client.get("/marketplace/favorites/999999", headers=buyer1)
-    check("S6 missing favourite → 405/404 (no such route)", r.status_code in (404, 405), f"{r.status_code}")
+    check(
+        "S6 missing favourite → 405/404 (no such route)",
+        r.status_code in (404, 405),
+        f"{r.status_code}",
+    )
 
     # S7 Invalid input for favourites
     r = client.post("/marketplace/favorites", json={}, headers=buyer1)
     check("S7 favourite with no target → 400", r.status_code == 400, f"{r.status_code}")
-    r = client.post("/marketplace/favorites", json={"listing_id": 1, "product_id": product_id}, headers=buyer1)
+    r = client.post(
+        "/marketplace/favorites", json={"listing_id": 1, "product_id": product_id}, headers=buyer1
+    )
     check("S7 favourite with both targets → 400", r.status_code == 400, f"{r.status_code}")
     r = client.post("/marketplace/favorites", json={"listing_id": 999999}, headers=buyer1)
     check("S7 favourite unknown target → 400", r.status_code == 400, f"{r.status_code}")
@@ -366,10 +495,19 @@ def main() -> None:
     # ══════════════════════════════════════════════════════════════════════
     r = client.post(
         "/marketplace/reviews",
-        json={"listing_id": listing_id, "rating": 5, "title": "Very fresh", "content": "Crisp and sweet."},
+        json={
+            "listing_id": listing_id,
+            "rating": 5,
+            "title": "Very fresh",
+            "content": "Crisp and sweet.",
+        },
         headers=buyer1,
     )
-    check("A10 create review on listing (201)", r.status_code == 201, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A10 create review on listing (201)",
+        r.status_code == 201,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     review_id = r.json()["id"]
     check(
         "A10 review derives the seller (the farmer)",
@@ -379,7 +517,12 @@ def main() -> None:
 
     r = client.post(
         "/marketplace/reviews",
-        json={"listing_id": listing_id, "rating": 4, "title": "Good", "content": "Nice quality at the price."},
+        json={
+            "listing_id": listing_id,
+            "rating": 4,
+            "title": "Good",
+            "content": "Nice quality at the price.",
+        },
         headers=buyer2,
     )
     check("A10 second buyer review (201)", r.status_code == 201, f"{r.status_code}: {r.text[:200]}")
@@ -397,13 +540,23 @@ def main() -> None:
     check("A10 review list = 2", body["total"] == 2 and len(body["items"]) == 2, body)
     check(
         "A10 rating summary (avg 4.5, dist {5:1, 4:1})",
-        body["summary"]["average"] == 4.5 and body["summary"]["total"] == 2
-        and body["summary"]["distribution"]["5"] == 1 and body["summary"]["distribution"]["4"] == 1,
+        body["summary"]["average"] == 4.5
+        and body["summary"]["total"] == 2
+        and body["summary"]["distribution"]["5"] == 1
+        and body["summary"]["distribution"]["4"] == 1,
         body["summary"],
     )
-    check("A10 my_review populated for caller", body["my_review"] is not None and body["my_review"]["id"] == review_id, body.get("my_review"))
+    check(
+        "A10 my_review populated for caller",
+        body["my_review"] is not None and body["my_review"]["id"] == review_id,
+        body.get("my_review"),
+    )
     r = client.get(f"/marketplace/reviews?listing_id={listing_id}", headers=outsider)
-    check("A10 my_review null for a non-reviewer", r.json()["my_review"] is None, r.json().get("my_review"))
+    check(
+        "A10 my_review null for a non-reviewer",
+        r.json()["my_review"] is None,
+        r.json().get("my_review"),
+    )
 
     # Seller reputation — reviews aggregate across the farmer's listings
     r = client.get(f"/marketplace/crops/{listing_id}", headers=buyer1)
@@ -420,27 +573,53 @@ def main() -> None:
         f"{r.status_code}: {r.text[:200]}",
     )
     r = client.get("/marketplace/reviews/mine", headers=buyer1)
-    check("A10 my-reviews (buyer1 has 1)", r.status_code == 200 and len(r.json()) == 1, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A10 my-reviews (buyer1 has 1)",
+        r.status_code == 200 and len(r.json()) == 1,
+        f"{r.status_code}: {r.text[:200]}",
+    )
 
     # S4 Review ownership + S7 invalid review input
-    r = client.patch(f"/marketplace/reviews/{review_id}", json={"content": "Even better after washing."}, headers=buyer2)
+    r = client.patch(
+        f"/marketplace/reviews/{review_id}",
+        json={"content": "Even better after washing."},
+        headers=buyer2,
+    )
     check("S4 other user cannot edit review → 404", r.status_code == 404, f"{r.status_code}")
     r = client.delete(f"/marketplace/reviews/{review_id}", headers=buyer2)
     check("S4 other user cannot delete review → 404", r.status_code == 404, f"{r.status_code}")
-    r = client.post("/marketplace/reviews", json={"rating": 6, "content": "Bad rating."}, headers=buyer1)
+    r = client.post(
+        "/marketplace/reviews", json={"rating": 6, "content": "Bad rating."}, headers=buyer1
+    )
     check("S7 review rating 6 → 422", r.status_code == 422, f"{r.status_code}")
     r = client.post("/marketplace/reviews", json={"rating": 4, "content": "   "}, headers=buyer1)
     check("S7 whitespace-only review → 422", r.status_code == 422, f"{r.status_code}")
-    r = client.post("/marketplace/reviews", json={"rating": 4, "content": "No target."}, headers=buyer1)
+    r = client.post(
+        "/marketplace/reviews", json={"rating": 4, "content": "No target."}, headers=buyer1
+    )
     check("S7 review with no target → 400", r.status_code == 400, f"{r.status_code}")
     r = client.patch(f"/marketplace/reviews/{review_id}", json={}, headers=buyer1)
     check("S7 empty review update → 422", r.status_code == 422, f"{r.status_code}")
-    r = client.post("/marketplace/reviews", json={"listing_id": listing_id, "rating": 5, "content": "Self review."}, headers=farmer)
-    check("S7 self-review (farmer rates own listing) → 400", r.status_code == 400, f"{r.status_code}")
+    r = client.post(
+        "/marketplace/reviews",
+        json={"listing_id": listing_id, "rating": 5, "content": "Self review."},
+        headers=farmer,
+    )
+    check(
+        "S7 self-review (farmer rates own listing) → 400", r.status_code == 400, f"{r.status_code}"
+    )
 
     # Edit own review → reputation updates
-    r = client.patch(f"/marketplace/reviews/{review_id}", json={"rating": 3, "title": "Pretty good"}, headers=buyer1)
-    check("A10 edit own review (200)", r.status_code == 200 and r.json()["rating"] == 3, f"{r.status_code}: {r.text[:200]}")
+    r = client.patch(
+        f"/marketplace/reviews/{review_id}",
+        json={"rating": 3, "title": "Pretty good"},
+        headers=buyer1,
+    )
+    check(
+        "A10 edit own review (200)",
+        r.status_code == 200 and r.json()["rating"] == 3,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     r = client.get(f"/marketplace/crops/{listing_id}", headers=buyer1)
     check(
         "A11 reputation follows the edit (avg 3.5)",
@@ -470,7 +649,11 @@ def main() -> None:
         json={"listing_id": listing_id, "message": "Is the tomato still available?"},
         headers=buyer1,
     )
-    check("A7 create conversation on listing (201)", r.status_code == 201, f"{r.status_code}: {r.text[:300]}")
+    check(
+        "A7 create conversation on listing (201)",
+        r.status_code == 201,
+        f"{r.status_code}: {r.text[:300]}",
+    )
     conversation_id = r.json()["id"]
     check(
         "A7 conversation seller is the farmer",
@@ -482,11 +665,19 @@ def main() -> None:
         json={"listing_id": listing_id, "message": "And do you deliver?"},
         headers=buyer1,
     )
-    check("A7 duplicate contact reuses thread", r.status_code == 201 and r.json()["id"] == conversation_id, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A7 duplicate contact reuses thread",
+        r.status_code == 201 and r.json()["id"] == conversation_id,
+        f"{r.status_code}: {r.text[:200]}",
+    )
 
     r = client.get("/marketplace/conversations", headers=farmer)
     inbox = r.json()
-    check("A8 farmer inbox has 1 thread", r.status_code == 200 and len(inbox) == 1, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "A8 farmer inbox has 1 thread",
+        r.status_code == 200 and len(inbox) == 1,
+        f"{r.status_code}: {r.text[:200]}",
+    )
     check("A8 inbox unread = 2", inbox[0]["unread_count"] == 2, inbox)
     r = client.post(
         f"/marketplace/conversations/{conversation_id}/messages",
@@ -499,7 +690,11 @@ def main() -> None:
 
     r = client.get(f"/marketplace/conversations/{conversation_id}", headers=outsider)
     check("S6 outsider cannot read thread → 404", r.status_code == 404, f"{r.status_code}")
-    r = client.post(f"/marketplace/conversations/{conversation_id}/messages", json={"content": "sneak"}, headers=outsider)
+    r = client.post(
+        f"/marketplace/conversations/{conversation_id}/messages",
+        json={"content": "sneak"},
+        headers=outsider,
+    )
     check("S6 outsider cannot message thread → 404", r.status_code == 404, f"{r.status_code}")
 
     r = client.post(
@@ -507,7 +702,11 @@ def main() -> None:
         json={"product_id": product_id, "message": "Is the neem oil in stock?"},
         headers=buyer2,
     )
-    check("A7 buyer2 conversation on product (201)", r.status_code == 201, f"{r.status_code}: {r.text[:300]}")
+    check(
+        "A7 buyer2 conversation on product (201)",
+        r.status_code == 201,
+        f"{r.status_code}: {r.text[:300]}",
+    )
     conv2_id = r.json()["id"]
     # Threads are participant-scoped: the shop seller sees only their product
     # thread (1), never the farmer's listing thread, and vice versa.
@@ -524,14 +723,20 @@ def main() -> None:
     r = client.get("/marketplace/conversations", headers=farmer)
     check(
         "A8 farmer inbox stays isolated (1, own thread only)",
-        r.status_code == 200
-        and len(r.json()) == 1
-        and r.json()[0]["id"] == conversation_id,
+        r.status_code == 200 and len(r.json()) == 1 and r.json()[0]["id"] == conversation_id,
         f"{r.status_code}: {r.text[:300]}",
     )
     r = client.post(f"/marketplace/conversations/{conv2_id}/close", headers=seller)
-    check("A8 close thread (200)", r.status_code == 200 and r.json()["status"] == "closed", f"{r.status_code}: {r.text[:200]}")
-    r = client.post(f"/marketplace/conversations/{conv2_id}/messages", json={"content": "still there?"}, headers=buyer2)
+    check(
+        "A8 close thread (200)",
+        r.status_code == 200 and r.json()["status"] == "closed",
+        f"{r.status_code}: {r.text[:200]}",
+    )
+    r = client.post(
+        f"/marketplace/conversations/{conv2_id}/messages",
+        json={"content": "still there?"},
+        headers=buyer2,
+    )
     check("A8 message on closed thread → 409", r.status_code == 409, f"{r.status_code}")
 
     # S7 Invalid conversation input

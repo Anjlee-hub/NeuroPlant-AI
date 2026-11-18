@@ -169,9 +169,7 @@ class OpenWeatherProvider:
             raise WeatherApiError("The weather provider is unreachable.") from exc
 
         if response.status_code != 200:
-            raise WeatherApiError(
-                f"The weather provider returned HTTP {response.status_code}."
-            )
+            raise WeatherApiError(f"The weather provider returned HTTP {response.status_code}.")
 
         try:
             payload = response.json()
@@ -205,9 +203,7 @@ class OpenWeatherProvider:
         wind_speed = wind.get("speed")
         wind_speed_ms = float(wind_speed) if isinstance(wind_speed, (int, float)) else 0.0
         wind_deg = wind.get("deg")
-        wind_direction_deg = (
-            float(wind_deg) if isinstance(wind_deg, (int, float)) else None
-        )
+        wind_direction_deg = float(wind_deg) if isinstance(wind_deg, (int, float)) else None
 
         rain = payload.get("rain")
         if not isinstance(rain, dict):

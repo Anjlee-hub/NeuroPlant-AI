@@ -9,18 +9,14 @@ read, and OpenAPI regression.
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
-
 from app.db.session import async_session_factory
 from app.main import app
 from app.models.notification import Notification, NotificationType
 from app.services.notifications import (
-    NotificationNotFoundError,
     NotificationService,
-    NotificationTransport,
     NotificationValidationError,
 )
-
+from sqlalchemy import select
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -97,9 +93,7 @@ async def test_create_accepts_enum_and_string_types():
 async def test_create_rejects_invalid_type():
     async with async_session_factory() as db:
         with pytest.raises(NotificationValidationError):
-            await NotificationService(db).create(
-                1, type="not_a_real_type", title="x", message="y"
-            )
+            await NotificationService(db).create(1, type="not_a_real_type", title="x", message="y")
 
 
 async def test_create_rejects_blank_title_and_message():
@@ -298,7 +292,6 @@ async def test_scheduling_seam_dispatches_due_notifications():
     """dispatch_scheduled delivers due notifications and marks sent_at."""
     from app.db.session import async_session_factory
     from app.models.user import User
-    from sqlalchemy import select
     from app.services.auth import register_user
 
     # Create a user for this test
@@ -307,13 +300,17 @@ async def test_scheduling_seam_dispatches_due_notifications():
         user = await db.scalar(select(User).where(User.id == 1))
         if user is None:
             # Create user 1 if it doesn't exist
-            user = await register_user(db, phone="+919999999991", name="Test", role="farmer", password="secret123")
+            user = await register_user(
+                db, phone="+919999999991", name="Test", role="farmer", password="secret123"
+            )
 
     user_id = user.id if user else 1
     past = datetime.now(UTC) - timedelta(minutes=5)
     future = datetime.now(UTC) + timedelta(hours=1)
     due = await _create_for(user_id, type="task_reminder", title="due", scheduled_at=past, count=1)
-    not_due = await _create_for(user_id, type="task_reminder", title="later", scheduled_at=future, count=1)
+    not_due = await _create_for(
+        user_id, type="task_reminder", title="later", scheduled_at=future, count=1
+    )
 
     transport = _RecordingTransport()
     async with async_session_factory() as db:
@@ -334,13 +331,14 @@ async def test_scheduling_seam_does_not_repeat_dispatch():
     """A sent notification is not dispatched again on the next tick."""
     from app.db.session import async_session_factory
     from app.models.user import User
-    from sqlalchemy import select
     from app.services.auth import register_user
 
     async with async_session_factory() as db:
         user = await db.scalar(select(User).where(User.id == 1))
         if user is None:
-            user = await register_user(db, phone="+919999999991", name="Test", role="farmer", password="secret123")
+            user = await register_user(
+                db, phone="+919999999991", name="Test", role="farmer", password="secret123"
+            )
 
     user_id = user.id if user else 1
     past = datetime.now(UTC) - timedelta(minutes=5)

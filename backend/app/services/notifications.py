@@ -125,12 +125,16 @@ class NotificationService:
         ) or 0
 
         items = (
-            await self.db.execute(
-                base.order_by(Notification.created_at.desc())
-                .offset((page - 1) * page_size)
-                .limit(page_size)
+            (
+                await self.db.execute(
+                    base.order_by(Notification.created_at.desc())
+                    .offset((page - 1) * page_size)
+                    .limit(page_size)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         return list(items), total, unread
 
@@ -195,7 +199,8 @@ class NotificationService:
                 type_enum = NotificationType(type)
             except ValueError as exc:
                 raise NotificationValidationError(
-                    f"Invalid notification type: {type}. Allowed: {[t.value for t in NotificationType]}"
+                    f"Invalid notification type: {type}. "
+                    f"Allowed: {[t.value for t in NotificationType]}"
                 ) from exc
         else:
             type_enum = type
@@ -246,9 +251,9 @@ class NotificationService:
         """
         now = datetime.now(UTC)
         result = await self.db.execute(
-            select(Notification).where(
-                Notification.scheduled_at <= now, Notification.sent_at.is_(None)
-            ).limit(limit)
+            select(Notification)
+            .where(Notification.scheduled_at <= now, Notification.sent_at.is_(None))
+            .limit(limit)
         )
         scheduled = result.scalars().all()
 
@@ -270,7 +275,5 @@ class NotificationService:
     async def _get_owned(self, notification_id: int, user_id: int) -> Notification:
         notif = await self.db.get(Notification, notification_id)
         if notif is None or notif.user_id != user_id:
-            raise NotificationNotFoundError(
-                f"Notification {notification_id} not found."
-            )
+            raise NotificationNotFoundError(f"Notification {notification_id} not found.")
         return notif

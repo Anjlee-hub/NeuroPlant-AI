@@ -5,6 +5,7 @@ PNG encode/decode helpers, the TensorFlow provider's graceful degradation
 without a CNN available, and loose performance budgets for the CPU path.
 """
 
+import sys
 import time
 from io import BytesIO
 from typing import cast
@@ -135,13 +136,16 @@ def test_overlay_clamps_opacity():
 # ── TensorFlowGradCAM (graceful without TF) ─────────────────────────────
 
 
-def test_tf_gradcam_missing_tensorflow_raises_inference_error():
+def test_tf_gradcam_missing_tensorflow_raises_inference_error(monkeypatch):
+    monkeypatch.setitem(sys.modules, "tensorflow", None)
+
     provider = TensorFlowGradCAM(
         model=object(),
         preprocessor=cast(Preprocessor, object()),
         label_map={"Late Blight": 0},
-        layer_name="conv1",  # explicit layer → __init__ never imports TF
+        layer_name="conv1",
     )
+
     with pytest.raises(InferenceError, match="tensorflow"):
         provider.heatmap(_image(), "Late Blight")
 

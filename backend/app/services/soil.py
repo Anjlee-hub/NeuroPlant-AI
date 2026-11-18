@@ -148,9 +148,7 @@ class SoilRecommendationService:
                 f"No soil plan found for scan {scan.id} ({scan.disease_name or 'unknown'}) "
                 f"in catalog {catalog.version}"
             )
-        return self._to_out(
-            catalog, row, severity=scan.severity, confidence=scan.confidence
-        )
+        return self._to_out(catalog, row, severity=scan.severity, confidence=scan.confidence)
 
     # ── Internals ──────────────────────────────────────────────────────
 
@@ -165,9 +163,7 @@ class SoilRecommendationService:
             )
         )
 
-    async def _load_by_name(
-        self, catalog_id: int, disease_name: str
-    ) -> SoilRecommendation | None:
+    async def _load_by_name(self, catalog_id: int, disease_name: str) -> SoilRecommendation | None:
         """A soil-plan row whose catalog disease name matches ``disease_name``."""
         return await self.db.scalar(
             select(SoilRecommendation)
@@ -256,9 +252,7 @@ class SoilRecommendationService:
         if severity_penalty > 0:
             reasons.append(f"{severity} disease severity")
 
-        low_confidence = (
-            confidence is not None and confidence < CONFIDENCE_LOW_THRESHOLD
-        )
+        low_confidence = confidence is not None and confidence < CONFIDENCE_LOW_THRESHOLD
         if low_confidence:
             reasons.append("low detection confidence")
 
