@@ -33,9 +33,7 @@ class RecoveryLogIn(BaseModel):
         max_length=500,
         description="What the farmer applied / did (e.g. 'Neem oil spray')",
     )
-    notes: str | None = Field(
-        default=None, max_length=2000, description="Free-form progress notes"
-    )
+    notes: str | None = Field(default=None, max_length=2000, description="Free-form progress notes")
     progress: str | None = Field(
         default=None,
         pattern="^(worsening|no-change|improving|recovered)$",
@@ -54,9 +52,7 @@ class RecoveryLogUpdate(BaseModel):
     clears it.
     """
 
-    treatment_applied: str | None = Field(
-        default=None, min_length=1, max_length=500
-    )
+    treatment_applied: str | None = Field(default=None, min_length=1, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
     progress: str | None = Field(
         default=None, pattern="^(worsening|no-change|improving|recovered)$"

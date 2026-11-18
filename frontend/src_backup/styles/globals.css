@@ -1,0 +1,199 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (toggled on <html>). */
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Brand palette (green — agriculture). */
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-400: #4ade80;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+  --color-brand-950: #052e16;
+
+  /* Semantic tokens (shadcn/ui convention), driven by CSS variables. */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --background: 0 0% 100%;
+  --foreground: 20 14.3% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14.3% 4.1%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14.3% 4.1%;
+  --primary: 142 76% 36%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 60 4.8% 95.9%;
+  --secondary-foreground: 24 9.8% 10%;
+  --muted: 60 4.8% 95.9%;
+  --muted-foreground: 25 5.3% 44.7%;
+  --accent: 60 4.8% 95.9%;
+  --accent-foreground: 24 9.8% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --border: 20 5.9% 90%;
+  --input: 20 5.9% 90%;
+  --ring: 142 76% 36%;
+}
+
+.dark {
+  --background: 20 14.3% 4.1%;
+  --foreground: 60 9.1% 97.8%;
+  --card: 24 9.8% 10%;
+  --card-foreground: 60 9.1% 97.8%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 60 9.1% 97.8%;
+  --primary: 142 76% 36%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 12 6.5% 15.1%;
+  --secondary-foreground: 60 9.1% 97.8%;
+  --muted: 12 6.5% 15.1%;
+  --muted-foreground: 24 5.4% 63.9%;
+  --accent: 12 6.5% 15.1%;
+  --accent-foreground: 60 9.1% 97.8%;
+  --destructive: 0 62.8% 30.6%;
+  --border: 12 6.5% 15.1%;
+  --input: 12 6.5% 15.1%;
+  --ring: 142 76% 36%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Brand-tinted text selection in both themes. */
+  ::selection {
+    background-color: hsl(var(--ring) / 0.25);
+  }
+
+  /* Users who prefer reduced motion: drop smooth scrolling and collapse
+     decorative CSS animations/transitions. JS-driven motion is handled by
+     <MotionConfig reducedMotion="user"> in app/providers. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Print-friendly styles for care plans (M3 T2). */
+  @media print {
+    @page {
+      margin: 16mm;
+    }
+    header,
+    footer,
+    nav,
+    button,
+    .print\\:hidden {
+      display: none !important;
+    }
+    .print\\:block {
+      display: block !important;
+    }
+    body {
+      background: white !important;
+      color: black !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .mx-auto.max-w-6xl {
+      max-width: 100% !important;
+      padding: 0 !important;
+    }
+    .rounded-xl,
+    .rounded-md {
+      border-radius: 0.375rem !important;
+    }
+    .shadow-sm,
+    .shadow {
+      box-shadow: none !important;
+    }
+    .bg-card,
+    .bg-background,
+    .bg-muted {
+      background: white !important;
+    }
+    .text-card-foreground,
+    .text-foreground,
+    .text-muted-foreground {
+      color: #111 !important;
+    }
+    .border,
+    .border-border,
+    .border-amber-300,
+    .border-amber-800 {
+      border-color: #ccc !important;
+    }
+    .text-brand-600,
+    .text-brand-700,
+    .text-brand-400,
+    .text-brand-300 {
+      color: #166534 !important;
+    }
+    .bg-brand-100,
+    .bg-brand-900\\/40,
+    .bg-brand-50,
+    .bg-amber-50,
+    .bg-amber-950\\/30 {
+      background: #f0fdf4 !important;
+    }
+    a {
+      text-decoration: none !important;
+      color: inherit !important;
+    }
+    .size-10,
+    .size-9,
+    .size-8,
+    .size-4 {
+      width: 1.25rem !important;
+      height: 1.25rem !important;
+    }
+  }
+}

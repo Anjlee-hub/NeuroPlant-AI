@@ -145,9 +145,7 @@ class RecoveryTrackerService:
             treatment_applied=payload.treatment_applied,
             notes=payload.notes,
             progress=payload.progress,
-            applied_at=(
-                _naive_utc(payload.applied_at) if payload.applied_at else _now_naive_utc()
-            ),
+            applied_at=(_naive_utc(payload.applied_at) if payload.applied_at else _now_naive_utc()),
         )
         self.db.add(log)
         await self.db.commit()

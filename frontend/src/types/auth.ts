@@ -2,7 +2,12 @@
  * Mirrors the backend auth/user schemas (app/schemas/auth.py, user.py).
  */
 
-export type UserRole = "farmer" | "customer" | "expert" | "seller";
+export type UserRole =
+  | "farmer"
+  | "customer"
+  | "expert"
+  | "seller"
+  | "admin";
 
 export interface TokenResponse {
   access_token: string;

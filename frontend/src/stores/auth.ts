@@ -12,8 +12,12 @@ import type { RegisterInput, User } from "@/types/auth";
 interface AuthState {
   user: User | null;
   loading: boolean;
-  challenge: string | null;
+
+  /** True after the stored session has been checked on app boot. */
   hydrated: boolean;
+
+  /** Pending MFA challenge handed back by /auth/login. */
+  challenge: string | null;
 
   register: (input: RegisterInput) => Promise<void>;
   login: (identifier: string, password: string) => Promise<"mfa" | "ok">;
@@ -32,8 +36,8 @@ async function loadUser(): Promise<User> {
 export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   loading: false,
-  challenge: null,
   hydrated: false,
+  challenge: null,
 
   register: async (input) => {
     set({ loading: true });

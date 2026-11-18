@@ -1,4 +1,6 @@
-﻿import {
+
+import {
+  Activity,
   CalendarDays,
   CloudUpload,
   Heart,
@@ -12,7 +14,9 @@
   PanelLeftClose,
   PanelLeftOpen,
   ScanLine,
+  ShieldCheck,
   ShoppingBag,
+  Sprout,
   Star,
   Stethoscope,
   Store,
@@ -29,6 +33,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/stores/auth";
 
 const NAV_ITEMS: Array<{
   to: string;
@@ -52,6 +57,18 @@ const NAV_ITEMS: Array<{
   { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
   { to: "/marketplace/favorites", labelKey: "nav.favourites", icon: Heart },
   { to: "/marketplace/my-reviews", labelKey: "nav.myReviews", icon: Star },
+  { to: "/plants/register", labelKey: "Plant Registration", icon: Sprout },
+  { to: "/plants/monitoring", labelKey: "Plant Monitoring", icon: Activity },
+];
+
+const ADMIN_NAV_ITEMS: Array<{
+  to: string;
+  labelKey: string;
+  icon: LucideIcon;
+  end?: boolean;
+}> = [
+  { to: "/admin", labelKey: "Admin Dashboard", icon: ShieldCheck, end: true },
+  { to: "/admin/platform", labelKey: "Platform Management", icon: Users },
 ];
 
 function SidebarLink({
@@ -59,7 +76,7 @@ function SidebarLink({
   collapsed = false,
   onNavigate,
 }: {
-  item: (typeof NAV_ITEMS)[number];
+  item: (typeof NAV_ITEMS)[number] | (typeof ADMIN_NAV_ITEMS)[number];
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
@@ -98,13 +115,20 @@ export function Header({
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const currentPage = [...NAV_ITEMS]
+  const isAdmin = useAuth((state) => state.user?.role === "admin");
+
+  const visibleNavItems = isAdmin
+    ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS]
+    : NAV_ITEMS;
+
+  const currentPage = [...visibleNavItems]
     .sort((a, b) => b.to.length - a.to.length)
-    .find((item) =>
-      item.end
-        ? location.pathname === item.to
-        : location.pathname === item.to ||
-          location.pathname.startsWith(`${item.to}/`),
+    .find(
+      (item) =>
+        item.end
+          ? location.pathname === item.to
+          : location.pathname === item.to ||
+            location.pathname.startsWith(`${item.to}/`),
     );
 
   return (
@@ -126,6 +150,7 @@ export function Header({
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Leaf className="size-6" />
           </span>
+
           {!collapsed && (
             <span className="min-w-0">
               <span className="block truncate text-base font-bold tracking-tight">
@@ -144,6 +169,7 @@ export function Header({
               Workspace
             </span>
           )}
+
           <Button
             variant="ghost"
             size="icon"
@@ -163,8 +189,12 @@ export function Header({
           className="flex-1 space-y-1 overflow-y-auto px-3 pb-4"
           aria-label="Main navigation"
         >
-          {NAV_ITEMS.map((item) => (
-            <SidebarLink key={item.to} item={item} collapsed={collapsed} />
+          {visibleNavItems.map((item) => (
+            <SidebarLink
+              key={item.to}
+              item={item}
+              collapsed={collapsed}
+            />
           ))}
         </nav>
 
@@ -230,7 +260,7 @@ export function Header({
           <aside className="absolute inset-y-0 left-0 flex w-[min(290px,85vw)] flex-col border-r border-border bg-card shadow-2xl">
             <div className="flex h-16 items-center justify-between border-b border-border px-4">
               <Link
-                to="/"
+                to="/home"
                 className="flex items-center gap-2"
                 onClick={() => setMobileOpen(false)}
               >
@@ -250,8 +280,11 @@ export function Header({
               </Button>
             </div>
 
-            <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-              {NAV_ITEMS.map((item) => (
+            <nav
+              className="flex-1 space-y-1 overflow-y-auto p-3"
+              aria-label="Mobile navigation"
+            >
+              {visibleNavItems.map((item) => (
                 <SidebarLink
                   key={item.to}
                   item={item}

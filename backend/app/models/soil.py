@@ -43,9 +43,7 @@ class SoilRecommendationCatalog(Base, TimestampMixin):
 
 class SoilRecommendation(Base, TimestampMixin):
     __tablename__ = "soil_recommendations"
-    __table_args__ = (
-        UniqueConstraint("catalog_id", "disease_id", name="uq_soil_catalog_disease"),
-    )
+    __table_args__ = (UniqueConstraint("catalog_id", "disease_id", name="uq_soil_catalog_disease"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     catalog_id: Mapped[int] = mapped_column(

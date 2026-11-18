@@ -1,0 +1,295 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { CropListingDetail } from "@/types/marketplace";
+
+const authMock = vi.hoisted(() => ({
+  user: null as { id: number; name: string } | null,
+}));
+/** Simulated server-side saved state for listing id 1 (the fixture below). */
+const favState = vi.hoisted(() => ({
+  favorited: false,
+  favorite_id: null as number | null,
+}));
+const apiMock = vi.hoisted(() => ({
+  getCropListing: vi.fn(),
+  createConversation: vi.fn(),
+  favouriteStatus: vi.fn(),
+  addFavourite: vi.fn(),
+  removeFavourite: vi.fn(),
+  listReviews: vi.fn(),
+  errorMessage: (err: Error) => err.message,
+}));
+
+vi.mock("@/stores/auth", () => ({
+  useAuth: () => ({ user: authMock.user, loading: false }),
+}));
+vi.mock("@/lib/api", () => ({ api: apiMock, errorMessage: apiMock.errorMessage }));
+
+import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail";
+
+/** One listing detail with sensible defaults; tests override fields. */
+function makeDetail(overrides: Partial<CropListingDetail> = {}): CropListingDetail {
+  return {
+    id: 1,
+    farmer_id: 1,
+    crop_name: "Tomato",
+    category: "vegetable",
+    variety: "Desi",
+    quantity: 50,
+    unit: "kg",
+    price: 40,
+    description: "Farm fresh tomatoes from Nashik.",
+    images: ["/media/marketplace/tomato.png", "/media/marketplace/tomato-2.png"],
+    harvest_date: "2026-07-15",
+    organic: true,
+    location: "Nashik",
+    availability: "available",
+    created_at: "2026-07-01T09:00:00Z",
+    updated_at: "2026-07-01T09:00:00Z",
+    farmer: { id: 5, name: "Kisan Kumar", verified: true, rating: 4.5, review_count: 3 },
+    ...overrides,
+  };
+}
+
+function renderPage(id = 1) {
+  const router = createMemoryRouter(
+    [
+      { path: "/", element: <div>home</div> },
+      { path: "/login", element: <div>login</div> },
+      { path: "/marketplace/browse", element: <div>browse</div> },
+      { path: "/marketplace/messages", element: <div>messages</div> },
+      {
+        path: "/marketplace/messages/:conversationId",
+        element: <div>conversation</div>,
+      },
+      {
+        path: "/marketplace/listings/:listingId",
+        element: <MarketplaceListingDetailPage />,
+      },
+    ],
+    { initialEntries: [`/marketplace/listings/${id}`] },
+  );
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+describe("MarketplaceListingDetailPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.user = { id: 1, name: "Tester" };
+    apiMock.getCropListing.mockResolvedValue(makeDetail());
+    // Favourite state for listing 1 starts unsaved; the POST/DELETE toggle it.
+    favState.favorited = false;
+    favState.favorite_id = null;
+    apiMock.favouriteStatus.mockImplementation(() =>
+      Promise.resolve({
+        favorited: favState.favorited,
+        favorite_id: favState.favorite_id,
+        listing_id: 1,
+        product_id: null,
+      }),
+    );
+    apiMock.addFavourite.mockImplementation(() => {
+      favState.favorited = true;
+      favState.favorite_id = 7;
+      return Promise.resolve({ id: 7 });
+    });
+    apiMock.removeFavourite.mockImplementation(() => {
+      favState.favorited = false;
+      favState.favorite_id = null;
+      return Promise.resolve(undefined);
+    });
+    // The ratings & reviews block loads below the grid — an empty page keeps
+    // the detail-focused tests from tripping over the review query.
+    apiMock.listReviews.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 5,
+      pages: 0,
+      summary: {
+        average: 0,
+        total: 0,
+        distribution: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+      },
+      my_review: null,
+    });
+  });
+
+  it("asks to sign in when no user is authenticated", async () => {
+    authMock.user = null;
+    renderPage();
+    expect(
+      await screen.findByText("Sign in to browse the marketplace."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders every field the buyer cares about", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Tomato" })).toBeInTheDocument();
+    expect(screen.getByText("Desi")).toBeInTheDocument();
+    expect(screen.getByText("50 kg")).toBeInTheDocument();
+    expect(screen.getByText("Farm fresh tomatoes from Nashik.")).toBeInTheDocument();
+    expect(screen.getByText("Nashik")).toBeInTheDocument();
+    expect(screen.getByText("Kisan Kumar")).toBeInTheDocument();
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    // Labels for the metadata rows are shown.
+    expect(screen.getByText("Harvest date")).toBeInTheDocument();
+    expect(screen.getByText("Listed on")).toBeInTheDocument();
+    expect(screen.getByText("Description")).toBeInTheDocument();
+    expect(screen.getByText("Farmer")).toBeInTheDocument();
+  });
+
+  it("shows the main gallery image and steps through photos", async () => {
+    renderPage();
+
+    const main = await screen.findByRole("img", { name: "Photo of Tomato" });
+    expect(main).toHaveAttribute("src", "/media/marketplace/tomato.png");
+
+    await userEvent.click(screen.getByRole("button", { name: "Next photo" }));
+    expect(main).toHaveAttribute("src", "/media/marketplace/tomato-2.png");
+
+    // A thumbnail jumps straight to a photo.
+    await userEvent.click(screen.getByRole("button", { name: "Thumbnail 1 of Tomato" }));
+    expect(main).toHaveAttribute("src", "/media/marketplace/tomato.png");
+  });
+
+  it("opens the lightbox and closes it on Escape", async () => {
+    renderPage();
+    await screen.findByRole("img", { name: "Photo of Tomato" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Open photo" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("img", { name: "Photo of Tomato" })).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest placeholder when the listing has no photos", async () => {
+    apiMock.getCropListing.mockResolvedValue(makeDetail({ images: null }));
+    renderPage();
+
+    expect(
+      await screen.findByRole("img", { name: "No photos for this listing." }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open photo" })).not.toBeInTheDocument();
+  });
+
+  it("toggles the listing in and out of favourites (server-backed)", async () => {
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Save to favourites" }),
+    ).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save to favourites" }));
+
+    await vi.waitFor(() => {
+      expect(apiMock.addFavourite).toHaveBeenCalledWith({
+        listing_id: 1,
+        product_id: undefined,
+      });
+      expect(screen.getByRole("button", { name: "Remove from favourites" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove from favourites" }));
+
+    await vi.waitFor(() => {
+      expect(apiMock.removeFavourite).toHaveBeenCalledWith(7);
+      expect(screen.getByRole("button", { name: "Save to favourites" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+  });
+
+  it("shows an inline error when toggling a favourite fails", async () => {
+    apiMock.addFavourite.mockRejectedValue(new Error("Couldn't save"));
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Save to favourites" }),
+    );
+
+    expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
+  });
+
+  it("disables the button and shows an error when the saved state fails to load", async () => {
+    apiMock.favouriteStatus.mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    expect(
+      await screen.findByText("Couldn't update saved items. Please try again."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save to favourites" }),
+    ).toBeDisabled();
+  });
+
+  it("shows the ratings & reviews block below the listing", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Ratings & Reviews")).toBeInTheDocument();
+  });
+
+  it("copies the listing link to the clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    renderPage();
+    const href = window.location.href;
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(href));
+    expect(screen.getByRole("button", { name: "Link copied" })).toBeInTheDocument();
+  });
+
+  it("opens a conversation with the listing's farmer on contact", async () => {
+    apiMock.createConversation.mockResolvedValue({ id: 42 });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Contact farmer" }));
+
+    await vi.waitFor(() => {
+      expect(apiMock.createConversation).toHaveBeenCalledWith({
+        listing_id: 1,
+        product_id: undefined,
+        seller_id: undefined,
+      });
+    });
+    // The button opens the new thread in the messaging UI.
+    expect(await screen.findByText("conversation")).toBeInTheDocument();
+  });
+
+  it("shows an inline error when starting a conversation fails", async () => {
+    apiMock.createConversation.mockRejectedValue(new Error("Something went wrong"));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Contact farmer" }));
+
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+  });
+
+  it("shows an error state with retry when the listing fails to load", async () => {
+    apiMock.getCropListing.mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    expect(await screen.findByText("Couldn't load listings")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+});

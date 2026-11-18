@@ -62,9 +62,7 @@ async def add_recovery_log(
     return await RecoveryTrackerService(db).add_log(scan, payload)
 
 
-@router.patch(
-    "/{scan_id}/recovery/logs/{log_id}", response_model=RecoveryLogOut
-)
+@router.patch("/{scan_id}/recovery/logs/{log_id}", response_model=RecoveryLogOut)
 async def update_recovery_log(
     scan_id: int, log_id: int, payload: RecoveryLogUpdate, user: CurrentUser, db: Db
 ) -> RecoveryLogOut:

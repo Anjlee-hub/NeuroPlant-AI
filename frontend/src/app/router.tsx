@@ -1,7 +1,8 @@
-﻿
+
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { ErrorBoundary } from "@/app/error-boundary";
+import { AdminRoute } from "@/components/auth/admin-route";
 import {
   EntryRedirect,
   PublicOnly,
@@ -40,6 +41,16 @@ import { MessagesListPage } from "@/pages/messages-list";
 import { MarketplaceFavoritesPage } from "@/pages/marketplace-favorites";
 import { MyReviewsPage } from "@/pages/my-reviews";
 
+import Maps from "@/pages/maps";
+import CropDoctor from "@/pages/CropDoctor";
+import PlantHealthReport from "@/pages/PlantHealthReport";
+import PlantRegistration from "@/pages/PlantRegistration";
+import PlantMonitoring from "@/pages/PlantMonitoring";
+import AdminDashboard from "@/pages/AdminDashboard";
+import PlatformManagement from "@/pages/PlatformManagement";
+import Cart from "@/pages/Cart";
+import OrderHistory from "@/pages/OrderHistory";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -75,114 +86,82 @@ export const router = createBrowserRouter([
       {
         element: <RootLayout />,
         children: [
-          {
-            path: "/home",
-            element: <HomePage />,
-          },
-          {
-            path: "/settings/mfa",
-            element: <MfaSetupPage />,
-          },
-          {
-            path: "/profile",
-            element: <ProfilePage />,
-          },
-          {
-            path: "/scans",
-            element: <ScanHistoryPage />,
-          },
-          {
-            path: "/scans/:scanId",
-            element: <ScanDetailPage />,
-          },
-          {
-            path: "/scans/:scanId/doctor",
-            element: <ScanDoctorPage />,
-          },
-          {
-            path: "/offline",
-            element: <OfflineQueuePage />,
-          },
-          {
-            path: "/detect",
-            element: <ScanCropPage />,
-          },
-          {
-            path: "/doctor",
-            element: <Navigate to="/scans" replace />,
-          },
-          {
-            path: "/calendar",
-            element: <FarmerCalendarPage />,
-          },
+          { index: true, element: <HomePage /> },
+          { path: "/home", element: <HomePage /> },
+
+          // Account and authentication settings.
+          { path: "/settings/mfa", element: <MfaSetupPage /> },
+          { path: "/profile", element: <ProfilePage /> },
+
+          // Crop scanning and diagnosis.
+          { path: "/scans", element: <ScanHistoryPage /> },
+          { path: "/scans/:scanId", element: <ScanDetailPage /> },
+          { path: "/scans/:scanId/doctor", element: <ScanDoctorPage /> },
+          { path: "/detect", element: <ScanCropPage /> },
+          { path: "/doctor", element: <Navigate to="/scans" replace /> },
+          { path: "/crop-doctor", element: <CropDoctor /> },
+          { path: "/plant-health-report", element: <PlantHealthReport /> },
+
+          // Plant registration and monitoring.
+          { path: "/plants/register", element: <PlantRegistration /> },
+          { path: "/plants/monitoring", element: <PlantMonitoring /> },
+
+          // Farmer tools.
+          { path: "/offline", element: <OfflineQueuePage /> },
+          { path: "/calendar", element: <FarmerCalendarPage /> },
+          { path: "/assistant", element: <AssistantPage /> },
+          { path: "/maps", element: <Maps /> },
 
           // Government schemes and farmer community.
-          {
-            path: "/schemes",
-            element: <GovernmentSchemesPage />,
-          },
-          {
-            path: "/community",
-            element: <CommunityPage />,
-          },
+          { path: "/schemes", element: <GovernmentSchemesPage /> },
+          { path: "/community", element: <CommunityPage /> },
 
-          // Marketplace routes.
-          {
-            path: "/marketplace",
-            element: <MarketplaceDashboardPage />,
-          },
-          {
-            path: "/marketplace/listings/new",
-            element: <MarketplaceListingFormPage />,
-          },
+          // Marketplace.
+          { path: "/marketplace", element: <MarketplaceDashboardPage /> },
+          { path: "/marketplace/listings/new", element: <MarketplaceListingFormPage /> },
           {
             path: "/marketplace/listings/:listingId/edit",
             element: <MarketplaceListingFormPage />,
           },
-          {
-            path: "/marketplace/browse",
-            element: <MarketplaceBuyPage />,
-          },
+          { path: "/marketplace/browse", element: <MarketplaceBuyPage /> },
           {
             path: "/marketplace/listings/:listingId",
             element: <MarketplaceListingDetailPage />,
           },
-          {
-            path: "/marketplace/favorites",
-            element: <MarketplaceFavoritesPage />,
-          },
-          {
-            path: "/marketplace/my-reviews",
-            element: <MyReviewsPage />,
-          },
-          {
-            path: "/marketplace/shop",
-            element: <SellerDashboardPage />,
-          },
-          {
-            path: "/marketplace/products",
-            element: <ProductMarketBrowsePage />,
-          },
-          {
-            path: "/marketplace/products/:id",
-            element: <ProductMarketDetailPage />,
-          },
-          {
-            path: "/marketplace/messages",
-            element: <MessagesListPage />,
-          },
+          { path: "/marketplace/favorites", element: <MarketplaceFavoritesPage /> },
+          { path: "/marketplace/my-reviews", element: <MyReviewsPage /> },
+          { path: "/marketplace/shop", element: <SellerDashboardPage /> },
+          { path: "/marketplace/products", element: <ProductMarketBrowsePage /> },
+          { path: "/marketplace/products/:id", element: <ProductMarketDetailPage /> },
+          { path: "/marketplace/messages", element: <MessagesListPage /> },
           {
             path: "/marketplace/messages/:conversationId",
             element: <MessagesDetailPage />,
           },
+
+          // Shopping cart and order history.
+          { path: "/cart", element: <Cart /> },
+          { path: "/orders", element: <OrderHistory /> },
+
+          // Admin-only pages.
           {
-            path: "/assistant",
-            element: <AssistantPage />,
+            path: "/admin",
+            element: (
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            ),
           },
           {
-            path: "*",
-            element: <NotFoundPage />,
+            path: "/admin/platform",
+            element: (
+              <AdminRoute>
+                <PlatformManagement />
+              </AdminRoute>
+            ),
           },
+
+          { path: "*", element: <NotFoundPage /> },
         ],
       },
     ],
