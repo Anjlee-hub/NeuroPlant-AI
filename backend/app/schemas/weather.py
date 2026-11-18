@@ -33,9 +33,7 @@ class WeatherOut(BaseModel):
     """Normalized current weather for one location (provider-independent)."""
 
     temperature_c: float = Field(description="Air temperature in °C")
-    humidity_percent: float = Field(
-        ge=0.0, le=100.0, description="Relative humidity (0–100%)"
-    )
+    humidity_percent: float = Field(ge=0.0, le=100.0, description="Relative humidity (0–100%)")
     rainfall_mm: float = Field(ge=0.0, description="Precipitation in the window (mm; 0 when n/a)")
     wind_speed_ms: float = Field(ge=0.0, description="Wind speed in m/s")
     wind_direction_deg: float | None = Field(
@@ -79,9 +77,7 @@ class DiseaseRiskOut(BaseModel):
         description="Pathogen label from the catalog (e.g. 'Fungus (Alternaria solani)')",
     )
     risk_level: str = Field(description="low | moderate | high | critical")
-    risk_score: float = Field(
-        ge=0.0, le=100.0, description="Composite weather-risk score (0–100)"
-    )
+    risk_score: float = Field(ge=0.0, le=100.0, description="Composite weather-risk score (0–100)")
     factors: list[RiskFactorOut] = Field(default_factory=list)
     explanation: str = Field(description="Plain-language summary of the driving factors")
 

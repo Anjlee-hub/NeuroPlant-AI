@@ -16,11 +16,11 @@ from app.models.conversation import ConversationMessage
 from app.models.marketplace import CropListing, Product
 from app.models.marketplace_trust import MarketplaceFavorite, MarketplaceReview
 from app.models.messaging import MarketplaceConversation, MarketplaceMessage
+from app.models.notification import Notification, NotificationType
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
-from app.models.notification import Notification, NotificationType
 from app.models.user import (
     MFA,
     Device,

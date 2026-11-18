@@ -115,9 +115,7 @@ class CartItem(Base, TimestampMixin):
     """One product and quantity saved in a buyer's cart."""
 
     __tablename__ = "cart_items"
-    __table_args__ = (
-        UniqueConstraint("user_id", "product_id", name="uq_cart_user_product"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "product_id", name="uq_cart_user_product"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -138,9 +136,7 @@ class Order(Base, TimestampMixin):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    status: Mapped[str] = mapped_column(
-        String(30), default="placed", nullable=False
-    )
+    status: Mapped[str] = mapped_column(String(30), default="placed", nullable=False)
     total_amount: Mapped[float] = mapped_column(Float, nullable=False)
     shipping_address: Mapped[str] = mapped_column(Text, nullable=False)
 

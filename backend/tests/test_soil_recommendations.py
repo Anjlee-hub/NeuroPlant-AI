@@ -314,9 +314,7 @@ async def test_soil_health_drops_with_severe_severity(client):
     await _seed_all()
     disease_id = await _tomato_early_blight_id()
     headers = await _register(client, "+919000000107")
-    resp = await client.get(
-        f"/api/v1/soil/diseases/{disease_id}?severity=severe", headers=headers
-    )
+    resp = await client.get(f"/api/v1/soil/diseases/{disease_id}?severity=severe", headers=headers)
     body = resp.json()
     health = body["soil_health"]
     assert health["score"] == 3.0
@@ -372,9 +370,7 @@ async def test_scan_soil_recommendations_low_confidence_note(client, db):
     await _seed_all()
     headers = await _register(client, "+919000000110")
     user_id = await _user_id(client, db, "+919000000110")
-    scan_id = await _make_scan(
-        user_id, None, "Early Blight", severity="low", confidence=0.42
-    )
+    scan_id = await _make_scan(user_id, None, "Early Blight", severity="low", confidence=0.42)
 
     resp = await client.get(f"/api/v1/scans/{scan_id}/soil-recommendations", headers=headers)
     assert resp.status_code == 200, resp.text

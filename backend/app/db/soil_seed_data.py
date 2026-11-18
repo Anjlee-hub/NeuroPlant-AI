@@ -63,8 +63,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
         micronutrients=("Calcium", "Magnesium", "Boron"),
         compost="15–20 t/ha well-rotted FYM or compost worked into the bed",
         mulching=(
-            "Black plastic or straw mulch saves water and stops soil splashing spores "
-            "onto leaves"
+            "Black plastic or straw mulch saves water and stops soil splashing spores onto leaves"
         ),
         soil_suitability=(
             "Tomato grows best in deep, well-drained sandy-loam soil with pH 6.0–6.8 "
@@ -98,9 +97,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Solarise or replace the top soil in badly infested beds before the next crop",
                 "Apply a micronutrient foliar spray to help plants recover",
             ),
-            "moderate": (
-                "Top-dress with potassium to strengthen recovering plants",
-            ),
+            "moderate": ("Top-dress with potassium to strengthen recovering plants",),
         },
     ),
     # ══ Potato ══════════════════════════════════════════════════════════
@@ -143,9 +140,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Rotate away from potato and tomato for at least 3 years",
                 "Test soil pH and correct towards 5.5–6.0 for tuber health",
             ),
-            "moderate": (
-                "Top-dress with potassium to strengthen plants",
-            ),
+            "moderate": ("Top-dress with potassium to strengthen plants",),
         },
     ),
     # ══ Paddy / Rice ════════════════════════════════════════════════════
@@ -192,9 +187,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Drain the field fully for 3–5 days to break disease cycles",
                 "Add silica-rich amendments (rice husk ash) to harden plants",
             ),
-            "moderate": (
-                "Split nitrogen into 3 doses to avoid lush, susceptible growth",
-            ),
+            "moderate": ("Split nitrogen into 3 doses to avoid lush, susceptible growth",),
         },
     ),
     # ══ Wheat ════════════════════════════════════════════════════════════
@@ -237,9 +230,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Plough stubble and volunteer wheat under before the next season",
                 "Apply a balanced NPK top-dressing to aid recovery",
             ),
-            "moderate": (
-                "Irrigate on time to avoid moisture stress during grain fill",
-            ),
+            "moderate": ("Irrigate on time to avoid moisture stress during grain fill",),
         },
     ),
     # ══ Maize / Corn ═════════════════════════════════════════════════════
@@ -282,9 +273,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Rotate away from maize for 2 years to break the residue cycle",
                 "Add potassium to harden plants against rust/blight",
             ),
-            "moderate": (
-                "Top-dress with nitrogen at the right stage only",
-            ),
+            "moderate": ("Top-dress with nitrogen at the right stage only",),
         },
     ),
     # ══ Cotton ═══════════════════════════════════════════════════════════
@@ -327,9 +316,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Provide field drainage and ridge sowing for the next crop",
                 "Apply potash to strengthen plants against rot",
             ),
-            "moderate": (
-                "Stop irrigation as bolls open to lower humidity",
-            ),
+            "moderate": ("Stop irrigation as bolls open to lower humidity",),
         },
     ),
     # ══ Chickpea / Chana ═════════════════════════════════════════════════
@@ -372,9 +359,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Solarise seed-bed soil for 3–4 weeks before sowing",
                 "Rotate to cereals for 2–3 years to starve soil-borne wilt",
             ),
-            "moderate": (
-                "Apply sulphur top-dressing to support recovery",
-            ),
+            "moderate": ("Apply sulphur top-dressing to support recovery",),
         },
     ),
     # ══ Onion ════════════════════════════════════════════════════════════
@@ -417,9 +402,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Stop irrigation to dry the canopy and bulbs",
                 "Rotate away from onion/garlic for 2 years",
             ),
-            "moderate": (
-                "Irrigate in the morning so foliage dries by night",
-            ),
+            "moderate": ("Irrigate in the morning so foliage dries by night",),
         },
     ),
     # ══ Chilli / Chilli pepper ═══════════════════════════════════════════
@@ -462,9 +445,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Stake plants and mulch to keep fruit off the soil",
                 "Add calcium (lime) before the next crop",
             ),
-            "moderate": (
-                "Top-dress with potassium for better fruit set",
-            ),
+            "moderate": ("Top-dress with potassium for better fruit set",),
         },
     ),
     # ══ Brinjal / Eggplant ═══════════════════════════════════════════════
@@ -507,9 +488,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Rotate away from solanaceous crops for 2 years",
                 "Plough infected debris under after harvest",
             ),
-            "moderate": (
-                "Top-dress with potassium to support fruiting",
-            ),
+            "moderate": ("Top-dress with potassium to support fruiting",),
         },
     ),
     # ══ Soybean ══════════════════════════════════════════════════════════
@@ -552,9 +531,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Rotate away from soybean for 2 years to break rust cycles",
                 "Improve drainage in low-lying patches",
             ),
-            "moderate": (
-                "Irrigate in the morning so foliage dries by night",
-            ),
+            "moderate": ("Irrigate in the morning so foliage dries by night",),
         },
     ),
     # ══ Groundnut / Peanut ═══════════════════════════════════════════════
@@ -597,9 +574,7 @@ SOIL_BY_CROP: dict[str, SoilSeed] = {
                 "Rotate away from groundnut for 2 years to break the leaf-spot cycle",
                 "Plough infected haulm under after harvest",
             ),
-            "moderate": (
-                "Apply calcium (gypsum) at pegging to support pod fill",
-            ),
+            "moderate": ("Apply calcium (gypsum) at pegging to support pod fill",),
         },
     ),
 }
