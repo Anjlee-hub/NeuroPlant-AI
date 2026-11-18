@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.models.calendar import CalendarTask, CropSchedule
 from app.models.catalog import Crop
 from app.models.notification import Notification, NotificationType
 from app.models.user import User
@@ -199,9 +200,9 @@ class NotificationTriggerService:
 
             # Get the user's schedule
             schedule = await calendar.db.scalar(
-                select(calendar.db.model.CropSchedule).where(
-                    calendar.db.model.CropSchedule.id == schedule_id,
-                    calendar.db.model.CropSchedule.user_id == user_id,
+                select(CropSchedule).where(
+                    CropSchedule.id == schedule_id,
+                    CropSchedule.user_id == user_id,
                 )
             )
             if not schedule:
@@ -213,15 +214,15 @@ class NotificationTriggerService:
                 return None
 
             # Find upcoming tasks in the window
-            tasks = await calendar.db.scalars(
-                select(calendar.db.model.CalendarTask).where(
-                    calendar.db.model.CalendarTask.schedule_id == schedule_id,
-                    calendar.db.model.CalendarTask.due_at >= now,
-                    calendar.db.model.CalendarTask.due_at <= cutoff,
-                    calendar.db.model.CalendarTask.completed_at.is_(None),
+            task_result = await calendar.db.scalars(
+                select(CalendarTask).where(
+                    CalendarTask.schedule_id == schedule_id,
+                    CalendarTask.due_at >= now,
+                    CalendarTask.due_at <= cutoff,
+                    CalendarTask.completed_at.is_(None),
                 )
             )
-            tasks = list(tasks.all())
+            tasks = list(task_result.all())
 
             for task in tasks:
                 payload = {
@@ -455,7 +456,7 @@ class NotificationTriggerService:
         logger.info(
             "notify_order_update_stub",
             user_id=user_id,
-            event=event,
+            order_event=event,
             order_id=order_id,
             note="order system not implemented — returning None",
         )
