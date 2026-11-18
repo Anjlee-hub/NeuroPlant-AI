@@ -58,7 +58,12 @@ def main() -> None:
     farmer_phone = f"9{str(uuid.uuid4().int)[:9]}"
     r = client.post(
         "/auth/register",
-        json={"phone": farmer_phone, "name": "Farmer Smoke", "role": "farmer", "password": "secret123"},
+        json={
+            "phone": farmer_phone,
+            "name": "Farmer Smoke",
+            "role": "farmer",
+            "password": "secret123",
+        },
     )
     check("farmer register (201)", r.status_code == 201, r.text[:200])
     farmer_tokens = r.json()
@@ -81,15 +86,31 @@ def main() -> None:
     check("shop rating starts 0", body.get("rating") == 0, body)
 
     r = client.get("/marketplace/shop/me", headers=seller_headers)
-    check("GET /shop/me (200)", r.status_code == 200 and r.json()["shop_name"] == "Green Agri Supplies", r.text[:200])
+    check(
+        "GET /shop/me (200)",
+        r.status_code == 200 and r.json()["shop_name"] == "Green Agri Supplies",
+        r.text[:200],
+    )
 
     # Edit the profile — turn delivery on, update phone.
-    r = client.patch("/marketplace/shop/me", json={"delivery_available": True, "phone": "+91 11111 22222"}, headers=seller_headers)
-    check("PATCH /shop/me (200)", r.status_code == 200 and r.json()["delivery_available"] is True, r.text[:200])
+    r = client.patch(
+        "/marketplace/shop/me",
+        json={"delivery_available": True, "phone": "+91 11111 22222"},
+        headers=seller_headers,
+    )
+    check(
+        "PATCH /shop/me (200)",
+        r.status_code == 200 and r.json()["delivery_available"] is True,
+        r.text[:200],
+    )
 
     # RBAC: a farmer must not register/read the shop.
     r = client.get("/marketplace/shop/me", headers=farmer_headers)
-    check("farmer blocked from /shop/me (403)", r.status_code == 403, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "farmer blocked from /shop/me (403)",
+        r.status_code == 403,
+        f"{r.status_code}: {r.text[:200]}",
+    )
 
     # ── Product lifecycle ──────────────────────────────────────────────────
     neem = {
@@ -137,7 +158,11 @@ def main() -> None:
     jute_id = r.json()["id"]
 
     r = client.get("/marketplace/shop/products", headers=seller_headers)
-    check("list own products (3)", r.status_code == 200 and len(r.json()) == 3, f"{r.status_code}: {r.text[:300]}")
+    check(
+        "list own products (3)",
+        r.status_code == 200 and len(r.json()) == 3,
+        f"{r.status_code}: {r.text[:300]}",
+    )
 
     r = client.get("/marketplace/shop/products/stats", headers=seller_headers)
     stats = r.json()
@@ -145,35 +170,86 @@ def main() -> None:
     check("stats zeroed out/archived", stats["out_of_stock"] == 0 and stats["archived"] == 0, stats)
 
     # Availability: mark urea out of stock, then back in stock.
-    r = client.patch(f"/marketplace/shop/products/{urea_id}", json={"availability": "out_of_stock"}, headers=seller_headers)
-    check("mark urea out_of_stock", r.status_code == 200 and r.json()["availability"] == "out_of_stock", r.text[:200])
-    r = client.patch(f"/marketplace/shop/products/{urea_id}", json={"availability": "in_stock"}, headers=seller_headers)
-    check("mark urea back in_stock", r.status_code == 200 and r.json()["availability"] == "in_stock", r.text[:200])
+    r = client.patch(
+        f"/marketplace/shop/products/{urea_id}",
+        json={"availability": "out_of_stock"},
+        headers=seller_headers,
+    )
+    check(
+        "mark urea out_of_stock",
+        r.status_code == 200 and r.json()["availability"] == "out_of_stock",
+        r.text[:200],
+    )
+    r = client.patch(
+        f"/marketplace/shop/products/{urea_id}",
+        json={"availability": "in_stock"},
+        headers=seller_headers,
+    )
+    check(
+        "mark urea back in_stock",
+        r.status_code == 200 and r.json()["availability"] == "in_stock",
+        r.text[:200],
+    )
 
     # Edit a product's price + brand.
-    r = client.patch(f"/marketplace/shop/products/{jute_id}", json={"price": 130, "brand": "AgroTools Pro"}, headers=seller_headers)
-    check("edit jute price/brand", r.status_code == 200 and r.json()["price"] == 130 and r.json()["brand"] == "AgroTools Pro", r.text[:200])
+    r = client.patch(
+        f"/marketplace/shop/products/{jute_id}",
+        json={"price": 130, "brand": "AgroTools Pro"},
+        headers=seller_headers,
+    )
+    check(
+        "edit jute price/brand",
+        r.status_code == 200 and r.json()["price"] == 130 and r.json()["brand"] == "AgroTools Pro",
+        r.text[:200],
+    )
 
     # Stats reflect the toggle round-trip.
     r = client.get("/marketplace/shop/products/stats", headers=seller_headers)
     stats = r.json()
-    check("stats after round-trip (3/3/0/0)", stats["total"] == 3 and stats["active"] == 3 and stats["out_of_stock"] == 0 and stats["archived"] == 0, stats)
+    check(
+        "stats after round-trip (3/3/0/0)",
+        stats["total"] == 3
+        and stats["active"] == 3
+        and stats["out_of_stock"] == 0
+        and stats["archived"] == 0,
+        stats,
+    )
 
     # ── Public product market ──────────────────────────────────────────────
     r = client.get("/marketplace/products", headers=farmer_headers)
     body = r.json()
-    check("browse all products (3)", r.status_code == 200 and body["total"] == 3, f"{r.status_code}: {r.text[:300]}")
+    check(
+        "browse all products (3)",
+        r.status_code == 200 and body["total"] == 3,
+        f"{r.status_code}: {r.text[:300]}",
+    )
 
     r = client.get("/marketplace/products", params={"q": "neem"}, headers=farmer_headers)
-    check("search 'neem' -> 1", r.json()["total"] == 1 and r.json()["items"][0]["name"] == "Neem oil spray", r.text[:300])
+    check(
+        "search 'neem' -> 1",
+        r.json()["total"] == 1 and r.json()["items"][0]["name"] == "Neem oil spray",
+        r.text[:300],
+    )
 
-    r = client.get("/marketplace/products", params={"category": "fertilizer"}, headers=farmer_headers)
-    check("filter fertilizer -> 1", r.json()["total"] == 1 and r.json()["items"][0]["category"] == "fertilizer", r.text[:300])
+    r = client.get(
+        "/marketplace/products", params={"category": "fertilizer"}, headers=farmer_headers
+    )
+    check(
+        "filter fertilizer -> 1",
+        r.json()["total"] == 1 and r.json()["items"][0]["category"] == "fertilizer",
+        r.text[:300],
+    )
 
     r = client.get("/marketplace/products", params={"organic": True}, headers=farmer_headers)
-    check("filter organic -> 1 (neem)", r.json()["total"] == 1 and r.json()["items"][0]["organic"] is True, r.text[:300])
+    check(
+        "filter organic -> 1 (neem)",
+        r.json()["total"] == 1 and r.json()["items"][0]["organic"] is True,
+        r.text[:300],
+    )
 
-    r = client.get("/marketplace/products", params={"min_price": 200, "max_price": 300}, headers=farmer_headers)
+    r = client.get(
+        "/marketplace/products", params={"min_price": 200, "max_price": 300}, headers=farmer_headers
+    )
     check("price window 200-300 -> 1", r.json()["total"] == 1, r.text[:300])
 
     r = client.get("/marketplace/products", params={"brand": "agrotools"}, headers=farmer_headers)
@@ -183,18 +259,38 @@ def main() -> None:
     prices = [p["price"] for p in r.json()["items"]]
     check("sort price_asc", prices == sorted(prices), prices)
 
-    r = client.get("/marketplace/products", params={"page": 1, "page_size": 2}, headers=farmer_headers)
+    r = client.get(
+        "/marketplace/products", params={"page": 1, "page_size": 2}, headers=farmer_headers
+    )
     body = r.json()
-    check("pagination page_size=2 -> 2 items, 2 pages", len(body["items"]) == 2 and body["pages"] == 2, body)
+    check(
+        "pagination page_size=2 -> 2 items, 2 pages",
+        len(body["items"]) == 2 and body["pages"] == 2,
+        body,
+    )
 
     # Detail with the shop attached.
     r = client.get(f"/marketplace/products/{neem_id}", headers=farmer_headers)
     detail = r.json()
-    check("detail neem + shop attached", r.status_code == 200 and detail["shop"]["shop_name"] == "Green Agri Supplies" and detail["brand"] == "BioAgri", r.text[:300])
+    check(
+        "detail neem + shop attached",
+        r.status_code == 200
+        and detail["shop"]["shop_name"] == "Green Agri Supplies"
+        and detail["brand"] == "BioAgri",
+        r.text[:300],
+    )
 
     # ── Archive hides from the public feed ─────────────────────────────────
-    r = client.patch(f"/marketplace/shop/products/{jute_id}", json={"availability": "archived"}, headers=seller_headers)
-    check("archive jute", r.status_code == 200 and r.json()["availability"] == "archived", r.text[:200])
+    r = client.patch(
+        f"/marketplace/shop/products/{jute_id}",
+        json={"availability": "archived"},
+        headers=seller_headers,
+    )
+    check(
+        "archive jute",
+        r.status_code == 200 and r.json()["availability"] == "archived",
+        r.text[:200],
+    )
     r = client.get("/marketplace/shop/products/stats", headers=seller_headers)
     stats = r.json()
     check("stats archived 1 / active 2", stats["archived"] == 1 and stats["active"] == 2, stats)
@@ -202,8 +298,14 @@ def main() -> None:
     r = client.get("/marketplace/products", headers=farmer_headers)
     check("archived hidden from browse (2)", r.json()["total"] == 2, r.text[:300])
     r = client.get(f"/marketplace/products/{jute_id}", headers=farmer_headers)
-    check("archived detail still readable (200)", r.status_code == 200, f"{r.status_code}: {r.text[:200]}")
-    r = client.get("/marketplace/products", params={"availability": "archived"}, headers=farmer_headers)
+    check(
+        "archived detail still readable (200)",
+        r.status_code == 200,
+        f"{r.status_code}: {r.text[:200]}",
+    )
+    r = client.get(
+        "/marketplace/products", params={"availability": "archived"}, headers=farmer_headers
+    )
     check("archived visible when explicitly requested", r.json()["total"] == 1, r.text[:300])
 
     # ── Delete + ownership guards ──────────────────────────────────────────
@@ -214,7 +316,9 @@ def main() -> None:
 
     # Enumeration guard: the farmer can't delete a seller's product, even guessing the id.
     r = client.delete(f"/marketplace/shop/products/{neem_id}", headers=farmer_headers)
-    check("farmer blocked from delete (403)", r.status_code == 403, f"{r.status_code}: {r.text[:200]}")
+    check(
+        "farmer blocked from delete (403)", r.status_code == 403, f"{r.status_code}: {r.text[:200]}"
+    )
     r = client.delete(f"/marketplace/shop/products/{neem_id}", headers=seller_headers)
     check("seller deletes neem (204)", r.status_code == 204, f"{r.status_code}: {r.text[:200]}")
 

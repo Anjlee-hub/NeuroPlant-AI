@@ -20,6 +20,9 @@ One service owns every review rule so the router only maps HTTP semantics.
 The list endpoint is the read model: one call for a target/seller returns the
 reviews, the aggregate summary, and (for a single item) the caller's own review
 so the UI knows whether to show "Write a review" or "Edit your review".
+
+M5 Task 3: integration with NotificationTriggerService for review_received
+notifications.
 """
 
 from __future__ import annotations
@@ -45,6 +48,7 @@ from app.schemas.reviews import (
     ReviewPageOut,
     ReviewUpdate,
 )
+from app.services.notification_triggers import NotificationTriggerService
 
 logger = get_logger(__name__)
 
@@ -104,6 +108,18 @@ class ReviewsService:
             seller_id=seller_id,
             rating=review.rating,
         )
+
+        # M5 Task 3: notify the reviewed seller
+        triggers = NotificationTriggerService(self.db)
+        await triggers.notify_review_received(
+            seller_id=seller_id,
+            review_id=review.id,
+            listing_id=payload.listing_id,
+            product_id=payload.product_id,
+            rating=payload.rating,
+            reviewer_name=user.name,
+        )
+
         return await self._build(review)
 
     async def update(self, user: User, review_id: int, payload: ReviewUpdate) -> ReviewOut:

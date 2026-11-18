@@ -171,9 +171,7 @@ async def test_recovery_endpoints_require_auth(client):
         await client.post("/api/v1/scans/1/recovery/logs", json={"treatment_applied": "x"})
     ).status_code == 401
     assert (
-        await client.patch(
-            "/api/v1/scans/1/recovery/logs/1", json={"notes": "x"}
-        )
+        await client.patch("/api/v1/scans/1/recovery/logs/1", json={"notes": "x"})
     ).status_code == 401
     assert (await client.delete("/api/v1/scans/1/recovery/logs/1")).status_code == 401
 

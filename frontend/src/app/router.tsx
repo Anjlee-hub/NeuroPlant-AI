@@ -1,5 +1,14 @@
+﻿import OrderHistory from "@/pages/OrderHistory";
 import { createBrowserRouter, Navigate } from "react-router-dom";
-
+import { AdminRoute } from "@/components/auth/admin-route";
+import Maps from "@/pages/maps";
+import CropDoctor from "@/pages/CropDoctor";
+import PlantHealthReport from "@/pages/PlantHealthReport";
+import PlantRegistration from "@/pages/PlantRegistration";
+import PlantMonitoring from "@/pages/PlantMonitoring";
+import AdminDashboard from "@/pages/AdminDashboard";
+import PlatformManagement from "@/pages/PlatformManagement";
+import Cart from "@/pages/Cart";
 import { ErrorBoundary } from "@/app/error-boundary";
 import { RootLayout } from "@/components/layout/root-layout";
 import { HomePage } from "@/pages/home";
@@ -30,7 +39,7 @@ import { MyReviewsPage } from "@/pages/my-reviews";
 
 /**
  * Route tree. Every nav destination resolves to a live page or an honest
- * "planned for Milestone X" page — there are no dead links (M2.1).
+ * "planned for Milestone X" page â€” there are no dead links (M2.1).
  */
 export const router = createBrowserRouter([
   {
@@ -39,6 +48,8 @@ export const router = createBrowserRouter([
     errorElement: <ErrorBoundary />,
     children: [
       { index: true, element: <HomePage /> },
+      { path: "cart", element: <Cart /> },
+      { path: "orders", element: <OrderHistory /> },
       { path: "login", element: <LoginPage /> },
       { path: "login/mfa", element: <MfaVerifyPage /> },
       { path: "register", element: <RegisterPage /> },
@@ -47,12 +58,44 @@ export const router = createBrowserRouter([
       { path: "scans", element: <ScanHistoryPage /> },
       { path: "scans/:scanId", element: <ScanDetailPage /> },
       { path: "scans/:scanId/doctor", element: <ScanDoctorPage /> },
+      {
+        path: "/crop-doctor",
+        element: <CropDoctor />,
+      },
+      {
+        path: "/plant-health-report",
+        element: <PlantHealthReport />,
+      },
+      {
+        path: "/admin",
+        element: (
+          <AdminRoute>
+            <AdminDashboard />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "/admin/platform",
+        element: (
+          <AdminRoute>
+            <PlatformManagement />
+          </AdminRoute>
+        ),
+      },
       { path: "offline", element: <OfflineQueuePage /> },
       { path: "detect", element: <ScanCropPage /> },
       // Crop Doctor is live per-scan (M3 T4): the nav hub lands on the scan
       // list so the user picks a scan to open its dashboard.
       { path: "doctor", element: <Navigate to="/scans" replace /> },
       { path: "calendar", element: <FarmerCalendarPage /> },
+      {
+        path: "/plants/register",
+        element: <PlantRegistration />,
+      },
+      {
+        path: "/plants/monitoring",
+        element: <PlantMonitoring />,
+      },
       // Farmer Crop Listings (M4 T2): dashboard + create/edit surface. The
       // create route is declared before the edit route for clarity, though
       // React Router ranks static segments above `:id` automatically.
@@ -69,17 +112,19 @@ export const router = createBrowserRouter([
       { path: "marketplace/my-reviews", element: <MyReviewsPage /> },
       // Seller Portal (M4 T4): seller dashboard at /marketplace/shop, public
       // product market at /marketplace/products (browse + detail). Static segments
-      // rank above :id, so "products" won't capture "products/new" etc. — we
+      // rank above :id, so "products" won't capture "products/new" etc. â€” we
       // don't have such routes yet, but this keeps future-proof.
       { path: "marketplace/shop", element: <SellerDashboardPage /> },
       { path: "marketplace/products", element: <ProductMarketBrowsePage /> },
       { path: "marketplace/products/:id", element: <ProductMarketDetailPage /> },
-      // Buyer↔seller messaging (M4 T5): inbox + one thread.
+      // Buyerâ†”seller messaging (M4 T5): inbox + one thread.
       { path: "marketplace/messages", element: <MessagesListPage /> },
       { path: "marketplace/messages/:conversationId", element: <MessagesDetailPage /> },
       // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
       { path: "assistant", element: <AssistantPage /> },
+      { path: "maps", element: <Maps /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);
+

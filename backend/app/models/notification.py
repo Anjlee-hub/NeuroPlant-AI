@@ -11,16 +11,17 @@ clients can group/filter without coupling to domain modules.
 """
 
 from datetime import datetime
-from enum import Enum as PyEnum
+from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, Text, Enum as SAEnum
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 from app.models.base import TimestampMixin
 
 
-class NotificationType(str, PyEnum):
+class NotificationType(StrEnum):
     """Stable type keys for client grouping/filtering.
 
     These are the M5+ types needed across milestones. They are decoupled from
