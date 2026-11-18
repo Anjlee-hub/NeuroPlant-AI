@@ -1,15 +1,21 @@
+
 import { create } from "zustand";
 
-import { api, getAccessToken, getRefreshToken, setTokens } from "@/lib/api";
+import {
+  api,
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+} from "@/lib/api";
 import type { RegisterInput, User } from "@/types/auth";
 
 interface AuthState {
-  /** Authenticated user; null when logged out or session not yet hydrated. */
   user: User | null;
-  /** True during any in-flight auth call (form buttons show spinners). */
   loading: boolean;
+
   /** True after the stored session has been checked on app boot. */
   hydrated: boolean;
+
   /** Pending MFA challenge handed back by /auth/login. */
   challenge: string | null;
 
@@ -19,9 +25,7 @@ interface AuthState {
   verifyOtp: (phone: string, code: string) => Promise<void>;
   verifyMfa: (code: string) => Promise<void>;
   logout: () => Promise<void>;
-  /** Restore a stored session on app boot. */
   hydrate: () => Promise<void>;
-  /** Merge fresh profile fields (e.g. after editing the profile). */
   updateUser: (patch: Partial<User>) => void;
 }
 
@@ -37,10 +41,13 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   register: async (input) => {
     set({ loading: true });
+
     try {
       const tokens = await api.register(input);
       setTokens(tokens);
-      set({ user: await loadUser() });
+
+      const user = await loadUser();
+      set({ user, challenge: null });
     } finally {
       set({ loading: false });
     }
@@ -48,14 +55,20 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   login: async (identifier, password) => {
     set({ loading: true });
+
     try {
-      const res = await api.login(identifier, password);
-      if ("requires_mfa" in res) {
-        set({ challenge: res.mfa_challenge });
+      const response = await api.login(identifier, password);
+
+      if ("requires_mfa" in response) {
+        set({ challenge: response.mfa_challenge });
         return "mfa";
       }
-      setTokens(res);
-      set({ user: await loadUser(), challenge: null });
+
+      setTokens(response);
+
+      const user = await loadUser();
+      set({ user, challenge: null });
+
       return "ok";
     } finally {
       set({ loading: false });
@@ -63,16 +76,19 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   sendOtp: async (phone) => {
-    const res = await api.sendOtp(phone, "login");
-    return res.debug_code;
+    const response = await api.sendOtp(phone, "login");
+    return response.debug_code;
   },
 
   verifyOtp: async (phone, code) => {
     set({ loading: true });
+
     try {
       const tokens = await api.verifyOtp(phone, "login", code);
       setTokens(tokens);
-      set({ user: await loadUser() });
+
+      const user = await loadUser();
+      set({ user, challenge: null });
     } finally {
       set({ loading: false });
     }
@@ -80,12 +96,19 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   verifyMfa: async (code) => {
     set({ loading: true });
+
     try {
       const challenge = get().challenge;
-      if (!challenge) throw new Error("No pending MFA challenge");
+
+      if (!challenge) {
+        throw new Error("No pending MFA challenge");
+      }
+
       const tokens = await api.verifyMfa(challenge, code);
       setTokens(tokens);
-      set({ user: await loadUser(), challenge: null });
+
+      const user = await loadUser();
+      set({ user, challenge: null });
     } finally {
       set({ loading: false });
     }
@@ -93,26 +116,30 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     const refresh = getRefreshToken();
+
     if (refresh) {
       try {
         await api.logout(refresh);
       } catch {
-        // Token may already be rotated/expired — local cleanup still proceeds.
+        // Local logout must still complete if the refresh token has expired.
       }
     }
+
     setTokens(null);
     set({ user: null, challenge: null });
   },
 
   hydrate: async () => {
     if (!getAccessToken()) {
-      set({ hydrated: true });
+      set({ user: null, hydrated: true });
       return;
     }
 
     set({ loading: true });
+
     try {
-      set({ user: await loadUser() });
+      const user = await loadUser();
+      set({ user });
     } catch {
       setTokens(null);
       set({ user: null });
@@ -122,6 +149,10 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   updateUser: (patch) => {
-    set((state) => (state.user ? { user: { ...state.user, ...patch } } : {}));
+    set((state) =>
+      state.user
+        ? { user: { ...state.user, ...patch } }
+        : {},
+    );
   },
 }));

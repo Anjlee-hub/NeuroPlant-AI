@@ -275,15 +275,18 @@ describe("ProductMarketBrowsePage (/marketplace/products)", () => {
     authMock.user = { id: 1, name: "Ravi" };
     renderPage("/marketplace/products");
 
-    expect(await screen.findByText("Neem oil spray")).toBeInTheDocument();
-    expect(screen.getByText("Urea 46%")).toBeInTheDocument();
+    expect(
+  await screen.findByRole("heading", { name: "Neem oil spray" }),
+).toBeInTheDocument();
+    expect( screen.getByRole("heading", { name: "Urea 46%" }),
+).toBeInTheDocument();
     expect(screen.getByText("2 products")).toBeInTheDocument();
   });
 
   it("passes search terms to the server-side browse query", async () => {
     authMock.user = { id: 1, name: "Ravi" };
     renderPage("/marketplace/products");
-    await screen.findByText("Neem oil spray");
+    await screen.findByRole("heading", { name: "Neem oil spray" });
 
     await userEvent.type(
       screen.getByRole("searchbox", { name: "Search products…" }),

@@ -1,30 +1,34 @@
-﻿import OrderHistory from "@/pages/OrderHistory";
+
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { AdminRoute } from "@/components/auth/admin-route";
-import Maps from "@/pages/maps";
-import CropDoctor from "@/pages/CropDoctor";
-import PlantHealthReport from "@/pages/PlantHealthReport";
-import PlantRegistration from "@/pages/PlantRegistration";
-import PlantMonitoring from "@/pages/PlantMonitoring";
-import AdminDashboard from "@/pages/AdminDashboard";
-import PlatformManagement from "@/pages/PlatformManagement";
-import Cart from "@/pages/Cart";
+
 import { ErrorBoundary } from "@/app/error-boundary";
+import { AdminRoute } from "@/components/auth/admin-route";
+import {
+  EntryRedirect,
+  PublicOnly,
+  RequireAuth,
+} from "@/components/auth-route-guards";
 import { RootLayout } from "@/components/layout/root-layout";
+
 import { HomePage } from "@/pages/home";
 import { LoginPage } from "@/pages/login";
+import { RegisterPage } from "@/pages/register";
 import { MfaSetupPage } from "@/pages/mfa-setup";
 import { MfaVerifyPage } from "@/pages/mfa-verify";
 import { NotFoundPage } from "@/pages/not-found";
-import { OfflineQueuePage } from "@/pages/offline-queue";
+
 import { ProfilePage } from "@/pages/profile";
-import { RegisterPage } from "@/pages/register";
+import { OfflineQueuePage } from "@/pages/offline-queue";
 import { ScanCropPage } from "@/pages/scan-crop";
 import { ScanDetailPage } from "@/pages/scan-detail";
 import { ScanDoctorPage } from "@/pages/scan-doctor";
 import { ScanHistoryPage } from "@/pages/scan-history";
 import { FarmerCalendarPage } from "@/pages/farmer-calendar";
 import { AssistantPage } from "@/pages/assistant";
+
+import { GovernmentSchemesPage } from "@/pages/government-schemes";
+import { CommunityPage } from "@/pages/community";
+
 import { MarketplaceDashboardPage } from "@/pages/marketplace-dashboard";
 import { MarketplaceListingFormPage } from "@/pages/marketplace-listing-form";
 import { MarketplaceBuyPage } from "@/pages/marketplace-buy";
@@ -37,94 +41,129 @@ import { MessagesListPage } from "@/pages/messages-list";
 import { MarketplaceFavoritesPage } from "@/pages/marketplace-favorites";
 import { MyReviewsPage } from "@/pages/my-reviews";
 
-/**
- * Route tree. Every nav destination resolves to a live page or an honest
- * "planned for Milestone X" page â€” there are no dead links (M2.1).
- */
+import Maps from "@/pages/maps";
+import CropDoctor from "@/pages/CropDoctor";
+import PlantHealthReport from "@/pages/PlantHealthReport";
+import PlantRegistration from "@/pages/PlantRegistration";
+import PlantMonitoring from "@/pages/PlantMonitoring";
+import AdminDashboard from "@/pages/AdminDashboard";
+import PlatformManagement from "@/pages/PlatformManagement";
+import Cart from "@/pages/Cart";
+import OrderHistory from "@/pages/OrderHistory";
+
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <RootLayout />,
+    element: <EntryRedirect />,
+    errorElement: <ErrorBoundary />,
+  },
+
+  // Authentication pages: no main application header or footer.
+  {
+    element: <PublicOnly />,
     errorElement: <ErrorBoundary />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: "cart", element: <Cart /> },
-      { path: "orders", element: <OrderHistory /> },
-      { path: "login", element: <LoginPage /> },
-      { path: "login/mfa", element: <MfaVerifyPage /> },
-      { path: "register", element: <RegisterPage /> },
-      { path: "settings/mfa", element: <MfaSetupPage /> },
-      { path: "profile", element: <ProfilePage /> },
-      { path: "scans", element: <ScanHistoryPage /> },
-      { path: "scans/:scanId", element: <ScanDetailPage /> },
-      { path: "scans/:scanId/doctor", element: <ScanDoctorPage /> },
       {
-        path: "/crop-doctor",
-        element: <CropDoctor />,
+        path: "/login",
+        element: <LoginPage />,
       },
       {
-        path: "/plant-health-report",
-        element: <PlantHealthReport />,
+        path: "/register",
+        element: <RegisterPage />,
       },
       {
-        path: "/admin",
-        element: (
-          <AdminRoute>
-            <AdminDashboard />
-          </AdminRoute>
-        ),
+        path: "/login/mfa",
+        element: <MfaVerifyPage />,
       },
+    ],
+  },
+
+  // Authenticated application pages.
+  {
+    element: <RequireAuth />,
+    errorElement: <ErrorBoundary />,
+    children: [
       {
-        path: "/admin/platform",
-        element: (
-          <AdminRoute>
-            <PlatformManagement />
-          </AdminRoute>
-        ),
+        element: <RootLayout />,
+        children: [
+          { index: true, element: <HomePage /> },
+          { path: "/home", element: <HomePage /> },
+
+          // Account and authentication settings.
+          { path: "/settings/mfa", element: <MfaSetupPage /> },
+          { path: "/profile", element: <ProfilePage /> },
+
+          // Crop scanning and diagnosis.
+          { path: "/scans", element: <ScanHistoryPage /> },
+          { path: "/scans/:scanId", element: <ScanDetailPage /> },
+          { path: "/scans/:scanId/doctor", element: <ScanDoctorPage /> },
+          { path: "/detect", element: <ScanCropPage /> },
+          { path: "/doctor", element: <Navigate to="/scans" replace /> },
+          { path: "/crop-doctor", element: <CropDoctor /> },
+          { path: "/plant-health-report", element: <PlantHealthReport /> },
+
+          // Plant registration and monitoring.
+          { path: "/plants/register", element: <PlantRegistration /> },
+          { path: "/plants/monitoring", element: <PlantMonitoring /> },
+
+          // Farmer tools.
+          { path: "/offline", element: <OfflineQueuePage /> },
+          { path: "/calendar", element: <FarmerCalendarPage /> },
+          { path: "/assistant", element: <AssistantPage /> },
+          { path: "/maps", element: <Maps /> },
+
+          // Government schemes and farmer community.
+          { path: "/schemes", element: <GovernmentSchemesPage /> },
+          { path: "/community", element: <CommunityPage /> },
+
+          // Marketplace.
+          { path: "/marketplace", element: <MarketplaceDashboardPage /> },
+          { path: "/marketplace/listings/new", element: <MarketplaceListingFormPage /> },
+          {
+            path: "/marketplace/listings/:listingId/edit",
+            element: <MarketplaceListingFormPage />,
+          },
+          { path: "/marketplace/browse", element: <MarketplaceBuyPage /> },
+          {
+            path: "/marketplace/listings/:listingId",
+            element: <MarketplaceListingDetailPage />,
+          },
+          { path: "/marketplace/favorites", element: <MarketplaceFavoritesPage /> },
+          { path: "/marketplace/my-reviews", element: <MyReviewsPage /> },
+          { path: "/marketplace/shop", element: <SellerDashboardPage /> },
+          { path: "/marketplace/products", element: <ProductMarketBrowsePage /> },
+          { path: "/marketplace/products/:id", element: <ProductMarketDetailPage /> },
+          { path: "/marketplace/messages", element: <MessagesListPage /> },
+          {
+            path: "/marketplace/messages/:conversationId",
+            element: <MessagesDetailPage />,
+          },
+
+          // Shopping cart and order history.
+          { path: "/cart", element: <Cart /> },
+          { path: "/orders", element: <OrderHistory /> },
+
+          // Admin-only pages.
+          {
+            path: "/admin",
+            element: (
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: "/admin/platform",
+            element: (
+              <AdminRoute>
+                <PlatformManagement />
+              </AdminRoute>
+            ),
+          },
+
+          { path: "*", element: <NotFoundPage /> },
+        ],
       },
-      { path: "offline", element: <OfflineQueuePage /> },
-      { path: "detect", element: <ScanCropPage /> },
-      // Crop Doctor is live per-scan (M3 T4): the nav hub lands on the scan
-      // list so the user picks a scan to open its dashboard.
-      { path: "doctor", element: <Navigate to="/scans" replace /> },
-      { path: "calendar", element: <FarmerCalendarPage /> },
-      {
-        path: "/plants/register",
-        element: <PlantRegistration />,
-      },
-      {
-        path: "/plants/monitoring",
-        element: <PlantMonitoring />,
-      },
-      // Farmer Crop Listings (M4 T2): dashboard + create/edit surface. The
-      // create route is declared before the edit route for clarity, though
-      // React Router ranks static segments above `:id` automatically.
-      { path: "marketplace", element: <MarketplaceDashboardPage /> },
-      { path: "marketplace/listings/new", element: <MarketplaceListingFormPage /> },
-      { path: "marketplace/listings/:listingId/edit", element: <MarketplaceListingFormPage /> },
-      // Buyer storefront (M4 T3): browse with server-side filters + the shared
-      // listing detail. Static segments (new/edit) outrank :listingId, so the
-      // farmer's create/edit routes stay unambiguous.
-      { path: "marketplace/browse", element: <MarketplaceBuyPage /> },
-      { path: "marketplace/listings/:listingId", element: <MarketplaceListingDetailPage /> },
-      // Marketplace trust (M4 Task 6): saved items + the caller's reviews.
-      { path: "marketplace/favorites", element: <MarketplaceFavoritesPage /> },
-      { path: "marketplace/my-reviews", element: <MyReviewsPage /> },
-      // Seller Portal (M4 T4): seller dashboard at /marketplace/shop, public
-      // product market at /marketplace/products (browse + detail). Static segments
-      // rank above :id, so "products" won't capture "products/new" etc. â€” we
-      // don't have such routes yet, but this keeps future-proof.
-      { path: "marketplace/shop", element: <SellerDashboardPage /> },
-      { path: "marketplace/products", element: <ProductMarketBrowsePage /> },
-      { path: "marketplace/products/:id", element: <ProductMarketDetailPage /> },
-      // Buyerâ†”seller messaging (M4 T5): inbox + one thread.
-      { path: "marketplace/messages", element: <MessagesListPage /> },
-      { path: "marketplace/messages/:conversationId", element: <MessagesDetailPage /> },
-      // Voice AI assistant is live (M3 T6): text or voice question, spoken replies.
-      { path: "assistant", element: <AssistantPage /> },
-      { path: "maps", element: <Maps /> },
-      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);
-

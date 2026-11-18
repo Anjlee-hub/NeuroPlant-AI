@@ -13,6 +13,7 @@ from app.models.calendar import (
 )
 from app.models.catalog import Crop, Disease
 from app.models.conversation import ConversationMessage
+from app.models.harvest import HarvestRecord
 from app.models.marketplace import CropListing, Product
 from app.models.marketplace_trust import MarketplaceFavorite, MarketplaceReview
 from app.models.messaging import MarketplaceConversation, MarketplaceMessage
@@ -20,6 +21,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
+from app.models.scheme import GovernmentScheme, SchemeUsageEvent
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
 from app.models.user import (
     MFA,
@@ -32,6 +34,7 @@ from app.models.user import (
     SellerProfile,
     User,
 )
+from app.models.yield_estimate import YieldEstimateRecord
 
 __all__ = [
     "AuditLog",
@@ -42,6 +45,10 @@ __all__ = [
     "Crop",
     "Disease",
     "ConversationMessage",
+    "HarvestRecord",
+    "GovernmentScheme",
+    "SchemeUsageEvent",
+    "YieldEstimateRecord",
     "CropListing",
     "Product",
     "MarketplaceFavorite",
@@ -66,3 +73,9 @@ __all__ = [
     "RefreshToken",
     "OtpCode",
 ]
+from app.models.community import (
+    CommunityPost,
+    CommunityComment,
+    CommunityVote,
+)
+from app.models.consultation import Consultation

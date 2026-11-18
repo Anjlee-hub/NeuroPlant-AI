@@ -105,17 +105,7 @@ export function ProductMarketBrowsePage() {
         </p>
       </header>
 
-      {data?.items && data.items.length > 0 && (
-        <section className="mt-6 rounded-xl border p-4">
-          <h2 className="text-lg font-semibold">
-            Recommended Products
-          </h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Explore available products selected from the current results.
-          </p>
-          <ProductListingGrid products={data.items.slice(0, 3)} />
-        </section>
-      )}
+
 
       <div className="mt-6 flex flex-col gap-5">
         <ProductMarketFilterBar

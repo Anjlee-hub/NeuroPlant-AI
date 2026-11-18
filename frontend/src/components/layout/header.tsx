@@ -1,15 +1,18 @@
-﻿import {
+
+import {
   Activity,
   CalendarDays,
   CloudUpload,
   Heart,
   History,
   Home,
-  MapPin,
   Inbox,
+  Landmark,
   Leaf,
   Menu,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   ScanLine,
   ShieldCheck,
   ShoppingBag,
@@ -23,7 +26,7 @@
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { AuthNav } from "@/components/layout/auth-nav";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -32,36 +35,30 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 
-const PRIMARY_NAV_ITEMS: Array<{
+const NAV_ITEMS: Array<{
   to: string;
   labelKey: string;
   icon: LucideIcon;
   end?: boolean;
 }> = [
-  { to: "/", labelKey: "nav.home", icon: Home, end: true },
-  { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
-  { to: "/assistant", labelKey: "nav.assistant", icon: MessageCircle },
-  // Maps and nearby agricultural services
-  { to: "/maps", labelKey: "Maps", icon: MapPin },
-  { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
-  { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
-];
-
-const MORE_NAV_ITEMS: Array<{
-  to: string;
-  labelKey: string;
-  icon: LucideIcon;
-  end?: boolean;
-}> = [
+  { to: "/home", labelKey: "nav.home", icon: Home, end: true },
   { to: "/detect", labelKey: "nav.detect", icon: ScanLine },
-  { to: "/doctor", labelKey: "nav.doctor", icon: Stethoscope },
   { to: "/scans", labelKey: "nav.history", icon: History },
   { to: "/offline", labelKey: "nav.offlineQueue", icon: CloudUpload },
+  { to: "/doctor", labelKey: "nav.doctor", icon: Stethoscope },
+  { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { to: "/assistant", labelKey: "nav.assistant", icon: MessageCircle },
+  { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
+  { to: "/schemes", labelKey: "nav.schemes", icon: Landmark },
+  { to: "/community", labelKey: "nav.community", icon: Users },
   { to: "/marketplace/browse", labelKey: "nav.marketplaceBuy", icon: ShoppingBag },
   { to: "/marketplace/shop", labelKey: "nav.sellerPortal", icon: Store },
   { to: "/marketplace/products", labelKey: "nav.productMarket", icon: ShoppingBag },
+  { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
   { to: "/marketplace/favorites", labelKey: "nav.favourites", icon: Heart },
   { to: "/marketplace/my-reviews", labelKey: "nav.myReviews", icon: Star },
+  { to: "/plants/register", labelKey: "Plant Registration", icon: Sprout },
+  { to: "/plants/monitoring", labelKey: "Plant Monitoring", icon: Activity },
 ];
 
 const ADMIN_NAV_ITEMS: Array<{
@@ -70,249 +67,241 @@ const ADMIN_NAV_ITEMS: Array<{
   icon: LucideIcon;
   end?: boolean;
 }> = [
-  { to: "/admin", labelKey: "Admin Dashboard", icon: ShieldCheck },
+  { to: "/admin", labelKey: "Admin Dashboard", icon: ShieldCheck, end: true },
   { to: "/admin/platform", labelKey: "Platform Management", icon: Users },
 ];
 
-function navClass({ isActive }: { isActive: boolean }) {
-  return cn(
-    "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-    isActive
-      ? "bg-accent text-accent-foreground"
-      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+function SidebarLink({
+  item,
+  collapsed = false,
+  onNavigate,
+}: {
+  item: (typeof NAV_ITEMS)[number] | (typeof ADMIN_NAV_ITEMS)[number];
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onNavigate}
+      title={collapsed ? t(item.labelKey) : undefined}
+      className={({ isActive }) =>
+        cn(
+          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+          isActive
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          collapsed && "justify-center px-2",
+        )
+      }
+    >
+      <item.icon className="size-5 shrink-0" />
+      {!collapsed && <span>{t(item.labelKey)}</span>}
+    </NavLink>
   );
 }
 
-/**
- * Sticky app header with a compact primary navigation and
- * a More menu for secondary features.
- */
-export function Header() {
+export function Header({
+  collapsed,
+  onToggleSidebar,
+}: {
+  collapsed: boolean;
+  onToggleSidebar: () => void;
+}) {
   const { t } = useTranslation();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+
   const isAdmin = useAuth((state) => state.user?.role === "admin");
 
-  const moreNavItems = isAdmin
-    ? [...MORE_NAV_ITEMS, ...ADMIN_NAV_ITEMS]
-    : MORE_NAV_ITEMS;
+  const visibleNavItems = isAdmin
+    ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS]
+    : NAV_ITEMS;
+
+  const currentPage = [...visibleNavItems]
+    .sort((a, b) => b.to.length - a.to.length)
+    .find(
+      (item) =>
+        item.end
+          ? location.pathname === item.to
+          : location.pathname === item.to ||
+            location.pathname.startsWith(`${item.to}/`),
+    );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        {/* Logo */}
+    <>
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 hidden border-r border-border bg-card transition-[width] duration-300 lg:flex lg:flex-col",
+          collapsed ? "w-[76px]" : "w-64",
+        )}
+      >
         <Link
-          to="/"
-          className="flex shrink-0 items-center gap-2"
-          aria-label={t("app.name")}
-          onClick={() => setMoreOpen(false)}
+          to="/home"
+          className={cn(
+            "flex h-16 shrink-0 items-center gap-3 border-b border-border px-5",
+            collapsed && "justify-center px-2",
+          )}
         >
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Leaf className="size-5" />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <Leaf className="size-6" />
           </span>
 
-          <span className="hidden text-lg font-bold tracking-tight sm:inline">
-            {t("app.name")}
-          </span>
+          {!collapsed && (
+            <span className="min-w-0">
+              <span className="block truncate text-base font-bold tracking-tight">
+                {t("app.name")}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Smart crop intelligence
+              </span>
+            </span>
+          )}
         </Link>
 
-        {/* Desktop navigation */}
-        <nav
-          className="hidden items-center gap-1 md:flex"
-          aria-label="Primary"
-        >
-          {PRIMARY_NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={navClass}
-              onClick={() => setMoreOpen(false)}
-            >
-              <item.icon className="size-4" />
-              {t(item.labelKey)}
-            </NavLink>
-          ))}
+        <div className="flex items-center justify-between px-4 pb-2 pt-5">
+          {!collapsed && (
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Workspace
+            </span>
+          )}
 
-          <Link
-            to="/plants/register"
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-            onClick={() => setMoreOpen(false)}
-          >
-            <Sprout size={18} />
-            Plant Registration
-          </Link>
-
-          <Link
-            to="/plants/monitoring"
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-            onClick={() => setMoreOpen(false)}
-          >
-            <Activity size={18} />
-            Plant Monitoring
-          </Link>
-
-          {/* More menu */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "gap-2 text-sm font-medium",
-                moreOpen
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-              )}
-              aria-expanded={moreOpen}
-              aria-haspopup="menu"
-              onClick={() => setMoreOpen((open) => !open)}
-            >
-              {moreOpen ? (
-                <X className="size-4" />
-              ) : (
-                <Menu className="size-4" />
-              )}
-              More
-            </Button>
-
-            {moreOpen && (
-              <>
-                {/* Backdrop */}
-                <button
-                  type="button"
-                  aria-label="Close menu"
-                  className="fixed inset-0 z-40 cursor-default"
-                  onClick={() => setMoreOpen(false)}
-                />
-
-                {/* Dropdown */}
-                <div
-                  className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-background p-2 shadow-xl"
-                  role="menu"
-                >
-                  <div className="px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      More Features
-                    </p>
-                  </div>
-
-                  <div className="grid gap-1">
-                    {moreNavItems.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.end}
-                        role="menuitem"
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                          "text-muted-foreground hover:bg-accent hover:text-foreground",
-                        )}
-                        onClick={() => setMoreOpen(false)}
-                      >
-                        <item.icon className="size-4 shrink-0" />
-                        {t(item.labelKey)}
-                      </NavLink>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </nav>
-
-        {/* Right-side controls */}
-        <div className="flex items-center gap-2">
-          <LanguageSwitcher />
-          <ThemeToggle />
-
-          <AuthNav className="hidden md:flex" />
-
-          {/* Mobile menu button */}
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
-            aria-label={t("nav.menu")}
-            aria-expanded={mobileOpen}
-            onClick={() => setMobileOpen((open) => !open)}
+            className="size-8"
+            onClick={onToggleSidebar}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {mobileOpen ? <X /> : <Menu />}
+            {collapsed ? (
+              <PanelLeftOpen className="size-4" />
+            ) : (
+              <PanelLeftClose className="size-4" />
+            )}
           </Button>
         </div>
-      </div>
 
-      {/* Mobile navigation */}
-      {mobileOpen && (
         <nav
-          className="border-t border-border bg-background px-4 py-4 md:hidden"
-          aria-label="Mobile"
+          className="flex-1 space-y-1 overflow-y-auto px-3 pb-4"
+          aria-label="Main navigation"
         >
-          {/* Primary mobile navigation */}
-          <div className="grid gap-1">
-            {PRIMARY_NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={navClass}
+          {visibleNavItems.map((item) => (
+            <SidebarLink
+              key={item.to}
+              item={item}
+              collapsed={collapsed}
+            />
+          ))}
+        </nav>
+
+        {!collapsed && (
+          <div className="m-3 rounded-xl border border-border bg-accent/40 p-3">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Leaf className="size-4 text-primary" />
+              Growing smarter
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Better crop insights for healthier harvests.
+            </p>
+          </div>
+        )}
+      </aside>
+
+      {/* Top navigation bar */}
+      <header
+        className={cn(
+          "fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur-xl transition-[left] duration-300 sm:px-6 print:hidden",
+          collapsed ? "lg:left-[76px]" : "lg:left-64",
+          "left-0",
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            aria-label={t("nav.menu")}
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu className="size-5" />
+          </Button>
+
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold sm:text-base">
+              {currentPage ? t(currentPage.labelKey) : t("app.name")}
+            </p>
+            <p className="hidden text-xs text-muted-foreground sm:block">
+              NeuroPlant AI · Smart crop intelligence
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <LanguageSwitcher />
+          <ThemeToggle />
+          <AuthNav className="hidden sm:flex" />
+        </div>
+      </header>
+
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[60] lg:hidden print:hidden">
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          <aside className="absolute inset-y-0 left-0 flex w-[min(290px,85vw)] flex-col border-r border-border bg-card shadow-2xl">
+            <div className="flex h-16 items-center justify-between border-b border-border px-4">
+              <Link
+                to="/home"
+                className="flex items-center gap-2"
                 onClick={() => setMobileOpen(false)}
               >
-                <item.icon className="size-4" />
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
+                <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                  <Leaf className="size-5" />
+                </span>
+                <span className="font-bold">{t("app.name")}</span>
+              </Link>
 
-            <Link
-              to="/plants/register"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-              onClick={() => setMobileOpen(false)}
-            >
-              <Sprout size={18} />
-              Plant Registration
-            </Link>
-
-            <Link
-              to="/plants/monitoring"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-              onClick={() => setMobileOpen(false)}
-            >
-              <Activity size={18} />
-              Plant Monitoring
-            </Link>
-          </div>
-
-          {/* More features */}
-          <div className="mt-4 border-t border-border pt-4">
-            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              More Features
-            </p>
-
-            <div className="grid gap-1">
-              {moreNavItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={navClass}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <item.icon className="size-4" />
-                  {t(item.labelKey)}
-                </NavLink>
-              ))}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Close navigation"
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="size-5" />
+              </Button>
             </div>
-          </div>
 
-          {/* Authentication */}
-          <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
-            <AuthNav
-              onNavigate={() => setMobileOpen(false)}
-              className="flex-col"
-            />
-          </div>
-        </nav>
+            <nav
+              className="flex-1 space-y-1 overflow-y-auto p-3"
+              aria-label="Mobile navigation"
+            >
+              {visibleNavItems.map((item) => (
+                <SidebarLink
+                  key={item.to}
+                  item={item}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+            </nav>
+
+            <div className="border-t border-border p-4">
+              <AuthNav
+                onNavigate={() => setMobileOpen(false)}
+                className="flex-col"
+              />
+            </div>
+          </aside>
+        </div>
       )}
-    </header>
+    </>
   );
 }
-

@@ -197,3 +197,174 @@
     }
   }
 }
+
+/* =========================================
+   NEUROPLANT AI — VISUAL DESIGN SYSTEM
+========================================= */
+
+:root {
+  --np-forest: #123d2b;
+  --np-leaf: #218c55;
+  --np-sage: #a8d5a2;
+  --np-mint: #eaf4e8;
+  --np-harvest: #d6a84b;
+}
+
+/* Smooth application transitions */
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Refined scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.35);
+  border-radius: 20px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.65);
+}
+
+/* Soft animated entrance */
+@keyframes np-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes np-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes np-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@keyframes np-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.16);
+  }
+  50% {
+    box-shadow: 0 0 0 9px hsl(var(--primary) / 0);
+  }
+}
+
+@keyframes np-gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Reusable animation utilities */
+.np-animate-fade-up {
+  animation: np-fade-up 650ms ease both;
+}
+
+.np-animate-fade-in {
+  animation: np-fade-in 500ms ease both;
+}
+
+.np-animate-float {
+  animation: np-float 4s ease-in-out infinite;
+}
+
+.np-animate-pulse {
+  animation: np-pulse 2.5s ease-in-out infinite;
+}
+
+/* Premium surface */
+.np-surface {
+  border: 1px solid hsl(var(--border) / 0.75);
+  border-radius: 1.25rem;
+  background: hsl(var(--card));
+  box-shadow: 0 5px 24px hsl(145 30% 15% / 0.045);
+  transition:
+    transform 250ms ease,
+    box-shadow 250ms ease,
+    border-color 250ms ease;
+}
+
+.np-surface:hover {
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.3);
+  box-shadow: 0 12px 30px hsl(145 30% 15% / 0.09);
+}
+
+/* Soft agricultural background */
+.np-green-gradient {
+  background: linear-gradient(
+    135deg,
+    #123d2b 0%,
+    #218c55 55%,
+    #4b9b65 100%
+  );
+  background-size: 200% 200%;
+  animation: np-gradient 12s ease infinite;
+}
+
+/* Glass surface */
+.np-glass {
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--background) / 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Keyboard accessibility */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .np-animate-fade-up,
+  .np-animate-fade-in,
+  .np-animate-float,
+  .np-animate-pulse,
+  .np-green-gradient {
+    animation: none !important;
+  }
+
+  .np-surface {
+    transition: none;
+  }
+
+  .np-surface:hover {
+    transform: none;
+  }
+}

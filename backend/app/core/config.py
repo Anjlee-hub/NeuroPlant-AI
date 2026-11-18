@@ -7,8 +7,9 @@ is supplied via the environment or a mounted `.env`.
 """
 
 from functools import lru_cache
+from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -111,12 +112,84 @@ class Settings(BaseSettings):
 
     @field_validator("allowed_origins")
     @classmethod
-    def _split_origins(cls, v: str) -> list[str]:
-        return [o.strip() for o in v.split(",") if o.strip()]
+    def _split_origins(cls, v: str) -> str:
+        origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+        if not origins:
+            raise ValueError("at least one allowed origin is required")
+        return ",".join(origins)
+
+    @model_validator(mode="after")
+    def _validate_environment_configuration(self) -> "Settings":
+        if self.environment not in {"development", "staging", "production", "test"}:
+            raise ValueError("environment must be development, staging, production, or test")
+        if not self.is_production:
+            return self
+
+        errors: list[str] = []
+        if not self.uses_postgres:
+            errors.append("DATABASE_URL must use PostgreSQL")
+        else:
+            try:
+                database_url = urlsplit(self.database_url)
+            except ValueError:
+                database_url = None
+            if (
+                database_url is None
+                or not database_url.hostname
+                or not database_url.username
+                or not database_url.password
+                or database_url.hostname.lower() in {"localhost", "127.0.0.1", "::1"}
+            ):
+                errors.append("DATABASE_URL must include remote PostgreSQL host and credentials")
+        for setting_name, redis_url in (
+            ("REDIS_URL", self.redis_url),
+            ("CELERY_BROKER_URL", self.celery_broker_url),
+            ("CELERY_RESULT_BACKEND", self.celery_result_backend),
+        ):
+            try:
+                parsed_redis_url = urlsplit(redis_url)
+            except ValueError:
+                parsed_redis_url = None
+            if (
+                parsed_redis_url is None
+                or parsed_redis_url.scheme not in {"redis", "rediss"}
+                or not parsed_redis_url.hostname
+                or parsed_redis_url.hostname.lower() in {"localhost", "127.0.0.1", "::1"}
+            ):
+                errors.append(f"{setting_name} must use a remote Redis URL")
+        if self.debug:
+            errors.append("DEBUG must be false")
+        if self.celery_task_always_eager:
+            errors.append("CELERY_TASK_ALWAYS_EAGER must be false")
+        if not self.rate_limit_enabled:
+            errors.append("RATE_LIMIT_ENABLED must be true")
+        if self.storage_provider != "s3":
+            errors.append("STORAGE_PROVIDER must be s3")
+        if len(self.jwt_secret) < 32 or self.jwt_secret.startswith("dev-"):
+            errors.append("JWT_SECRET must be a non-default secret of at least 32 characters")
+        if (
+            len(self.jwt_refresh_secret) < 32
+            or self.jwt_refresh_secret.startswith("dev-")
+            or self.jwt_refresh_secret == self.jwt_secret
+        ):
+            errors.append(
+                "JWT_REFRESH_SECRET must be distinct, non-default, and at least 32 characters"
+            )
+        origins = self.cors_allowed_origins
+        if not origins or any("localhost" in origin or "127.0.0.1" in origin for origin in origins):
+            errors.append("ALLOWED_ORIGINS must contain production origins, not localhost")
+        if errors:
+            raise ValueError("Invalid production configuration: " + "; ".join(errors))
+        return self
 
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        """CORS middleware origins parsed from the comma-separated setting."""
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
 
     @property
     def uses_postgres(self) -> bool:
