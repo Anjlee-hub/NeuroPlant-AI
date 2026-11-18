@@ -38,7 +38,7 @@ class PredictedDisease:
     """One ranked prediction mapped onto the diseases catalog."""
 
     disease_name: str
-    confidence: float
+    confidence: float | None
     disease_id: int | None = None
     crop_id: int | None = None
     severity: str | None = None  # low | moderate | severe

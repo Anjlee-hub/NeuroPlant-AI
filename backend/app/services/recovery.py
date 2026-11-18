@@ -226,7 +226,9 @@ class RecoveryTrackerService:
     def risk(scan: Scan) -> str:
         """Risk band from severity, escalated when detection confidence is low."""
         base = RISK_BY_SEVERITY.get(scan.severity or "", "medium")
-        low_confidence = scan.confidence < CONFIDENCE_LOW_THRESHOLD
+        low_confidence = (
+            scan.confidence is None or scan.confidence < CONFIDENCE_LOW_THRESHOLD
+        )
         if low_confidence and _RISK_RANK[base] < _RISK_RANK["high"]:
             return _RISK_LABELS[_RISK_RANK[base] + 1]
         return base

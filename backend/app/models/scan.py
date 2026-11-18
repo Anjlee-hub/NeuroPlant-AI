@@ -62,7 +62,7 @@ class Scan(Base, TimestampMixin):
         ForeignKey("diseases.id", ondelete="SET NULL"), nullable=True, index=True
     )
     disease_name: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
-    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     severity: Mapped[str | None] = mapped_column(String(20), nullable=True)
     stage: Mapped[str | None] = mapped_column(String(60), nullable=True)
 

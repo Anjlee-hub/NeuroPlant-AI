@@ -92,7 +92,7 @@ class RecoveryScanOut(BaseModel):
     part_type: str | None
     severity: str | None
     stage: str | None
-    confidence: float
+    confidence: float | None
     provider: str
     model_version: str | None
     created_at: datetime

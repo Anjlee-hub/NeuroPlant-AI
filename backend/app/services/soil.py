@@ -50,6 +50,9 @@ LOW_CONFIDENCE_NOTE = (
     "Detection confidence is low — re-scan or confirm the diagnosis before acting "
     "on this soil advice."
 )
+UNAVAILABLE_CONFIDENCE_NOTE = (
+    "Model confidence is unavailable — confirm the diagnosis before acting on this soil advice."
+)
 
 # Label thresholds on the 0–5 score (inclusive lower bounds).
 _LABEL_THRESHOLDS: tuple[tuple[str, float], ...] = (
@@ -148,9 +151,12 @@ class SoilRecommendationService:
                 f"No soil plan found for scan {scan.id} ({scan.disease_name or 'unknown'}) "
                 f"in catalog {catalog.version}"
             )
-        return self._to_out(
+        result = self._to_out(
             catalog, row, severity=scan.severity, confidence=scan.confidence
         )
+        if scan.confidence is None:
+            result = result.model_copy(update={"confidence_note": UNAVAILABLE_CONFIDENCE_NOTE})
+        return result
 
     # ── Internals ──────────────────────────────────────────────────────
 

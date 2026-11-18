@@ -49,12 +49,15 @@ _CONFIDENCE_ADVICE: dict[str, str] = {
         "Retake the photo in even lighting and at close range, or check with a local "
         "agronomist before applying any treatment."
     ),
+    "unavailable": (
+        "No model confidence is available for this result. Treat this prediction as unverified "
+        "and confirm it with a clear photo or a local agronomist before applying treatment."
+    ),
 }
 
 
 def _explanation(scan: Scan, heatmap_available: bool) -> str:
     """Compose the deterministic plain-language "why" from stored facts."""
-    pct = round(scan.confidence * 100)
     focus = (
         " The heatmap overlay marks the image regions the model focused on."
         if heatmap_available
@@ -65,8 +68,13 @@ def _explanation(scan: Scan, heatmap_available: bool) -> str:
         detail = (
             f" The pattern is consistent with {scan.severity} severity at the {scan.stage} stage."
         )
+    confidence_text = (
+        f"with {round(scan.confidence * 100)}% confidence"
+        if scan.confidence is not None
+        else "but model confidence is unavailable"
+    )
     return (
-        f"This photo was classified as {scan.disease_name} with {pct}% confidence.{focus}{detail}"
+        f"This photo was classified as {scan.disease_name} {confidence_text}.{focus}{detail}"
     )
 
 
@@ -108,7 +116,11 @@ class ExplainService:
             top5=[
                 RankingOut(
                     disease_name=candidate.get("disease_name", ""),
-                    confidence=float(candidate.get("confidence", 0.0)),
+                    confidence=(
+                        float(candidate["confidence"])
+                        if candidate.get("confidence") is not None
+                        else None
+                    ),
                     disease_id=candidate.get("disease_id"),
                     crop_id=candidate.get("crop_id"),
                 )

@@ -226,7 +226,9 @@ export function ScanDetailPage() {
 
     const text =
       `Disease: ${scan.disease_name}\n` +
-      `Confidence: ${formatPercent(scan.confidence)}\n` +
+      `Confidence: ${scan.confidence === null
+        ? t("scanHistory.needsReview")
+        : formatPercent(scan.confidence)}\n` +
       `AI provider: ${scan.provider} (${scan.model_version ?? t("scanDetail.notSet")})`;
 
     try {
@@ -414,7 +416,9 @@ export function ScanDetailPage() {
                       )}
                     </DetailRow>
                     <DetailRow label={t("scanDetail.confidence")}>
-                      {formatPercent(scan.confidence)}
+                      {scan.confidence === null
+                        ? t("scanHistory.needsReview")
+                        : formatPercent(scan.confidence)}
                     </DetailRow>
                     <DetailRow label={t("scanDetail.confidenceLevel")}>
                       {explain ? (
@@ -500,18 +504,21 @@ export function ScanDetailPage() {
                     <SectionCard title={t("scanDetail.adviceTitle")}>
                       <div
                         className={
-                          explain.confidence.level === "low"
+                          explain.confidence.level === "low" ||
+                          explain.confidence.level === "unavailable"
                             ? "flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                             : "flex items-start gap-3 rounded-xl bg-muted/50 p-4 text-sm"
                         }
                       >
-                        {explain.confidence.level === "low" ? (
+                        {explain.confidence.level === "low" ||
+                        explain.confidence.level === "unavailable" ? (
                           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-300" />
                         ) : (
                           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-emerald-600" />
                         )}
                         <div>
-                          {explain.confidence.level === "low" && (
+                          {(explain.confidence.level === "low" ||
+                            explain.confidence.level === "unavailable") && (
                             <p className="mb-1 font-bold">
                               {t("scanDetail.lowConfidenceTitle")}
                             </p>
@@ -541,26 +548,30 @@ export function ScanDetailPage() {
                                   </span>
                                 </span>
                                 <span className="shrink-0 font-bold tabular-nums">
-                                  {formatPercent(ranking.confidence)}
+                                  {ranking.confidence === null
+                                    ? t("scanHistory.needsReview")
+                                    : formatPercent(ranking.confidence)}
                                 </span>
                               </div>
 
-                              <div
-                                className="h-2 overflow-hidden rounded-full bg-muted"
-                                role="progressbar"
-                                aria-valuenow={Math.round(
-                                  ranking.confidence * 100,
-                                )}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                              >
+                              {ranking.confidence !== null && (
                                 <div
-                                  className="h-full rounded-full bg-emerald-600 transition-all duration-700 dark:bg-emerald-400"
-                                  style={{
-                                    width: `${Math.max(0, Math.min(100, ranking.confidence * 100))}%`,
-                                  }}
-                                />
-                              </div>
+                                  className="h-2 overflow-hidden rounded-full bg-muted"
+                                  role="progressbar"
+                                  aria-valuenow={Math.round(
+                                    ranking.confidence * 100,
+                                  )}
+                                  aria-valuemin={0}
+                                  aria-valuemax={100}
+                                >
+                                  <div
+                                    className="h-full rounded-full bg-emerald-600 transition-all duration-700 dark:bg-emerald-400"
+                                    style={{
+                                      width: `${Math.max(0, Math.min(100, ranking.confidence * 100))}%`,
+                                    }}
+                                  />
+                                </div>
+                              )}
                             </li>
                           ))}
                         </ol>

@@ -53,7 +53,7 @@ async def _upload(client, headers, *, client_scan_id: str) -> dict:
     return resp.json()
 
 
-async def _seed_scan(db, user_id: int, *, confidence: float = 0.6) -> int:
+async def _seed_scan(db, user_id: int, *, confidence: float | None = 0.6) -> int:
     """Insert a scan directly (bypassing the pipeline) for degrade-path tests."""
     ai_metadata = {
         "rankings": [{"disease_name": "Powdery Mildew", "confidence": 0.55, "disease_id": 2}],
@@ -71,7 +71,10 @@ async def _seed_scan(db, user_id: int, *, confidence: float = 0.6) -> int:
                 "crop_id": 101,
             },
         ],
-        "confidence": {"top": confidence, "level": "medium"},
+        "confidence": {
+            "top": confidence,
+            "level": "unavailable" if confidence is None else "medium",
+        },
         "model": {"provider": "baseline", "model_name": "rule-baseline"},
     }
     scan = await ScanService(db).create(
@@ -123,7 +126,7 @@ async def test_explain_returns_full_payload(client, db):
     assert isinstance(body["disease"]["symptoms"], list)
 
     assert body["confidence"]["top"] == scan["confidence"]
-    assert body["confidence"]["level"] in {"high", "medium", "low"}
+    assert body["confidence"]["level"] in {"high", "medium", "low", "unavailable"}
     assert body["confidence"]["advice"]
 
     assert body["top5"], "top-5 candidates must be present"
@@ -203,3 +206,19 @@ async def test_explain_low_confidence_carries_advice(client, db):
     assert body["confidence"]["level"] == "low"
     advice = body["confidence"]["advice"].lower()
     assert "retake" in advice or "agronomist" in advice
+
+
+async def test_explain_handles_unavailable_confidence(client, db):
+    await seed_catalog(db)
+    headers = await _auth_headers(client, "+919000000019")
+    scan_id = await _seed_scan(
+        db, await _user_id(db, "+919000000019"), confidence=None
+    )
+
+    resp = await client.get(f"/api/v1/scans/{scan_id}/explain", headers=headers)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["confidence"]["top"] is None
+    assert body["confidence"]["level"] == "unavailable"
+    assert "unverified" in body["confidence"]["advice"]

@@ -219,6 +219,7 @@
     "authRequired": "Sign in to view your scan history.",
     "signIn": "Sign in",
     "confidence": "Confidence",
+    "needsReview": "Needs review",
     "severity": {
       "low": "Low",
       "moderate": "Moderate",
@@ -263,7 +264,8 @@
     "levels": {
       "high": "High confidence",
       "medium": "Medium confidence",
-      "low": "Low confidence"
+      "low": "Low confidence",
+      "unavailable": "Confidence unavailable"
     },
     "timestamp": "Scanned on",
     "processing": "Processing time",

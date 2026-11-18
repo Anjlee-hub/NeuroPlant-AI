@@ -17,10 +17,10 @@ flowchart LR
     EV -- fail --> TR
     REG --> PROMO[Promote → production<br/>registry-only change]
     PROMO --> SVC[Serving<br/>LocalTensorFlowClassifier]
-    SVC --> FALLBACK{confidence < 0.6?}
-    FALLBACK -- yes --> CLOUD[CloudClassifier<br/>Vertex AI / Gemini vision]
-    FALLBACK -- no --> OUT
-    CLOUD --> OUT[Result + ai_provider + model_version]
+    SVC --> ARTIFACT{trained artifact available?}
+    ARTIFACT -- yes --> OUT[Model result + provider + model version]
+    ARTIFACT -- no --> BASELINE[Rule baseline<br/>confidence unavailable]
+    BASELINE --> OUT
 
     FARM[Farmer scan] --> UNK{unknown disease?}
     UNK -- yes --> UP[unknown_disease_samples<br/>status=pending]
@@ -41,9 +41,12 @@ flowchart LR
   per-part fine-tuned head — decided at training-time, driven by the label map.
 - **Serving**:
   - Primary: `LocalTensorFlowClassifier` (SavedModel/Keras in image).
-  - Fallback: `CloudClassifier` (Vertex AI endpoint / Gemini vision) when
-    top-1 confidence < **0.6**.
-  - Result records `ai_provider` + `model_version` + `dataset_version`.
+  - If no trained artifact is available, `RuleBaselineClassifier` produces a
+    deterministic catalog label with confidence marked unavailable; no cloud
+    classifier is implemented.
+  - Model confidence is the predicted class's output probability, not measured
+    accuracy or a calibration guarantee. The result records provider,
+    `model_version` and `dataset_version`.
 - **Severity / stage / symptoms**: rule heuristics over symptom coverage +
   confidence, calibrated per disease (stored in the `diseases` catalog).
 

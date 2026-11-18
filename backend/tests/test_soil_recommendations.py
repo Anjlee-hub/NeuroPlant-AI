@@ -57,7 +57,7 @@ async def _make_scan(
     disease_name: str,
     *,
     severity: str = "moderate",
-    confidence: float = 0.92,
+    confidence: float | None = 0.92,
 ) -> int:
     """Persist a scan directly (bypasses inference) for deterministic tests."""
     async with async_session_factory() as db:
@@ -383,6 +383,22 @@ async def test_scan_soil_recommendations_low_confidence_note(client, db):
     # Low severity (no penalty) − 0.5 low-confidence penalty = 4.0 - 0.5 = 3.5.
     assert body["soil_health"]["label"] == "good"
     assert body["soil_health"]["score"] == 3.5
+
+
+async def test_scan_soil_recommendations_marks_unavailable_confidence(client, db):
+    await _seed_all()
+    headers = await _register(client, "+919000000120")
+    user_id = await _user_id(client, db, "+919000000120")
+    scan_id = await _make_scan(
+        user_id, None, "Early Blight", severity="low", confidence=None
+    )
+
+    resp = await client.get(f"/api/v1/scans/{scan_id}/soil-recommendations", headers=headers)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["confidence"] is None
+    assert "confidence is unavailable" in body["confidence_note"].lower()
 
 
 async def test_scan_soil_recommendations_resolves_by_name_when_no_disease_id(client, db):

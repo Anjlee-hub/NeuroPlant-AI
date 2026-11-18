@@ -41,15 +41,16 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Confidence bands for the stored confidence metadata (Task 5.2). The low
-# boundary aligns with the serving fallback threshold (top-1 < 0.6 → cloud) in
-# docs/08-ai-pipeline.md.
+# Confidence bands for model-backed predictions. The rule baseline has no
+# probability output and is represented as unavailable.
 CONFIDENCE_LEVEL_HIGH = 0.85
 CONFIDENCE_LEVEL_LOW = 0.60
 
 
-def confidence_level(confidence: float) -> str:
-    """Label a confidence as ``high`` / ``medium`` / ``low``."""
+def confidence_level(confidence: float | None) -> str:
+    """Label a confidence as high / medium / low, or unavailable."""
+    if confidence is None:
+        return "unavailable"
     if confidence >= CONFIDENCE_LEVEL_HIGH:
         return "high"
     if confidence >= CONFIDENCE_LEVEL_LOW:
@@ -64,7 +65,7 @@ class ScanResult:
     disease_id: int | None
     disease_name: str
     crop_id: int | None
-    confidence: float
+    confidence: float | None
     provider: str
     model_name: str
     model_version: str

@@ -154,7 +154,7 @@ function ResultView({
             {explain && (
               <ResultRow label={t("scanCrop.confidence")}>
                 <Badge variant={confidenceVariant(explain.confidence.top)}>
-                  {explain.confidence.level}
+                  {t(`scanDetail.levels.${explain.confidence.level}`)}
                 </Badge>
               </ResultRow>
             )}
@@ -188,7 +188,8 @@ function ResultView({
             <CardContent>
               <div
                 className={
-                  explain.confidence.level === "low"
+                  explain.confidence.level === "low" ||
+                  explain.confidence.level === "unavailable"
                     ? "rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                     : "rounded-xl bg-muted/50 p-4 text-sm leading-6"
                 }
@@ -242,20 +243,24 @@ function ResultView({
                       </span>
                     </span>
                     <span className="shrink-0 font-bold tabular-nums">
-                      {formatPercent(ranking.confidence)}
+                      {ranking.confidence === null
+                        ? t("scanHistory.needsReview")
+                        : formatPercent(ranking.confidence)}
                     </span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-green-700 to-lime-500"
-                      style={{
-                        width: `${Math.max(
-                          0,
-                          Math.min(100, ranking.confidence * 100),
-                        )}%`,
-                      }}
-                    />
-                  </div>
+                  {ranking.confidence !== null && (
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-green-700 to-lime-500"
+                        style={{
+                          width: `${Math.max(
+                            0,
+                            Math.min(100, ranking.confidence * 100),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>

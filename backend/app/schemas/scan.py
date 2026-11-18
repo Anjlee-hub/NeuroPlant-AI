@@ -33,7 +33,7 @@ class ScanCreate(BaseModel):
 
     disease_id: int | None = None
     disease_name: str = Field(min_length=1)
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     severity: str | None = None
     stage: str | None = None
 
@@ -53,7 +53,9 @@ class RankingOut(BaseModel):
     """One ranked alternative candidate (top-k)."""
 
     disease_name: str = Field(description="Alternative disease name")
-    confidence: float = Field(ge=0.0, le=1.0, description="Model confidence in [0, 1]")
+    confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Model confidence in [0, 1], if available"
+    )
     disease_id: int | None = Field(default=None, description="Catalog disease id")
     crop_id: int | None = Field(default=None, description="Catalog crop id")
 
@@ -72,8 +74,10 @@ class ExplainDiseaseOut(BaseModel):
 class ExplainConfidenceOut(BaseModel):
     """Top confidence, its band, and expert advice (Task 5.3 low-confidence path)."""
 
-    top: float = Field(ge=0.0, le=1.0, description="Top-1 model confidence in [0, 1]")
-    level: str = Field(description="Confidence band: high | medium | low")
+    top: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Top-1 model confidence in [0, 1], if available"
+    )
+    level: str = Field(description="Confidence band: high | medium | low | unavailable")
     advice: str = Field(description="Plain-language expert advice for this band")
 
 
@@ -252,7 +256,7 @@ class ScanOut(BaseModel):
     part_type: str | None
     disease_id: int | None
     disease_name: str
-    confidence: float
+    confidence: float | None
     severity: str | None
     stage: str | None
     provider: str

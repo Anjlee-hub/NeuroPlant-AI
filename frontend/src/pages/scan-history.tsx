@@ -36,6 +36,7 @@ import {
   ConfidenceBadge,
   SeverityBadge,
   SyncBadge,
+  confidenceVariant,
 } from "@/components/ui/status-badges";
 import { StateCard } from "@/components/ui/state-card";
 import type {
@@ -194,8 +195,18 @@ function ScanCard({ scan, index }: { scan: Scan; index: number }) {
               <span className="text-xs text-muted-foreground">
                 {t("scanHistory.confidence")}
               </span>
-              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                {formatPercent(scan.confidence)}
+              <span
+                className={
+                  confidenceVariant(scan.confidence) === "success"
+                    ? "text-sm font-bold text-emerald-700 dark:text-emerald-300"
+                    : confidenceVariant(scan.confidence) === "secondary"
+                      ? "text-sm font-bold text-amber-700 dark:text-amber-300"
+                      : "text-sm font-bold text-destructive"
+                }
+              >
+                {scan.confidence === null
+                  ? t("scanHistory.needsReview")
+                  : formatPercent(scan.confidence)}
               </span>
             </div>
           </CardContent>

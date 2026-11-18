@@ -50,25 +50,29 @@ def _upload(data: bytes, content_type: str = "image/jpeg") -> UploadFile:
     )
 
 
-def _fixed_result() -> ScanResult:
+def _fixed_result(confidence: float | None = 0.92) -> ScanResult:
     return ScanResult(
         disease_id=1,
         disease_name="Late Blight",
         crop_id=101,
-        confidence=0.92,
+        confidence=confidence,
         provider="baseline",
         model_name="rule-baseline",
         model_version="baseline-v1",
         inference_time_ms=1.5,
         dataset_version="v1",
-        rankings=[
-            PredictedDisease(
-                disease_name="Powdery Mildew",
-                confidence=0.7,
-                disease_id=2,
-                crop_id=101,
-            )
-        ],
+        rankings=(
+            [
+                PredictedDisease(
+                    disease_name="Powdery Mildew",
+                    confidence=0.7,
+                    disease_id=2,
+                    crop_id=101,
+                )
+            ]
+            if confidence is not None
+            else []
+        ),
     )
 
 
@@ -89,10 +93,16 @@ class _StubDetection:
     """
 
     def __init__(
-        self, *, fail: bool = False, slow: bool = False, heatmap_fail: bool = False
+        self,
+        *,
+        fail: bool = False,
+        slow: bool = False,
+        heatmap_fail: bool = False,
+        confidence: float | None = 0.92,
     ) -> None:
         self._fail = fail
         self._slow = slow
+        self._confidence = confidence
         self.explainer = None if heatmap_fail else _StubHeatmap()
 
     async def predict_async(self, _image):  # noqa: ARG002
@@ -100,7 +110,7 @@ class _StubDetection:
             raise InferenceError("model unavailable")
         if self._slow:
             await asyncio.sleep(1.0)
-        return _fixed_result()
+        return _fixed_result(self._confidence)
 
     def generate_heatmap(self, image, class_name):  # noqa: ARG002
         if self.explainer is None:
@@ -211,6 +221,19 @@ async def test_scan_stores_top5_confidence_and_model_metadata(db, tmp_path):
         "model_version": "baseline-v1",
         "dataset_version": "v1",
     }
+
+
+async def test_scan_persists_unavailable_confidence(db, tmp_path):
+    detection = _StubDetection(confidence=None)
+    scan, _ = await _service(db, tmp_path, detection=detection).process_upload(
+        user_id=1,
+        files=[_upload(_jpeg_bytes())],
+        client_scan_id=_client_id(21),
+    )
+
+    assert scan.confidence is None
+    assert scan.ai_metadata["confidence"] == {"top": None, "level": "unavailable"}
+    assert scan.ai_metadata["top5"][0]["confidence"] is None
 
 
 async def test_heatmap_failure_degrades_gracefully(db, tmp_path):

@@ -87,6 +87,23 @@ async def test_list_empty_history(client, db):
     assert body["has_next"] is False
 
 
+async def test_null_confidence_is_persisted_and_returned(client, db):
+    user, headers = await _auth(client, db, "+919000000120")
+    scan = await _create(
+        db,
+        user.id,
+        0,
+        confidence=None,
+        ai_metadata={"confidence": {"top": None, "level": "unavailable"}},
+    )
+
+    resp = await client.get("/api/v1/scans", headers=headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["id"] == scan.id
+    assert resp.json()["items"][0]["confidence"] is None
+
+
 # ── Pagination ──────────────────────────────────────────────────────────
 
 

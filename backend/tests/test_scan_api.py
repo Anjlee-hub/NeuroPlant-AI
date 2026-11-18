@@ -73,7 +73,7 @@ async def test_upload_success(client, db):
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["disease_name"]
-    assert body["confidence"] == 0.6  # rule-baseline marker
+    assert body["confidence"] is None  # rule baseline has no probability output
     assert body["provider"] == "baseline"
     assert body["image_path"]
     assert body["processed_image_path"]

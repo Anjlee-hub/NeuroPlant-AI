@@ -83,7 +83,7 @@ async def test_sync_success_batch(client, db):
         scan = result["scan"]
         assert scan["id"]
         assert scan["disease_name"]
-        assert scan["confidence"] == 0.6  # rule-baseline marker
+        assert scan["confidence"] is None  # rule baseline has no probability output
         assert scan["provider"] == "baseline"
         assert scan["model_version"]
         assert scan["sync_status"] == "synced"
