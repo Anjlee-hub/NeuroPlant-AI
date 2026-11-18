@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight, ImageOff, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,9 @@ export function Lightbox({
 }) {
   const { t } = useTranslation();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const total = images.length;
+  const imageUrl = images[index];
   const prev = (index - 1 + total) % total;
   const next = (index + 1) % total;
 
@@ -76,11 +78,22 @@ export function Lightbox({
         </Button>
       )}
 
-      <img
-        src={images[index]}
-        alt={t("marketplaceBuy.gallery.mainImage", { name })}
-        className="max-h-full max-w-full rounded-md object-contain"
-      />
+      {failedImageUrl === imageUrl ? (
+        <div
+          className="flex size-64 items-center justify-center rounded-md border border-white/20 text-white/80"
+          role="img"
+          aria-label={t("marketplaceBuy.detail.noImages")}
+        >
+          <ImageOff className="size-12" aria-hidden />
+        </div>
+      ) : (
+        <img
+          src={imageUrl}
+          alt={t("marketplaceBuy.gallery.mainImage", { name })}
+          className="max-h-full max-w-full rounded-md object-contain"
+          onError={() => setFailedImageUrl(imageUrl)}
+        />
+      )}
 
       {total > 1 && (
         <Button

@@ -1,4 +1,3 @@
-
 from sqlalchemy import (
     Boolean,
     ForeignKey,
@@ -7,10 +6,11 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.base import TimestampMixin
+from app.models.user import User
 
 
 class CommunityPost(Base, TimestampMixin):
@@ -31,6 +31,7 @@ class CommunityPost(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True
     )
+    farmer: Mapped[User] = relationship(lazy="joined")
 
 
 class CommunityComment(Base, TimestampMixin):
@@ -49,6 +50,7 @@ class CommunityComment(Base, TimestampMixin):
         ForeignKey("community_comments.id", ondelete="CASCADE"),
         nullable=True,
     )
+    farmer: Mapped[User] = relationship(lazy="joined")
 
 
 class CommunityVote(Base, TimestampMixin):

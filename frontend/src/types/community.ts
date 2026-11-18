@@ -6,6 +6,14 @@
   image_url: string | null;
   category: string;
   is_active: boolean;
+  farmer: CommunityFarmer;
+  like_count: number;
+  is_liked: boolean;
+}
+
+export interface CommunityFarmer {
+  name: string;
+  avatar_url: string | null;
 }
 
 export interface CreatePostInput {
@@ -21,6 +29,13 @@ export interface CommunityComment {
   user_id: number;
   content: string;
   parent_id: number | null;
+  farmer: CommunityFarmer;
+}
+
+export interface CommunityVoteResult {
+  message: string;
+  like_count: number;
+  is_liked: boolean;
 }
 
 export interface CreateCommentInput {

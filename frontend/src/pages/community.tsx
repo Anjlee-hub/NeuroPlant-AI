@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, ThumbsUp, Users, Leaf } from "lucide-react";
@@ -31,7 +31,7 @@ function PostComments({ postId }: { postId: number }) {
           <div key={comment.id} className="rounded-lg bg-muted/50 p-3">
             <p className="text-sm">{comment.content}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Farmer #{comment.user_id}
+              {comment.farmer.name}
             </p>
           </div>
         ))}
@@ -84,6 +84,8 @@ export function CommunityPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("general");
+  const [image, setImage] = useState<File | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const postsQuery = useQuery({
     queryKey: ["community-posts"],
@@ -92,16 +94,23 @@ export function CommunityPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      api.createCommunityPost({
+    mutationFn: async () => {
+      const uploaded = image
+        ? await api.uploadCommunityPostImage(image)
+        : undefined;
+      return api.createCommunityPost({
         title: title.trim(),
         content: content.trim(),
         category,
-      }),
+        image_url: uploaded?.image_url,
+      });
+    },
     onSuccess: async () => {
       setTitle("");
       setContent("");
       setCategory("general");
+      setImage(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
       await queryClient.invalidateQueries({
         queryKey: ["community-posts"],
       });
@@ -110,6 +119,9 @@ export function CommunityPage() {
 
   const voteMutation = useMutation({
     mutationFn: (postId: number) => api.voteForPost(postId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["community-posts"] });
+    },
   });
 
   if (!user) {
@@ -177,6 +189,13 @@ export function CommunityPage() {
               rows={4}
               required
               className="w-full resize-y rounded-lg border bg-background px-4 py-3"
+            />
+
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/bmp,image/gif,image/tiff"
+              onChange={(event) => setImage(event.target.files?.[0] ?? null)}
             />
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -268,7 +287,7 @@ export function CommunityPage() {
                     {post.category}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Farmer #{post.user_id}
+                    {post.farmer.name}
                   </span>
                 </div>
 
@@ -276,15 +295,24 @@ export function CommunityPage() {
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                   {post.content}
                 </p>
+                {post.image_url && (
+                  <img
+                    src={post.image_url}
+                    alt={post.title}
+                    className="mt-4 max-h-96 w-full rounded-lg object-cover"
+                  />
+                )}
 
                 <div className="mt-4 flex items-center gap-4">
                   <button
                     onClick={() => voteMutation.mutate(post.id)}
                     disabled={voteMutation.isPending}
+                    aria-label={post.is_liked ? "Unlike post" : "Like post"}
+                    aria-pressed={post.is_liked}
                     className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
                   >
                     <ThumbsUp className="h-4 w-4" />
-                    Vote
+                    {post.like_count}
                   </button>
                   <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                     <MessageCircle className="h-4 w-4" />

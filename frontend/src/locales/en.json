@@ -18,7 +18,7 @@
     "marketplace": "Marketplace",
     "marketplaceBuy": "Buy",
     "sellerPortal": "My Shop",
-    "productMarket": "Buy Farm Inputs",
+    "productMarket": "Plant Protection & Farm Inputs",
     "messages": "Messages",
     "favourites": "Saved items",
     "myReviews": "My reviews",
@@ -712,6 +712,14 @@
       "error": "Couldn't add the task. Please try again."
     }
   },
+  "marketplaceHub": {
+    "navigation": "Marketplace sections",
+    "browseCrops": "Browse Crops",
+    "myShop": "My Shop",
+    "farmInputs": "Plant Protection & Farm Inputs",
+    "messages": "Messages",
+    "unreadMessages": "{{count}} unread messages"
+  },
   "marketplace": {
     "authRequired": "Sign in to manage your crop listings.",
     "signIn": "Sign in",
@@ -1026,6 +1034,13 @@
     "empty": "No products yet. Add your first product to start selling.",
     "editProfile": "Edit shop profile",
     "addProduct": "Add product",
+    "storefront": {
+      "deliveryAvailable": "Delivery available",
+      "deliveryUnavailable": "No delivery",
+      "notProvided": "Not provided",
+      "logoAlt": "Shop logo",
+      "catalog": "Products"
+    },
     "stats": {
       "total": "Total products",
       "active": "Active",
@@ -1139,7 +1154,7 @@
   "productMarket": {
     "authRequired": "Sign in to browse agricultural products.",
     "signIn": "Sign in",
-    "title": "Buy Farm Inputs",
+    "title": "Plant Protection & Farm Inputs",
     "subtitle": "Fertilizers, pesticides, seeds, tools and organic inputs from shops across India.",
     "errorTitle": "Couldn't load products",
     "errorBody": "Check your connection and try again.",

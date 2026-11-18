@@ -9,7 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import type { SellerProfile, SellerUpdate } from "@/types/marketplace";
+import type {
+  SellerProfile,
+  SellerRegisterInput,
+  SellerUpdate,
+} from "@/types/marketplace";
 
 /**
  * Shop profile form (M4 Task 4).
@@ -21,24 +25,26 @@ const inputClass =
 
 export function ShopProfileForm({
   shop,
+  showCancel = true,
   onSaved,
   onCancel,
 }: {
   /** Current shop profile — initializes every field. */
-  shop: SellerProfile;
+  shop: SellerProfile | null;
+  showCancel?: boolean;
   onSaved: (shop: SellerProfile) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
 
-  const [shopName, setShopName] = useState(shop.shop_name ?? "");
-  const [address, setAddress] = useState(shop.address ?? "");
-  const [phone, setPhone] = useState(shop.phone ?? "");
-  const [deliveryAvailable, setDeliveryAvailable] = useState(shop.delivery_available ?? false);
-  const [description, setDescription] = useState(shop.description ?? "");
-  const [openingHours, setOpeningHours] = useState(shop.opening_hours ?? "");
-  const [logoUrl, setLogoUrl] = useState<string[]>(shop.logo_url ? [shop.logo_url] : []);
-  const [bannerUrl, setBannerUrl] = useState<string[]>(shop.banner_url ? [shop.banner_url] : []);
+  const [shopName, setShopName] = useState(shop?.shop_name ?? "");
+  const [address, setAddress] = useState(shop?.address ?? "");
+  const [phone, setPhone] = useState(shop?.phone ?? "");
+  const [deliveryAvailable, setDeliveryAvailable] = useState(shop?.delivery_available ?? false);
+  const [description, setDescription] = useState(shop?.description ?? "");
+  const [openingHours, setOpeningHours] = useState(shop?.opening_hours ?? "");
+  const [logoUrl, setLogoUrl] = useState<string[]>(shop?.logo_url ? [shop.logo_url] : []);
+  const [bannerUrl, setBannerUrl] = useState<string[]>(shop?.banner_url ? [shop.banner_url] : []);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -67,7 +73,9 @@ export function ShopProfileForm({
 
     setSaving(true);
     try {
-      const saved = await api.updateShop(payload);
+      const saved = shop
+        ? await api.updateShop(payload)
+        : await api.registerShop({ ...payload, shop_name: name } satisfies SellerRegisterInput);
       onSaved(saved);
     } catch {
       setSubmitError(t("sellerPortal.profile.error"));
@@ -162,9 +170,11 @@ export function ShopProfileForm({
           {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {saving ? t("sellerPortal.profile.saving") : t("sellerPortal.profile.save")}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
-          {t("sellerPortal.form.cancel")}
-        </Button>
+        {showCancel && (
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
+            {t("sellerPortal.form.cancel")}
+          </Button>
+        )}
       </div>
     </form>
   );

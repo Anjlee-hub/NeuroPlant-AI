@@ -163,7 +163,7 @@ app.add_exception_handler(CalendarScheduleNotFoundError, _error_handler(404))
 app.add_exception_handler(CalendarTaskNotFoundError, _error_handler(404))
 
 # Marketplace (M4 T1) — 404 for a listing/product that isn't yours or doesn't
-# exist, and a seller role with no registered shop (same guard as scans).
+# exist, and a farmer/seller without a registered shop (same guard as scans).
 app.add_exception_handler(CropListingNotFoundError, _error_handler(404))
 app.add_exception_handler(ProductNotFoundError, _error_handler(404))
 app.add_exception_handler(SellerShopNotFoundError, _error_handler(404))

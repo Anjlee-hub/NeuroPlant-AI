@@ -16,6 +16,7 @@ const authMock = vi.hoisted(() => ({
 }));
 const apiMock = vi.hoisted(() => ({
   getMyShop: vi.fn(),
+  registerShop: vi.fn(),
   updateShop: vi.fn(),
   myProducts: vi.fn(),
   getProductStats: vi.fn(),
@@ -84,8 +85,8 @@ const shop: SellerProfile = {
   created_at: new Date().toISOString(),
   description: "Farm inputs since 2010.",
   opening_hours: "Mon–Sat 9:00–19:00",
-  logo_url: null,
-  banner_url: null,
+  logo_url: "/media/marketplace/shop-logo.png",
+  banner_url: "/media/marketplace/shop-banner.png",
   products: [neem, urea],
 };
 
@@ -112,6 +113,7 @@ describe("SellerDashboardPage (/marketplace/shop)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiMock.getMyShop.mockResolvedValue(shop);
+    apiMock.registerShop.mockResolvedValue(shop);
     apiMock.myProducts.mockResolvedValue([neem, urea]);
     apiMock.getProductStats.mockResolvedValue(stats);
     apiMock.updateProduct.mockResolvedValue(neem);
@@ -132,12 +134,17 @@ describe("SellerDashboardPage (/marketplace/shop)", () => {
     );
   });
 
-  it("renders the shop profile, stats, and every product card", async () => {
+  it("renders the storefront, stats, and every product card", async () => {
     authMock.user = { id: 1, name: "Ravi" };
     renderPage("/marketplace/shop");
 
-    // Shop profile form is initialized from the seller's profile.
-    expect(await screen.findByLabelText("Shop name")).toHaveValue("Green Agri Supplies");
+    expect(await screen.findByRole("heading", { name: "Green Agri Supplies" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Shop logo" })).toHaveAttribute(
+      "src",
+      shop.logo_url,
+    );
+    expect(screen.getByRole("button", { name: "Edit shop profile" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Shop name")).not.toBeInTheDocument();
 
     // Stats counts come through (values chosen to not collide with prices).
     expect(screen.getByText("9")).toBeInTheDocument();
@@ -150,6 +157,63 @@ describe("SellerDashboardPage (/marketplace/shop)", () => {
     expect(screen.getByText("Urea 46%")).toBeInTheDocument();
     expect(screen.getByText("250")).toBeInTheDocument();
     expect(screen.getByText("320")).toBeInTheDocument();
+  });
+
+  it("prepopulates edit fields and preserves uploaded images when saving unchanged", async () => {
+    authMock.user = { id: 1, name: "Ravi" };
+    renderPage("/marketplace/shop");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit shop profile" }));
+    expect(await screen.findByLabelText("Shop name")).toHaveValue("Green Agri Supplies");
+    expect(screen.getByLabelText("Address (optional)")).toHaveValue("Main Bazaar, Ludhiana");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save profile" }));
+    await waitFor(() =>
+      expect(apiMock.updateShop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shop_name: "Green Agri Supplies",
+          logo_url: shop.logo_url,
+          banner_url: shop.banner_url,
+        }),
+      ),
+    );
+    expect(await screen.findByRole("heading", { name: "Green Agri Supplies" })).toBeInTheDocument();
+  });
+
+  it("shows setup for a farmer without a shop and registers the profile", async () => {
+    authMock.user = { id: 1, name: "Ravi" };
+    apiMock.getMyShop.mockRejectedValue(
+      Object.assign(new Error("shop profile not found"), { status: 404 }),
+    );
+    apiMock.registerShop.mockResolvedValue({
+      ...shop,
+      shop_name: "Ravi's Farm Shop",
+      logo_url: null,
+      banner_url: null,
+    });
+    apiMock.myProducts.mockResolvedValue([]);
+    apiMock.getProductStats.mockResolvedValue({
+      total: 0,
+      active: 0,
+      out_of_stock: 0,
+      archived: 0,
+    });
+    renderPage("/marketplace/shop");
+
+    const shopName = await screen.findByLabelText("Shop name");
+    expect(shopName).toHaveValue("");
+    await userEvent.type(shopName, "Ravi's Farm Shop");
+    await userEvent.click(screen.getByRole("button", { name: "Save profile" }));
+
+    await waitFor(() =>
+      expect(apiMock.registerShop).toHaveBeenCalledWith(
+        expect.objectContaining({ shop_name: "Ravi's Farm Shop" }),
+      ),
+    );
+    expect(apiMock.updateShop).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole("heading", { name: "Ravi's Farm Shop" }),
+    ).toBeInTheDocument();
   });
 
   it("shows an empty state with an add CTA when there are no products", async () => {

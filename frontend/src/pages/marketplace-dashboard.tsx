@@ -1,8 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Store } from "lucide-react";
+import {
+  Heart,
+  Inbox,
+  Leaf,
+  Plus,
+  ShoppingBag,
+  Star,
+  Store,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { FilterBar } from "@/components/marketplace/filter-bar";
 import {
@@ -16,8 +25,110 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StateCard } from "@/components/ui/state-card";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import type { CropAvailability, CropListing } from "@/types/marketplace";
+import { CONVERSATIONS_KEY } from "@/pages/messages-list";
+
+const MARKETPLACE_SECTIONS: Array<{
+  to: string;
+  labelKey: string;
+  icon: LucideIcon;
+  end?: boolean;
+}> = [
+  {
+    to: "/marketplace/shop",
+    labelKey: "marketplaceHub.myShop",
+    icon: Store,
+    end: true,
+  },
+  {
+    to: "/marketplace/browse",
+    labelKey: "marketplaceHub.browseCrops",
+    icon: Leaf,
+    end: true,
+  },
+  {
+    to: "/marketplace/products",
+    labelKey: "marketplaceHub.farmInputs",
+    icon: ShoppingBag,
+  },
+  {
+    to: "/marketplace/messages",
+    labelKey: "marketplaceHub.messages",
+    icon: Inbox,
+  },
+  {
+    to: "/marketplace/favorites",
+    labelKey: "nav.favourites",
+    icon: Heart,
+  },
+  {
+    to: "/marketplace/my-reviews",
+    labelKey: "nav.myReviews",
+    icon: Star,
+  },
+];
+
+export function MarketplaceHubPage() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const conversationsQuery = useQuery({
+    queryKey: CONVERSATIONS_KEY,
+    queryFn: () => api.listConversations(),
+    enabled: !!user,
+    refetchInterval: user ? 30_000 : false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  });
+  const unreadCount =
+    conversationsQuery.data?.reduce((total, conversation) => total + conversation.unread_count, 0) ?? 0;
+
+  return (
+    <>
+      <nav
+        aria-label={t("marketplaceHub.navigation")}
+        className="mx-4 mt-5 flex max-w-6xl gap-1 overflow-x-auto rounded-2xl border border-border bg-card/80 p-1.5 shadow-sm sm:mx-6 lg:mx-auto"
+      >
+        {MARKETPLACE_SECTIONS.map((section) => (
+          <NavLink
+            key={section.to}
+            to={section.to}
+            end={section.end}
+            className={({ isActive }) =>
+              cn(
+                "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm",
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )
+            }
+          >
+            <section.icon className="size-4 shrink-0" aria-hidden />
+            {t(section.labelKey)}
+            {section.to === "/marketplace/messages" && unreadCount > 0 && (
+              <>
+                <span
+                  aria-label={t("marketplaceHub.unreadMessages", { count: unreadCount })}
+                  aria-live="polite"
+                  className="inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
+                >
+                  {unreadCount}
+                </span>
+                <span
+                  aria-hidden
+                  className="size-2 rounded-full bg-destructive"
+                />
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      <Outlet />
+    </>
+  );
+}
 
 /**
  * Farmer Crop Listing dashboard (M4 Task 2) — the farmer's own listings at a

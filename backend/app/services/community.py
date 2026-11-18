@@ -1,58 +1,241 @@
+import io
 
-from sqlalchemy import select
+from fastapi import UploadFile
+from PIL import Image, UnidentifiedImageError
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.community import (
-    CommunityPost,
     CommunityComment,
+    CommunityPost,
     CommunityVote,
 )
+from app.models.user import User
+from app.schemas.community import (
+    CommentCreate,
+    CommentResponse,
+    CommentUpdate,
+    PostCreate,
+    PostResponse,
+    PostUpdate,
+)
+from app.services.storage import get_storage_service
+
+MAX_COMMUNITY_IMAGE_BYTES = 10 * 1024 * 1024
+COMMUNITY_IMAGE_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/bmp",
+    "image/gif",
+    "image/tiff",
+}
 
 
-async def create_post(db: AsyncSession, user_id: int, data):
+async def upload_post_image(user_id: int, file: UploadFile) -> str:
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in COMMUNITY_IMAGE_CONTENT_TYPES:
+        raise ValueError(f"unsupported image type: {content_type or 'unknown'}")
+
+    data = await file.read(MAX_COMMUNITY_IMAGE_BYTES + 1)
+    if not data:
+        raise ValueError("image file is empty")
+    if len(data) > MAX_COMMUNITY_IMAGE_BYTES:
+        raise ValueError("image exceeds the 10 MB limit")
+
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            image_format = image.format
+            image.verify()
+    except (
+        OSError,
+        UnidentifiedImageError,
+        ValueError,
+        Image.DecompressionBombError,
+    ) as exc:
+        raise ValueError("file is not a valid image") from exc
+
+    if Image.MIME.get(image_format or "") != content_type:
+        raise ValueError("image content does not match its declared type")
+
+    storage = get_storage_service()
+    key = storage.save(data, content_type, user_id, subdir="community")
+    return storage.url(key)
+
+
+async def create_post(db: AsyncSession, user_id: int, data: PostCreate) -> PostResponse:
     post = CommunityPost(user_id=user_id, **data.model_dump())
+    post.farmer = await db.get(User, user_id)
     db.add(post)
     await db.commit()
     await db.refresh(post)
-    return post
+    return await _post_response(db, post, user_id)
 
 
-async def get_posts(db: AsyncSession):
-    result = await db.execute(
-        select(CommunityPost)
-        .where(CommunityPost.is_active == True)
-        .order_by(CommunityPost.id.desc())
+async def get_posts(db: AsyncSession, user_id: int) -> list[PostResponse]:
+    posts = (
+        await db.scalars(
+            select(CommunityPost).where(CommunityPost.is_active).order_by(CommunityPost.id.desc())
+        )
+    ).all()
+    if not posts:
+        return []
+
+    votes = await db.execute(
+        select(
+            CommunityVote.post_id,
+            func.count(CommunityVote.id),
+            func.max(case((CommunityVote.user_id == user_id, 1), else_=0)),
+        )
+        .where(CommunityVote.post_id.in_([post.id for post in posts]))
+        .group_by(CommunityVote.post_id)
     )
-    return result.scalars().all()
+    counts = {
+        post_id: (like_count, bool(is_liked)) for post_id, like_count, is_liked in votes.all()
+    }
+    return [
+        PostResponse.model_validate(post).model_copy(
+            update={
+                "like_count": counts.get(post.id, (0, False))[0],
+                "is_liked": counts.get(post.id, (0, False))[1],
+            }
+        )
+        for post in posts
+    ]
 
 
-async def add_comment(db: AsyncSession, post_id: int, user_id: int, data):
+async def _post_response(db: AsyncSession, post: CommunityPost, user_id: int) -> PostResponse:
+    like_count = await db.scalar(
+        select(func.count(CommunityVote.id)).where(CommunityVote.post_id == post.id)
+    )
+    is_liked = await db.scalar(
+        select(CommunityVote.id).where(
+            CommunityVote.post_id == post.id,
+            CommunityVote.user_id == user_id,
+        )
+    )
+    return PostResponse.model_validate(post).model_copy(
+        update={"like_count": like_count or 0, "is_liked": is_liked is not None}
+    )
+
+
+async def update_post(
+    db: AsyncSession, post_id: int, user_id: int, data: PostUpdate
+) -> PostResponse | None:
+    post = await db.scalar(
+        select(CommunityPost).where(
+            CommunityPost.id == post_id,
+            CommunityPost.user_id == user_id,
+            CommunityPost.is_active,
+        )
+    )
+    if post is None:
+        return None
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(post, field, value)
+    await db.commit()
+    await db.refresh(post)
+    return await _post_response(db, post, user_id)
+
+
+async def delete_post(db: AsyncSession, post_id: int, user_id: int) -> bool:
+    post = await db.scalar(
+        select(CommunityPost).where(
+            CommunityPost.id == post_id,
+            CommunityPost.user_id == user_id,
+            CommunityPost.is_active,
+        )
+    )
+    if post is None:
+        return False
+
+    post.is_active = False
+    await db.commit()
+    return True
+
+
+async def add_comment(
+    db: AsyncSession, post_id: int, user_id: int, data: CommentCreate
+) -> CommentResponse | None:
     post = await db.get(CommunityPost, post_id)
+
     if not post or not post.is_active:
         return None
+
+    if data.parent_id is not None:
+        parent = await db.get(CommunityComment, data.parent_id)
+
+        if not parent or parent.post_id != post_id:
+            raise ValueError("Parent comment does not belong to this post")
 
     comment = CommunityComment(
         post_id=post_id,
         user_id=user_id,
         **data.model_dump(),
     )
+    comment.farmer = await db.get(User, user_id)
+
     db.add(comment)
     await db.commit()
     await db.refresh(comment)
-    return comment
+
+    return CommentResponse.model_validate(comment)
 
 
-async def get_comments(db: AsyncSession, post_id: int):
+async def update_comment(
+    db: AsyncSession,
+    post_id: int,
+    comment_id: int,
+    user_id: int,
+    data: CommentUpdate,
+) -> CommentResponse | None:
+    comment = await db.scalar(
+        select(CommunityComment).where(
+            CommunityComment.id == comment_id,
+            CommunityComment.post_id == post_id,
+            CommunityComment.user_id == user_id,
+        )
+    )
+    if comment is None:
+        return None
+
+    comment.content = data.content
+    await db.commit()
+    await db.refresh(comment)
+    return CommentResponse.model_validate(comment)
+
+
+async def delete_comment(db: AsyncSession, post_id: int, comment_id: int, user_id: int) -> bool:
+    comment = await db.scalar(
+        select(CommunityComment).where(
+            CommunityComment.id == comment_id,
+            CommunityComment.post_id == post_id,
+            CommunityComment.user_id == user_id,
+        )
+    )
+    if comment is None:
+        return False
+
+    await db.delete(comment)
+    await db.commit()
+    return True
+
+
+async def get_comments(db: AsyncSession, post_id: int) -> list[CommentResponse]:
     result = await db.execute(
         select(CommunityComment)
         .where(CommunityComment.post_id == post_id)
         .order_by(CommunityComment.id.asc())
     )
-    return result.scalars().all()
+    return [CommentResponse.model_validate(comment) for comment in result.scalars().all()]
 
 
-async def vote_post(db: AsyncSession, post_id: int, user_id: int):
-    post = await db.get(CommunityPost, post_id)
+async def vote_post(db: AsyncSession, post_id: int, user_id: int) -> dict | None:
+    post = await db.scalar(
+        select(CommunityPost).where(CommunityPost.id == post_id).with_for_update()
+    )
+
     if not post or not post.is_active:
         return None
 
@@ -62,13 +245,29 @@ async def vote_post(db: AsyncSession, post_id: int, user_id: int):
             CommunityVote.user_id == user_id,
         )
     )
+
     existing = result.scalar_one_or_none()
 
     if existing:
         await db.delete(existing)
         await db.commit()
-        return "Vote removed"
+        message = "Vote removed"
+    else:
+        db.add(CommunityVote(post_id=post_id, user_id=user_id))
+        await db.commit()
+        message = "Vote added"
 
-    db.add(CommunityVote(post_id=post_id, user_id=user_id))
-    await db.commit()
-    return "Vote added"
+    like_count = await db.scalar(
+        select(func.count(CommunityVote.id)).where(CommunityVote.post_id == post_id)
+    )
+    is_liked = await db.scalar(
+        select(CommunityVote.id).where(
+            CommunityVote.post_id == post_id,
+            CommunityVote.user_id == user_id,
+        )
+    )
+    return {
+        "message": message,
+        "like_count": like_count or 0,
+        "is_liked": is_liked is not None,
+    }

@@ -7,7 +7,7 @@ semantics. Three roles feed it:
   their own crops.
 * **Customers** (any authenticated user) browse, search and filter listings
   and view a listing's detail (with its farmer).
-* **Sellers** register/refresh their shop profile and manage their
+* **Farmers and sellers** register/refresh their shop profile and manage their
   ``Product`` catalog. The shop *is* the existing ``SellerProfile`` row — this
   service is where the marketplace extends it, never a second seller table.
 
@@ -101,7 +101,7 @@ class ProductNotFoundError(Exception):
 
 
 class SellerShopNotFoundError(Exception):
-    """The user has no registered shop profile (role seller without a profile)."""
+    """The user has no registered shop profile."""
 
 
 class ListingImageUploadError(Exception):
@@ -311,9 +311,8 @@ class MarketplaceService:
     # ── Seller: shop registration + product catalog ─────────────────────
 
     async def register_shop(self, user: User, payload: SellerRegister) -> SellerOut:
-        """Fill in / refresh the seller's shop profile (the ``SellerProfile``
-        row auto-created at registration)."""
-        profile = await self._profile_for_user(user.id)
+        """Create or refresh the seller's shop profile."""
+        profile = await self._profile_for_user(user.id, create=True)
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(profile, field, value)
         self.db.add(profile)
@@ -329,9 +328,9 @@ class MarketplaceService:
     async def add_product(self, user: User, payload: ProductIn) -> ProductOut:
         """Add one agricultural input to the seller's catalog.
 
-        The seller's ``SellerProfile`` always exists (auto-created at
-        registration), so a product can be listed before the shop profile is
-        filled in — the product only needs the seller's user id.
+        A seller's ``SellerProfile`` is created at registration; farmers can
+        list products before initializing their shop because products are
+        keyed directly to the authenticated user id.
         """
         product = Product(
             seller_id=user.id,
@@ -379,7 +378,7 @@ class MarketplaceService:
     async def update_shop(self, user: User, payload: SellerUpdate) -> SellerOut:
         """Edit the seller's shop profile (M4 Task 4). Only the fields sent are
         changed; ``shop()`` re-assembles the full shop payload."""
-        profile = await self._profile_for_user(user.id)
+        profile = await self._profile_for_user(user.id, create=True)
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(profile, field, value)
         self.db.add(profile)
@@ -704,11 +703,17 @@ class MarketplaceService:
             products=products,
         )
 
-    async def _profile_for_user(self, user_id: int) -> SellerProfile:
+    async def _profile_for_user(
+        self, user_id: int, *, create: bool = False
+    ) -> SellerProfile:
         profile = await self.db.scalar(
             select(SellerProfile).where(SellerProfile.user_id == user_id)
         )
         if profile is None:
+            if create:
+                profile = SellerProfile(user_id=user_id)
+                self.db.add(profile)
+                return profile
             raise SellerShopNotFoundError(f"no shop registered for user {user_id}")
         return profile
 

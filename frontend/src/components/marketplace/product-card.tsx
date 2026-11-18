@@ -1,5 +1,6 @@
 import {
   Archive,
+  PackageOpen,
   Loader2,
   Pencil,
   Trash2,
@@ -48,9 +49,8 @@ export function ProductCard({
     : t("sellerPortal.card.markInStock");
 
   return (
-    <article className="flex flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-center">
-      {/* Photo / placeholder — first image, else an honest empty slot. */}
-      <div className="aspect-square w-full shrink-0 overflow-hidden rounded-md bg-muted sm:w-24">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
+      <div className="aspect-[16/10] w-full shrink-0 overflow-hidden bg-muted">
         {product.images?.[0] ? (
           <img
             src={product.images[0]}
@@ -59,13 +59,12 @@ export function ProductCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <span className="text-3xl">📦</span>
+            <PackageOpen className="size-10" aria-hidden />
           </div>
         )}
       </div>
 
-      {/* Core details. */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold">{product.name}</h3>
           {product.brand && (
@@ -91,8 +90,7 @@ export function ProductCard({
         )}
       </div>
 
-      {/* Seller actions — contextual status toggles + edit/delete. */}
-      <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+      <div className="flex flex-wrap items-center gap-2 border-t p-4 pt-3">
         {busy ? (
           <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={t("common.loading")} />
         ) : (

@@ -28,7 +28,10 @@ import { AssistantPage } from "@/pages/assistant";
 import { GovernmentSchemesPage } from "@/pages/government-schemes";
 import { CommunityPage } from "@/pages/community";
 
-import { MarketplaceDashboardPage } from "@/pages/marketplace-dashboard";
+import {
+  MarketplaceDashboardPage,
+  MarketplaceHubPage,
+} from "@/pages/marketplace-dashboard";
 import { MarketplaceListingFormPage } from "@/pages/marketplace-listing-form";
 import { MarketplaceBuyPage } from "@/pages/marketplace-buy";
 import { MarketplaceListingDetailPage } from "@/pages/marketplace-listing-detail";
@@ -126,54 +129,64 @@ export const router = createBrowserRouter([
             element: <CommunityPage />,
           },
 
-          // Marketplace routes.
+          // Marketplace routes. Existing subsection URLs remain stable inside the hub.
           {
             path: "/marketplace",
-            element: <MarketplaceDashboardPage />,
-          },
-          {
-            path: "/marketplace/listings/new",
-            element: <MarketplaceListingFormPage />,
-          },
-          {
-            path: "/marketplace/listings/:listingId/edit",
-            element: <MarketplaceListingFormPage />,
-          },
-          {
-            path: "/marketplace/browse",
-            element: <MarketplaceBuyPage />,
-          },
-          {
-            path: "/marketplace/listings/:listingId",
-            element: <MarketplaceListingDetailPage />,
-          },
-          {
-            path: "/marketplace/favorites",
-            element: <MarketplaceFavoritesPage />,
-          },
-          {
-            path: "/marketplace/my-reviews",
-            element: <MyReviewsPage />,
-          },
-          {
-            path: "/marketplace/shop",
-            element: <SellerDashboardPage />,
-          },
-          {
-            path: "/marketplace/products",
-            element: <ProductMarketBrowsePage />,
-          },
-          {
-            path: "/marketplace/products/:id",
-            element: <ProductMarketDetailPage />,
-          },
-          {
-            path: "/marketplace/messages",
-            element: <MessagesListPage />,
-          },
-          {
-            path: "/marketplace/messages/:conversationId",
-            element: <MessagesDetailPage />,
+            element: <MarketplaceHubPage />,
+            children: [
+              {
+                index: true,
+                element: <Navigate to="/marketplace/browse" replace />,
+              },
+              {
+                path: "browse",
+                element: <MarketplaceBuyPage />,
+              },
+              {
+                path: "listings",
+                element: <MarketplaceDashboardPage />,
+              },
+              {
+                path: "listings/new",
+                element: <MarketplaceListingFormPage />,
+              },
+              {
+                path: "listings/:listingId/edit",
+                element: <MarketplaceListingFormPage />,
+              },
+              {
+                path: "listings/:listingId",
+                element: <MarketplaceListingDetailPage />,
+              },
+              {
+                path: "favorites",
+                element: <MarketplaceFavoritesPage />,
+              },
+              {
+                path: "my-reviews",
+                element: <MyReviewsPage />,
+              },
+              {
+                path: "shop",
+                element: <SellerDashboardPage />,
+              },
+              {
+                path: "products",
+                element: <ProductMarketBrowsePage />,
+              },
+              {
+                path: "products/:id",
+                element: <ProductMarketDetailPage />,
+              },
+              {
+                path: "messages",
+                element: <MessagesListPage />,
+              },
+              {
+                path: "messages/:conversationId",
+                element: <MessagesDetailPage />,
+              },
+            ],
           },
           {
             path: "/assistant",

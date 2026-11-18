@@ -1,10 +1,8 @@
 ﻿import {
   CalendarDays,
   CloudUpload,
-  Heart,
   History,
   Home,
-  Inbox,
   Landmark,
   Leaf,
   Menu,
@@ -12,8 +10,6 @@
   PanelLeftClose,
   PanelLeftOpen,
   ScanLine,
-  ShoppingBag,
-  Star,
   Stethoscope,
   Store,
   Users,
@@ -46,12 +42,6 @@ const NAV_ITEMS: Array<{
   { to: "/marketplace", labelKey: "nav.marketplace", icon: Store },
   { to: "/schemes", labelKey: "nav.schemes", icon: Landmark },
   { to: "/community", labelKey: "nav.community", icon: Users },
-  { to: "/marketplace/browse", labelKey: "nav.marketplaceBuy", icon: ShoppingBag },
-  { to: "/marketplace/shop", labelKey: "nav.sellerPortal", icon: Store },
-  { to: "/marketplace/products", labelKey: "nav.productMarket", icon: ShoppingBag },
-  { to: "/marketplace/messages", labelKey: "nav.messages", icon: Inbox },
-  { to: "/marketplace/favorites", labelKey: "nav.favourites", icon: Heart },
-  { to: "/marketplace/my-reviews", labelKey: "nav.myReviews", icon: Star },
 ];
 
 function SidebarLink({

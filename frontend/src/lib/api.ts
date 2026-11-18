@@ -1,5 +1,6 @@
 import type {
   CommunityPost,
+  CommunityVoteResult,
   CreatePostInput,
   CommunityComment,
   CreateCommentInput,
@@ -676,10 +677,33 @@ export const api = {
   listCommunityPosts: () =>
     request<CommunityPost[]>("/community/posts", { auth: true }),
 
+  uploadCommunityPostImage: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<{ image_url: string }>("/community/posts/image", {
+      method: "POST",
+      body: fd,
+      auth: true,
+    });
+  },
+
   createCommunityPost: (payload: CreatePostInput) =>
     request<CommunityPost>("/community/posts", {
       method: "POST",
       body: payload,
+      auth: true,
+    }),
+
+  updateCommunityPost: (postId: number, payload: Partial<CreatePostInput>) =>
+    request<CommunityPost>(`/community/posts/${postId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+
+  deleteCommunityPost: (postId: number) =>
+    request<void>(`/community/posts/${postId}`, {
+      method: "DELETE",
       auth: true,
     }),
 
@@ -695,8 +719,21 @@ export const api = {
       auth: true,
     }),
 
+  updatePostComment: (postId: number, commentId: number, content: string) =>
+    request<CommunityComment>(`/community/posts/${postId}/comments/${commentId}`, {
+      method: "PATCH",
+      body: { content },
+      auth: true,
+    }),
+
+  deletePostComment: (postId: number, commentId: number) =>
+    request<void>(`/community/posts/${postId}/comments/${commentId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
   voteForPost: (postId: number) =>
-    request<{ message: string }>(`/community/posts/${postId}/vote`, {
+    request<CommunityVoteResult>(`/community/posts/${postId}/vote`, {
       method: "POST",
       auth: true,
     }),

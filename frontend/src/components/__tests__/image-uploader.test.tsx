@@ -4,11 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiMock = vi.hoisted(() => ({
   uploadListingImages: vi.fn(),
+  createCropListing: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 
 import { ListingImageUploader } from "@/components/marketplace/image-uploader";
+import { ListingForm } from "@/components/marketplace/listing-form";
 
 /** A valid PNG file (type + size are what the component checks). */
 function pngFile(name = "photo.png", size = 1024): File {
@@ -24,6 +26,8 @@ describe("ListingImageUploader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiMock.uploadListingImages.mockResolvedValue({ urls: ["/media/marketplace/uploaded.png"] });
+    apiMock.createCropListing.mockResolvedValue({});
+    apiMock.createCropListing.mockResolvedValue({});
   });
 
   it("renders persisted URLs with a remove affordance and reports removal", async () => {
@@ -55,6 +59,74 @@ describe("ListingImageUploader", () => {
     expect(files).toHaveLength(1);
     expect(files[0].name).toBe("photo.png");
     expect(onChange).toHaveBeenCalledWith(["/media/marketplace/uploaded.png"]);
+  });
+
+  it("does not save a listing until its selected photos have persisted URLs", async () => {
+    const user = userEvent.setup();
+    let finishUpload!: (result: { urls: string[] }) => void;
+    apiMock.uploadListingImages.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    render(<ListingForm onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Crop name"), "Tomatoes");
+    await user.type(screen.getByLabelText("Quantity"), "20");
+    await user.type(screen.getByLabelText("Price per unit"), "15");
+    await pickFile(pngFile("tomatoes.png"));
+
+    const saveButton = screen.getByRole("button", { name: "Save listing" });
+    expect(saveButton).toBeDisabled();
+    await user.click(screen.getAllByRole("button", { name: "Add photos" })[1]);
+    await waitFor(() => expect(apiMock.uploadListingImages).toHaveBeenCalledTimes(1));
+    expect(saveButton).toBeDisabled();
+    expect(apiMock.createCropListing).not.toHaveBeenCalled();
+
+    finishUpload({ urls: ["/media/1/marketplace/tomatoes.png"] });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    await user.click(saveButton);
+
+    await waitFor(() =>
+      expect(apiMock.createCropListing).toHaveBeenCalledWith(
+        expect.objectContaining({ images: ["/media/1/marketplace/tomatoes.png"] }),
+      ),
+    );
+  });
+
+  it("waits for picked photos to upload before saving the listing", async () => {
+    const user = userEvent.setup();
+    let finishUpload!: (result: { urls: string[] }) => void;
+    apiMock.uploadListingImages.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    render(<ListingForm onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Crop name"), "Tomatoes");
+    await user.type(screen.getByLabelText("Quantity"), "20");
+    await user.type(screen.getByLabelText("Price per unit"), "15");
+    await pickFile(pngFile("tomatoes.png"));
+
+    const saveButton = screen.getByRole("button", { name: "Save listing" });
+    expect(saveButton).toBeDisabled();
+    await user.click(screen.getAllByRole("button", { name: "Add photos" })[1]);
+    await waitFor(() => expect(apiMock.uploadListingImages).toHaveBeenCalledTimes(1));
+    expect(saveButton).toBeDisabled();
+    expect(apiMock.createCropListing).not.toHaveBeenCalled();
+
+    finishUpload({ urls: ["/media/1/marketplace/tomatoes.png"] });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    await user.click(saveButton);
+
+    await waitFor(() =>
+      expect(apiMock.createCropListing).toHaveBeenCalledWith(
+        expect.objectContaining({ images: ["/media/1/marketplace/tomatoes.png"] }),
+      ),
+    );
   });
 
   it("rejects more than 8 images as a batch", async () => {

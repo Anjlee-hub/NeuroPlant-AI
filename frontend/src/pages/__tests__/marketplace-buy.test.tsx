@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,6 +113,15 @@ describe("MarketplaceBuyPage", () => {
     expect(detailLinks).toHaveLength(2);
     expect(detailLinks[0]).toHaveAttribute("href", "/marketplace/listings/1");
     expect(detailLinks[1]).toHaveAttribute("href", "/marketplace/listings/2");
+  });
+
+  it("shows a fallback if a browse listing image cannot be loaded", async () => {
+    renderPage();
+
+    const image = await screen.findByRole("img", { name: "Tomato" });
+    fireEvent.error(image);
+
+    expect(screen.getByRole("img", { name: "Tomato" }).tagName).toBe("DIV");
   });
 
   it("searches server-side as the user types", async () => {

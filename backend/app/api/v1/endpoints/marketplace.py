@@ -6,8 +6,8 @@ Three surfaces share the ``/marketplace`` prefix:
   crop listings.
 * **Any authenticated user** (customers included) browses, searches, filters
   and opens listing details — read-only.
-* **Sellers** (``seller``/``admin``) register their shop and manage their
-  product catalog.
+* **Farmers and sellers** (``farmer``/``seller``/``admin``) register their
+  shop and manage its product catalog.
 
 Role checks use ``require_roles`` so RBAC is enforced as a dependency; the
 service owns every business rule (ownership guard answers ``404`` for other
@@ -63,7 +63,10 @@ router = APIRouter(prefix="/marketplace", tags=["marketplace"])
 Db = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 FarmerUser = Annotated[User, Depends(require_roles(UserRole.FARMER, UserRole.ADMIN))]
-SellerUser = Annotated[User, Depends(require_roles(UserRole.SELLER, UserRole.ADMIN))]
+SellerUser = Annotated[
+    User,
+    Depends(require_roles(UserRole.FARMER, UserRole.SELLER, UserRole.ADMIN)),
+]
 
 
 @router.get("/crops", response_model=CropListingPageOut)
