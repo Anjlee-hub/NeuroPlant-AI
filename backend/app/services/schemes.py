@@ -2,10 +2,15 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.scheme import GovernmentScheme, SchemeUsageEvent
+from app.models.scheme import (
+    GovernmentScheme,
+    SavedGovernmentScheme,
+    SchemeUsageEvent,
+)
+from app.models.user import FarmerProfile
 from app.schemas.scheme import (
     EligibilityCheckIn,
     EligibilityCheckOut,
@@ -24,6 +29,16 @@ class GovernmentSchemeService:
 
     async def create(self, payload: GovernmentSchemeCreate) -> GovernmentScheme:
         data = payload.model_dump()
+        existing = await self.db.scalar(
+            select(GovernmentScheme).where(
+                or_(
+                    GovernmentScheme.name.ilike(data["name"]),
+                    GovernmentScheme.source_url == str(data["source_url"]),
+                )
+            )
+        )
+        if existing is not None:
+            raise ValueError("A scheme with the same name or source URL already exists.")
         for field in ("official_application_url", "source_url"):
             if data[field] is not None:
                 data[field] = str(data[field])
@@ -41,12 +56,27 @@ class GovernmentSchemeService:
         crop_name: str | None = None,
         farmer_category: str | None = None,
         category: str | None = None,
+        district_code: str | None = None,
+        search: str | None = None,
+        status: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[GovernmentScheme], int]:
-        statement = select(GovernmentScheme).where(GovernmentScheme.is_active.is_(True))
+        statement = select(GovernmentScheme)
         if category:
             statement = statement.where(GovernmentScheme.category.ilike(category))
+        if status:
+            statement = statement.where(GovernmentScheme.status == status)
+        if search:
+            term = f"%{search.strip()}%"
+            statement = statement.where(
+                or_(
+                    GovernmentScheme.name.ilike(term),
+                    GovernmentScheme.description.ilike(term),
+                    GovernmentScheme.department.ilike(term),
+                    GovernmentScheme.source_name.ilike(term),
+                )
+            )
         records = list(await self.db.scalars(statement.order_by(GovernmentScheme.name)))
 
         def matches(scheme: GovernmentScheme) -> bool:
@@ -66,6 +96,12 @@ class GovernmentSchemeService:
                     or not scheme.farmer_categories
                     or farmer_category.casefold()
                     in {item.casefold() for item in scheme.farmer_categories}
+                )
+                and (
+                    not district_code
+                    or not scheme.district_codes
+                    or district_code.casefold()
+                    in {item.casefold() for item in scheme.district_codes}
                 )
             )
 
@@ -90,10 +126,7 @@ class GovernmentSchemeService:
 
     async def get(self, user_id: int, scheme_id: int) -> GovernmentScheme | None:
         scheme = await self.db.scalar(
-            select(GovernmentScheme).where(
-                GovernmentScheme.id == scheme_id,
-                GovernmentScheme.is_active.is_(True),
-            )
+            select(GovernmentScheme).where(GovernmentScheme.id == scheme_id)
         )
         if scheme is not None:
             self.db.add(
@@ -114,24 +147,35 @@ class GovernmentSchemeService:
         payload: EligibilityCheckIn,
     ) -> EligibilityCheckOut | None:
         scheme = await self.db.scalar(
-            select(GovernmentScheme).where(
-                GovernmentScheme.id == scheme_id,
-                GovernmentScheme.is_active.is_(True),
-            )
+            select(GovernmentScheme).where(GovernmentScheme.id == scheme_id)
         )
         if scheme is None:
             return None
 
+        profile = await self.db.scalar(
+            select(FarmerProfile).where(FarmerProfile.user_id == user_id)
+        )
+        profile_crops = (
+            [str(item) for item in profile.crops_grown]
+            if profile is not None and profile.crops_grown
+            else []
+        )
         supplied = {
             "state_code": payload.state_code.upper() if payload.state_code else None,
-            "crop_name": payload.crop_name,
+            "district_code": payload.district_code,
+            "crop_name": payload.crop_name
+            or (profile_crops[0] if len(profile_crops) == 1 else None),
             "farmer_category": payload.farmer_category,
+            "landholding_acres": payload.landholding_acres
+            if payload.landholding_acres is not None
+            else (profile.farm_size if profile is not None else None),
         }
         matches: list[str] = []
         unmet: list[str] = []
         unknown: list[str] = []
         constraints = (
             ("state_code", scheme.state_codes),
+            ("district_code", scheme.district_codes),
             ("crop_name", scheme.crops),
             ("farmer_category", scheme.farmer_categories),
         )
@@ -150,7 +194,32 @@ class GovernmentSchemeService:
             value = supplied.get(field)
             if value is None:
                 unknown.append(f"{field} was not provided")
-            elif value.casefold() in {item.casefold() for item in allowed}:
+            elif field == "landholding_acres" and isinstance(value, (int, float)):
+                matched_numeric = False
+                for rule in allowed:
+                    rule_text = rule.strip().lower()
+                    if (
+                        rule_text.startswith("<=")
+                        and float(value) <= float(rule_text[2:].strip())
+                    ) or (
+                        rule_text.startswith(">=")
+                        and float(value) >= float(rule_text[2:].strip())
+                    ) or (
+                        rule_text.startswith("<")
+                        and float(value) < float(rule_text[1:].strip())
+                    ) or (
+                        rule_text.startswith(">")
+                        and float(value) > float(rule_text[1:].strip())
+                    ):
+                        matched_numeric = True
+                if matched_numeric:
+                    matches.append(f"{field} matches the published rule")
+                else:
+                    unmet.append(f"{field} does not match the published rule")
+            elif (
+                isinstance(value, str)
+                and value.casefold() in {item.casefold() for item in allowed}
+            ):
                 matches.append(f"{field} matches the published rule")
             else:
                 unmet.append(f"{field} does not match the published rule")
@@ -187,3 +256,58 @@ class GovernmentSchemeService:
             unmet_rules=unmet + unknown,
             explanation=explanation,
         )
+
+    async def list_saved(self, user_id: int) -> list[GovernmentScheme]:
+        rows = list(
+            await self.db.scalars(
+                select(GovernmentScheme)
+                .join(
+                    SavedGovernmentScheme,
+                    SavedGovernmentScheme.scheme_id == GovernmentScheme.id,
+                )
+                .where(SavedGovernmentScheme.user_id == user_id)
+                .order_by(GovernmentScheme.name)
+            )
+        )
+        return rows
+
+    async def is_saved(self, user_id: int, scheme_id: int) -> bool:
+        row = await self.db.scalar(
+            select(SavedGovernmentScheme).where(
+                SavedGovernmentScheme.user_id == user_id,
+                SavedGovernmentScheme.scheme_id == scheme_id,
+            )
+        )
+        return row is not None
+
+    async def save(self, user_id: int, scheme_id: int) -> bool:
+        scheme = await self.db.scalar(
+            select(GovernmentScheme).where(GovernmentScheme.id == scheme_id)
+        )
+        if scheme is None:
+            return False
+        existing = await self.db.scalar(
+            select(SavedGovernmentScheme).where(
+                SavedGovernmentScheme.user_id == user_id,
+                SavedGovernmentScheme.scheme_id == scheme_id,
+            )
+        )
+        if existing is None:
+            self.db.add(
+                SavedGovernmentScheme(user_id=user_id, scheme_id=scheme_id)
+            )
+            await self.db.commit()
+        return True
+
+    async def remove_saved(self, user_id: int, scheme_id: int) -> bool:
+        row = await self.db.scalar(
+            select(SavedGovernmentScheme).where(
+                SavedGovernmentScheme.user_id == user_id,
+                SavedGovernmentScheme.scheme_id == scheme_id,
+            )
+        )
+        if row is None:
+            return False
+        await self.db.delete(row)
+        await self.db.commit()
+        return True

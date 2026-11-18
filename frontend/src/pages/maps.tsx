@@ -6,6 +6,7 @@ import {
   CircleMarker,
   Popup,
 } from "react-leaflet";
+import { api, type CurrentWeather } from "@/lib/api";
 
 type Service = {
   id: number;
@@ -129,6 +130,30 @@ export default function Maps() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [locationName, setLocationName] = useState("");
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
+
+  const loadLocationDetails = async (lat: number, lon: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+      );
+      if (response.ok) {
+        const data = (await response.json()) as { display_name?: string };
+        setLocationName(data.display_name ?? "");
+      }
+    } catch {
+      setLocationName("");
+    }
+
+    try {
+      setWeather(await api.getCurrentWeather(lat, lon));
+    } catch {
+      setWeather(null);
+    }
+  };
 
   const getLocation = () => {
     setError("");
@@ -147,6 +172,7 @@ export default function Maps() {
         const lon = position.coords.longitude;
 
         setLocation({ latitude: lat, longitude: lon });
+        await loadLocationDetails(lat, lon);
         setLoading(false);
         setSearching(true);
 
@@ -169,6 +195,28 @@ export default function Maps() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const applyManualLocation = async () => {
+    const lat = Number(manualLat);
+    const lon = Number(manualLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      setError("Enter a valid latitude and longitude.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    setSearching(true);
+    setLocation({ latitude: lat, longitude: lon });
+    await loadLocationDetails(lat, lon);
+    try {
+      setServices(await findNearbyServices(lat, lon));
+    } catch {
+      setError("Unable to load nearby services. Please try again later.");
+    } finally {
+      setLoading(false);
+      setSearching(false);
+    }
   };
 
   return (
@@ -194,6 +242,20 @@ export default function Maps() {
               : "Find My Location"}
         </button>
 
+        <div className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="manual-lat">Latitude</label>
+            <input id="manual-lat" value={manualLat} onChange={(event) => setManualLat(event.target.value)} type="number" step="any" className="rounded-lg border px-3 py-2" placeholder="12.9716" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="manual-lng">Longitude</label>
+            <input id="manual-lng" value={manualLng} onChange={(event) => setManualLng(event.target.value)} type="number" step="any" className="rounded-lg border px-3 py-2" placeholder="77.5946" />
+          </div>
+          <button type="button" onClick={() => void applyManualLocation()} className="rounded-lg border border-green-700 px-4 py-2 font-semibold text-green-800 hover:bg-green-50">
+            Use entered location
+          </button>
+        </div>
+
         {error && (
           <p className="mb-4 rounded-lg bg-red-100 p-3 text-red-700">
             {error}
@@ -203,8 +265,18 @@ export default function Maps() {
         {location && (
           <div className="mb-5 rounded-lg bg-green-100 p-4 text-green-900">
             <h2 className="font-semibold">Your Current Location</h2>
+            {locationName && <p className="mt-1">{locationName}</p>}
             <p>Latitude: {location.latitude.toFixed(6)}</p>
             <p>Longitude: {location.longitude.toFixed(6)}</p>
+          </div>
+        )}
+
+        {weather && (
+          <div className="mb-5 grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-4">
+            <div><p className="text-xs text-gray-500">Temperature</p><p className="font-bold">{weather.temperature_c.toFixed(1)} °C</p></div>
+            <div><p className="text-xs text-gray-500">Humidity</p><p className="font-bold">{weather.humidity_percent.toFixed(0)}%</p></div>
+            <div><p className="text-xs text-gray-500">Rainfall</p><p className="font-bold">{weather.rainfall_mm.toFixed(1)} mm</p></div>
+            <div><p className="text-xs text-gray-500">Wind</p><p className="font-bold">{weather.wind_speed_ms.toFixed(1)} m/s</p></div>
           </div>
         )}
 

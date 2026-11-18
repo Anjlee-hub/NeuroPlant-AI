@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Leaf,
   ScanLine,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Stethoscope,
@@ -316,7 +317,8 @@ export function ScanCropPage() {
   const queryClient = useQueryClient();
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -327,6 +329,10 @@ export function ScanCropPage() {
   const [explain, setExplain] = useState<ScanExplain | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
 
   const cropsQuery = useQuery({
     queryKey: ["crops"],
@@ -340,6 +346,88 @@ export function ScanCropPage() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    return () => {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOpen(false);
+  };
+
+  const openCamera = async (preferredFacing: "environment" | "user" = facingMode) => {
+    setCameraError("");
+    setCameraLoading(true);
+    setCameraOpen(true);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera access is not supported by this browser. Please use HTTPS or localhost and upload a photo instead.");
+      setCameraLoading(false);
+      return;
+    }
+
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: preferredFacing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          void videoRef.current.play().catch(() => undefined);
+        }
+      });
+      setFacingMode(preferredFacing);
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setCameraError("Camera permission was denied. Allow camera access in your browser settings, or upload a photo.");
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setCameraError("No camera device was found. You can upload a photo instead.");
+      } else {
+        setCameraError("Unable to start the camera. Check camera permissions and availability, or upload a photo.");
+      }
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  const switchCamera = async () => {
+    await openCamera(facingMode === "environment" ? "user" : "environment");
+  };
+
+  const captureImage = () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      setCameraError("The camera preview is still starting. Please try again.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError("Unable to capture the image in this browser.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setCameraError("Unable to create an image from the camera frame.");
+        return;
+      }
+      const captured = new File([blob], `crop-camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+      pickFile(captured);
+      stopCamera();
+    }, "image/jpeg", 0.92);
+  };
 
   const pickFile = (picked: File | null) => {
     if (!picked) return;
@@ -365,6 +453,7 @@ export function ScanCropPage() {
   };
 
   const reset = () => {
+    stopCamera();
     setFile(null);
     setPreviewUrl(null);
     setCropId("");
@@ -375,7 +464,6 @@ export function ScanCropPage() {
     setErrorMsg("");
 
     if (uploadInputRef.current) uploadInputRef.current.value = "";
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   const submit = async () => {
@@ -452,6 +540,61 @@ export function ScanCropPage() {
             </Button>
           </div>
         </header>
+
+        {cameraOpen && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Live crop camera"
+          >
+            <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-card shadow-2xl">
+              <div className="relative aspect-[4/3] max-h-[70vh] min-h-[300px] overflow-hidden bg-black sm:aspect-video">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover"
+                  aria-label="Live camera preview"
+                />
+                <div className="pointer-events-none absolute inset-[12%] rounded-2xl border-4 border-green-400/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.15)]">
+                  <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                    Position the affected leaf in this frame
+                  </span>
+                </div>
+                {cameraLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-semibold text-white">
+                    Starting camera...
+                  </div>
+                )}
+                {cameraError && (
+                  <div className="absolute inset-x-4 bottom-4 rounded-xl bg-destructive px-4 py-3 text-sm text-destructive-foreground">
+                    {cameraError}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 p-4">
+                <Button variant="outline" onClick={stopCamera}>
+                  Cancel
+                </Button>
+                <Button
+                  size="lg"
+                  className="min-w-32 rounded-full"
+                  onClick={captureImage}
+                  disabled={cameraLoading || !!cameraError}
+                >
+                  <Camera className="mr-2 size-5" />
+                  Capture
+                </Button>
+                <Button variant="outline" onClick={() => void switchCamera()}>
+                  <RefreshCw className="mr-2 size-4" />
+                  Switch camera
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {phase === "result" && result ? (
           <ResultView
@@ -607,7 +750,7 @@ export function ScanCropPage() {
                           </Button>
                           <Button
                             variant="outline"
-                            onClick={() => cameraInputRef.current?.click()}
+                            onClick={() => void openCamera()}
                           >
                             <Camera className="mr-2 size-4" />
                             {t("scanCrop.cameraPhoto")}
@@ -629,19 +772,6 @@ export function ScanCropPage() {
                     }}
                   />
 
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    data-testid="scan-camera-input"
-                    onChange={(event) => {
-                      pickFile(event.target.files?.[0] ?? null);
-                      event.target.value = "";
-                    }}
-                  />
-
                   {file && (
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button
@@ -655,7 +785,7 @@ export function ScanCropPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => cameraInputRef.current?.click()}
+                        onClick={() => void openCamera()}
                       >
                         <Camera className="mr-2 size-4" />
                         {t("scanCrop.cameraPhoto")}

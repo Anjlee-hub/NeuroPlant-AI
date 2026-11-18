@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import i18n, { type Language, SUPPORTED_LANGUAGES } from "@/i18n";
 
 const STORAGE_KEY = "i18nextLng";
+export const AUTO_LANGUAGE_STORAGE_KEY = "neuroplant.autoLocalLanguage";
 
 /**
  * Language switching for the current session. Persists to localStorage
@@ -21,6 +22,7 @@ export function useLanguage() {
 
   const setLanguage = useCallback(
     (lang: Language) => {
+      localStorage.setItem(AUTO_LANGUAGE_STORAGE_KEY, "false");
       void i18n.changeLanguage(lang);
       localStorage.setItem(STORAGE_KEY, lang);
     },

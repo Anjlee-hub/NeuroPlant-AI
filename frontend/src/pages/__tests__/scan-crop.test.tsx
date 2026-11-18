@@ -169,10 +169,9 @@ describe("ScanCropPage", () => {
       "href",
       "/scans/11",
     );
-    expect(screen.getByRole("link", { name: "View scan history" })).toHaveAttribute(
-      "href",
-      "/scans",
-    );
+    const historyLinks = screen.getAllByRole("link", { name: "View scan history" });
+    expect(historyLinks.length).toBeGreaterThan(0);
+    historyLinks.forEach((link) => expect(link).toHaveAttribute("href", "/scans"));
   });
 
   it("surfaces a readable error when the upload fails", async () => {

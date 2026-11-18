@@ -107,6 +107,16 @@ export interface ScanUploadInput {
   deviceId?: string;
 }
 
+export interface CurrentWeather {
+  coordinates: { lat: number; lng: number };
+  temperature_c: number;
+  humidity_percent: number;
+  rainfall_mm: number;
+  wind_speed_ms: number;
+  provider: string;
+  is_fallback: boolean;
+}
+
 type CartResponse = {
   items: {
     id: number;
@@ -321,6 +331,10 @@ export const api = {
   getScan: (scanId: number) => request<Scan>(`/scans/${scanId}`, { auth: true }),
   getScanExplain: (scanId: number) =>
     request<ScanExplain>(`/scans/${scanId}/explain`, { auth: true }),
+  getCurrentWeather: (lat: number, lng: number) =>
+    request<CurrentWeather>(`/weather/current?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`, {
+      auth: true,
+    }),
   /** Treatment care plan for a scan's predicted disease (M3 T2). */
   getScanRecommendations: (scanId: number) =>
     request<DiseaseRecommendation>(`/scans/${scanId}/recommendations`, { auth: true }),
@@ -398,6 +412,20 @@ export const api = {
     request<EligibilityCheck>(`/schemes/${schemeId}/eligibility`, {
       method: "POST",
       body: payload,
+      auth: true,
+    }),
+  listSavedGovernmentSchemes: () =>
+    request<GovernmentScheme[]>("/schemes/saved", { auth: true }),
+  getSavedGovernmentSchemeStatus: (schemeId: number) =>
+    request<{ saved: boolean }>(`/schemes/saved/status/${schemeId}`, { auth: true }),
+  saveGovernmentScheme: (schemeId: number) =>
+    request<{ saved: boolean }>(`/schemes/saved/${schemeId}`, {
+      method: "POST",
+      auth: true,
+    }),
+  removeSavedGovernmentScheme: (schemeId: number) =>
+    request<{ saved: boolean }>(`/schemes/saved/${schemeId}`, {
+      method: "DELETE",
       auth: true,
     }),
   // ── Voice AI Assistant (M3 T6 → M3.1 conversational) ──────────────────

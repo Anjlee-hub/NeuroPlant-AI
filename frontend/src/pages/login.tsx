@@ -224,7 +224,6 @@ export function LoginPage() {
             <div
               id="login-panel"
               role="tabpanel"
-              aria-labelledby={`login-tab-${mode}`}
             >
               {error && (
                 <div

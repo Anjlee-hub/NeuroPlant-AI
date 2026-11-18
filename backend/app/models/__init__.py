@@ -21,7 +21,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.recommendation import DiseaseRecommendation, RecommendationCatalog
 from app.models.recovery import RecoveryLog
 from app.models.scan import Scan
-from app.models.scheme import GovernmentScheme, SchemeUsageEvent
+from app.models.scheme import GovernmentScheme, SavedGovernmentScheme, SchemeUsageEvent
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
 from app.models.user import (
     MFA,
@@ -47,6 +47,7 @@ __all__ = [
     "ConversationMessage",
     "HarvestRecord",
     "GovernmentScheme",
+    "SavedGovernmentScheme",
     "SchemeUsageEvent",
     "YieldEstimateRecord",
     "CropListing",

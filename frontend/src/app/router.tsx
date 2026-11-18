@@ -24,6 +24,7 @@ import { ScanDoctorPage } from "@/pages/scan-doctor";
 import { ScanHistoryPage } from "@/pages/scan-history";
 import { FarmerCalendarPage } from "@/pages/farmer-calendar";
 import { AssistantPage } from "@/pages/assistant";
+import MapsPage from "@/pages/maps";
 
 import { GovernmentSchemesPage } from "@/pages/government-schemes";
 import { CommunityPage } from "@/pages/community";
@@ -117,6 +118,10 @@ export const router = createBrowserRouter([
           {
             path: "/calendar",
             element: <FarmerCalendarPage />,
+          },
+          {
+            path: "/location",
+            element: <MapsPage />,
           },
 
           // Government schemes and farmer community.

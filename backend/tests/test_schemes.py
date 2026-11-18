@@ -72,6 +72,13 @@ async def test_admin_can_add_verified_source_and_farmers_can_filter_and_check(cl
     assert create.status_code == 201, create.text
     scheme_id = create.json()["id"]
 
+    details = await client.get(f"/api/v1/schemes/{scheme_id}", headers=headers)
+    assert details.status_code == 200
+    assert details.json()["description"] == "A test description from a source record."
+    assert details.json()["required_documents"] == ["Identity proof"]
+    assert details.json()["application_instructions"] == "Follow the official instructions."
+    assert details.json()["source_url"] == "https://example.gov/scheme"
+
     listing = await client.get(
         "/api/v1/schemes?state_code=KA&crop_name=rice&farmer_category=small",
         headers=headers,
@@ -157,3 +164,114 @@ async def test_scheme_administration_requires_admin_role(client):
         },
     )
     assert response.status_code == 403
+
+
+async def test_save_status_list_and_remove_scheme(client):
+    user_id, headers = await _register(client, "+919200000005")
+    await _make_admin(user_id)
+    created = await client.post(
+        "/api/v1/schemes",
+        headers=headers,
+        json={
+            "name": "Saved catalogue scheme",
+            "category": "storage",
+            "department": "Test Department",
+            "description": "Officially attributed test record.",
+            "state_codes": ["KA"],
+            "district_codes": ["Bengaluru Urban"],
+            "source_name": "Test department",
+            "source_url": "https://example.gov/saved-catalogue-scheme",
+        },
+    )
+    assert created.status_code == 201, created.text
+    scheme_id = created.json()["id"]
+
+    initial_status = await client.get(
+        f"/api/v1/schemes/saved/status/{scheme_id}",
+        headers=headers,
+    )
+    assert initial_status.json() == {"saved": False}
+
+    save = await client.post(
+        f"/api/v1/schemes/saved/{scheme_id}",
+        headers=headers,
+    )
+    assert save.status_code == 200
+    assert save.json() == {"saved": True}
+
+    saved = await client.get("/api/v1/schemes/saved", headers=headers)
+    assert saved.status_code == 200
+    assert [item["id"] for item in saved.json()] == [scheme_id]
+
+    remove = await client.delete(
+        f"/api/v1/schemes/saved/{scheme_id}",
+        headers=headers,
+    )
+    assert remove.status_code == 200
+    assert remove.json() == {"saved": False}
+    remaining = await client.get("/api/v1/schemes/saved", headers=headers)
+    assert remaining.json() == []
+
+
+async def test_saved_schemes_are_isolated_by_authenticated_user(client):
+    owner_id, owner_headers = await _register(client, "+919200000007")
+    await _make_admin(owner_id)
+    created = await client.post(
+        "/api/v1/schemes",
+        headers=owner_headers,
+        json={
+            "name": "Private saved scheme",
+            "category": "storage",
+            "description": "A source-attributed test record.",
+            "source_name": "Test department",
+            "source_url": "https://example.gov/private-saved-scheme",
+        },
+    )
+    assert created.status_code == 201, created.text
+    scheme_id = created.json()["id"]
+    assert (await client.post(
+        f"/api/v1/schemes/saved/{scheme_id}",
+        headers=owner_headers,
+    )).status_code == 200
+
+    _, other_headers = await _register(client, "+919200000008")
+    status = await client.get(
+        f"/api/v1/schemes/saved/status/{scheme_id}",
+        headers=other_headers,
+    )
+    saved = await client.get("/api/v1/schemes/saved", headers=other_headers)
+    remove = await client.delete(
+        f"/api/v1/schemes/saved/{scheme_id}",
+        headers=other_headers,
+    )
+
+    assert status.json() == {"saved": False}
+    assert saved.json() == []
+    assert remove.status_code == 404
+
+
+async def test_search_and_duplicate_catalogue_records(client):
+    user_id, headers = await _register(client, "+919200000006")
+    await _make_admin(user_id)
+    payload = {
+        "name": "District search scheme",
+        "category": "irrigation",
+        "department": "Test Department",
+        "description": "A source-backed irrigation record.",
+        "district_codes": ["Bengaluru Rural"],
+        "source_name": "Test department",
+        "source_url": "https://example.gov/district-search-scheme",
+    }
+    first = await client.post("/api/v1/schemes", headers=headers, json=payload)
+    assert first.status_code == 201
+
+    duplicate = await client.post("/api/v1/schemes", headers=headers, json=payload)
+    assert duplicate.status_code == 409
+
+    listing = await client.get(
+        "/api/v1/schemes",
+        headers=headers,
+        params={"district_code": "Bengaluru Rural", "search": "irrigation"},
+    )
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1

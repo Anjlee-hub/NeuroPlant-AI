@@ -1,6 +1,48 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+// Vitest 4 can run jsdom without a usable global localStorage depending on
+// the Node host. Provide a standards-shaped in-memory implementation so
+// i18n, theme and language preference tests exercise the same Storage API.
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>();
+
+  get length(): number {
+    return this.values.size;
+  }
+
+  clear(): void {
+    this.values.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.values.has(key) ? this.values.get(key)! : null;
+  }
+
+  key(index: number): string | null {
+    return Array.from(this.values.keys())[index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(String(key), String(value));
+  }
+}
+
+const testLocalStorage = new MemoryStorage();
+
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: testLocalStorage,
+});
+Object.defineProperty(window, "localStorage", {
+  configurable: true,
+  value: testLocalStorage,
+});
+
 // jsdom ships no matchMedia — the theme provider and theme toggle rely on it.
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -32,6 +74,11 @@ class IntersectionObserverStub implements IntersectionObserver {
 }
 
 vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
+
+Object.defineProperty(Element.prototype, "scrollIntoView", {
+  configurable: true,
+  value: vi.fn(),
+});
 
 // jsdom ships no createObjectURL/revokeObjectURL — the Scan Crop preview and
 // the offline queue thumbnail rely on them. Returning a stable blob URL keeps

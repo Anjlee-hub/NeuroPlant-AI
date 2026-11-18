@@ -9,9 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 class GovernmentSchemeCreate(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     category: str = Field(min_length=2, max_length=80)
+    department: str = Field(default="Official department", min_length=2, max_length=200)
+    status: Literal["active", "closed", "unverified"] = "active"
     description: str = Field(min_length=1, max_length=10000)
     benefits: str | None = Field(default=None, max_length=5000)
     state_codes: list[str] = Field(default_factory=list, max_length=40)
+    district_codes: list[str] = Field(default_factory=list, max_length=200)
     crops: list[str] = Field(default_factory=list, max_length=100)
     farmer_categories: list[str] = Field(default_factory=list, max_length=40)
     eligibility_requirements: list[str] = Field(default_factory=list, max_length=100)
@@ -38,9 +41,12 @@ class GovernmentSchemeOut(BaseModel):
     id: int
     name: str
     category: str
+    department: str
+    status: str
     description: str
     benefits: str | None
     state_codes: list[str]
+    district_codes: list[str]
     crops: list[str]
     farmer_categories: list[str]
     eligibility_requirements: list[str]
@@ -66,8 +72,10 @@ class GovernmentSchemePageOut(BaseModel):
 
 class EligibilityCheckIn(BaseModel):
     state_code: str | None = Field(default=None, min_length=2, max_length=8)
+    district_code: str | None = Field(default=None, min_length=1, max_length=120)
     crop_name: str | None = Field(default=None, min_length=1, max_length=120)
     farmer_category: str | None = Field(default=None, min_length=1, max_length=80)
+    landholding_acres: float | None = Field(default=None, ge=0, le=100000)
 
 
 class EligibilityCheckOut(BaseModel):
@@ -77,3 +85,10 @@ class EligibilityCheckOut(BaseModel):
     unmet_rules: list[str]
     explanation: str
     legal_determination: Literal[False] = False
+
+
+class SavedGovernmentSchemeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    scheme: GovernmentSchemeOut
