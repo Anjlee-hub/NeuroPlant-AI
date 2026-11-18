@@ -16,6 +16,21 @@ type Service = {
   distance: number;
 };
 
+type OverpassElement = {
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: {
+    lat: number;
+    lon: number;
+  };
+  tags?: Record<string, string>;
+};
+
+type OverpassResponse = {
+  elements: OverpassElement[];
+};
+
 function calculateDistance(
   lat1: number,
   lon1: number,
@@ -69,20 +84,23 @@ async function findNearbyServices(lat: number, lon: number) {
     throw new Error("Could not load nearby agricultural services.");
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as OverpassResponse;
 
   return data.elements
-    .filter((item: any) => item.tags?.name)
-    .map((item: any) => {
+    .filter((item: OverpassElement) => item.tags?.name)
+    .map((item: OverpassElement) => {
       const latitude = item.lat ?? item.center?.lat;
       const longitude = item.lon ?? item.center?.lon;
+      const name = item.tags?.name;
 
-      if (latitude == null || longitude == null) return null;
+      if (latitude == null || longitude == null || name == null) {
+        return null;
+      }
 
       return {
         id: item.id,
-        name: item.tags.name,
-        category: getCategory(item.tags),
+        name,
+        category: getCategory(item.tags ?? {}),
         latitude,
         longitude,
         distance: calculateDistance(lat, lon, latitude, longitude),
