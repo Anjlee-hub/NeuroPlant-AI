@@ -524,10 +524,7 @@ class MarketplaceService:
         product = await self.db.get(Product, payload.product_id)
         if product is None or product.availability != "in_stock":
             raise HTTPException(status_code=404, detail="Product unavailable")
-        if (
-            product.stock_quantity is not None
-            and payload.quantity > product.stock_quantity
-        ):
+        if product.stock_quantity is not None and payload.quantity > product.stock_quantity:
             raise HTTPException(status_code=400, detail="Insufficient stock")
         item = await self.db.scalar(
             select(CartItem).where(
@@ -536,10 +533,7 @@ class MarketplaceService:
             )
         )
         new_quantity = payload.quantity + (item.quantity if item else 0)
-        if (
-            product.stock_quantity is not None
-            and new_quantity > product.stock_quantity
-        ):
+        if product.stock_quantity is not None and new_quantity > product.stock_quantity:
             raise HTTPException(status_code=400, detail="Insufficient stock")
         if item:
             item.quantity = new_quantity
@@ -584,10 +578,7 @@ class MarketplaceService:
                     status_code=400,
                     detail=f"Product unavailable: {product.name}",
                 )
-            if (
-                product.stock_quantity is not None
-                and cart_item.quantity > product.stock_quantity
-            ):
+            if product.stock_quantity is not None and cart_item.quantity > product.stock_quantity:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Insufficient stock for {product.name}",
@@ -645,9 +636,7 @@ class MarketplaceService:
 
     async def get_orders(self, user: User) -> list[OrderOut]:
         result = await self.db.scalars(
-            select(Order)
-            .where(Order.user_id == user.id)
-            .order_by(Order.created_at.desc())
+            select(Order).where(Order.user_id == user.id).order_by(Order.created_at.desc())
         )
         orders = result.all()
         output: list[OrderOut] = []

@@ -199,14 +199,25 @@ def pathogen_class(pathogen_type: str | None) -> str:
 def _compute_factors(pclass: str, weather: WeatherData) -> list[dict[str, float | str]]:
     """Favorability + impact label for each weather factor under ``pclass``."""
     entries = [
-        ("humidity", f"relative humidity {weather.humidity_percent:.0f}%",
-         HUMIDITY_PROFILES[pclass], weather.humidity_percent),
-        ("temperature", f"temperature {weather.temperature_c:.1f}°C",
-         None, weather.temperature_c),
-        ("rainfall", f"rainfall {weather.rainfall_mm:.1f} mm",
-         RAINFALL_PROFILES[pclass], weather.rainfall_mm),
-        ("wind", f"wind {weather.wind_speed_ms:.1f} m/s",
-         WIND_PROFILES[pclass], weather.wind_speed_ms),
+        (
+            "humidity",
+            f"relative humidity {weather.humidity_percent:.0f}%",
+            HUMIDITY_PROFILES[pclass],
+            weather.humidity_percent,
+        ),
+        ("temperature", f"temperature {weather.temperature_c:.1f}°C", None, weather.temperature_c),
+        (
+            "rainfall",
+            f"rainfall {weather.rainfall_mm:.1f} mm",
+            RAINFALL_PROFILES[pclass],
+            weather.rainfall_mm,
+        ),
+        (
+            "wind",
+            f"wind {weather.wind_speed_ms:.1f} m/s",
+            WIND_PROFILES[pclass],
+            weather.wind_speed_ms,
+        ),
     ]
     factors: list[dict[str, float | str]] = []
     for factor, condition, profile, value in entries:
@@ -301,7 +312,5 @@ class DiseaseRiskService:
             select(Crop).options(selectinload(Crop.diseases)).where(Crop.id == crop_id)
         )
         if crop is None:
-            raise CropNotFoundError(
-                f"Crop {crop_id} is not in the catalog (unsupported crop)."
-            )
+            raise CropNotFoundError(f"Crop {crop_id} is not in the catalog (unsupported crop).")
         return crop

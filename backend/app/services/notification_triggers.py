@@ -1,12 +1,12 @@
+
 """Notification triggers — domain integration (M5, Task 3).
 
 Integrates the existing NotificationService with domain features so that
 domain events create notifications without duplicating domain logic.
 
-All triggers are idempotent where repeated events are possible (e.g. a
-weather risk re-assessment on the same coordinates should not spam the
-user). Each trigger uses the domain service's own data and calls
-NotificationService.create() with the appropriate type + payload.
+All triggers are idempotent where repeated events are possible. Each trigger
+uses the domain service's own data and calls NotificationService.create()
+with the appropriate type and payload.
 
 No push is implemented — the existing InAppTransport seam is preserved.
 """
@@ -46,13 +46,14 @@ async def _notification_exists(
     *,
     since_hours: int = 24,
 ) -> bool:
-    """Check if a similar notification was already created recently.
+    """Check whether a similar notification was created recently.
 
     Prevents duplicate notifications for the same user/type/payload within
-    the time window. The payload match is loose (subset) so that additional
-    keys in the new payload don't bypass the check.
+    the configured time window. Payload matching is loose: all keys in the
+    new payload must match, while extra keys in the existing payload are OK.
     """
     since = datetime.now(UTC) - timedelta(hours=since_hours)
+
     result = await db.execute(
         select(Notification.id).where(
             Notification.user_id == user_id,
@@ -60,15 +61,18 @@ async def _notification_exists(
             Notification.created_at >= since,
         )
     )
+
     for (notif_id,) in result.all():
         notif = await db.get(Notification, notif_id)
-        if notif and _payload_matches(notif.payload, payload):
+
+        if notif and _payload_matches(notif.payload or {}, payload):
             return True
+
     return False
 
 
 def _payload_matches(existing: dict, new: dict) -> bool:
-    """True if all new keys match existing values (extra keys in existing are OK)."""
+    """Return True when all new payload keys match the existing payload."""
     return all(existing.get(key) == value for key, value in new.items())
 
 
@@ -79,8 +83,10 @@ class NotificationTriggerService:
     """Domain event → notification wiring.
 
     All methods are async and return the created Notification (or None if
-    skipped due to idempotency / missing objects / failures). Exceptions from
-    domain services propagate; callers should log and continue.
+    skipped due to idempotency, missing objects, or handled failures).
+
+    Unexpected domain errors are logged and handled so notification failures
+    do not unnecessarily disrupt the primary application workflow.
     """
 
     def __init__(self, db: AsyncSession) -> None:
@@ -98,85 +104,115 @@ class NotificationTriggerService:
         *,
         notify_levels: tuple[str, ...] = ("high", "critical"),
     ) -> Notification | None:
-        """Create weather_risk / disease_risk notifications if risk crosses threshold.
+        """Create weather_risk / disease_risk notifications when risk is high.
 
-        Uses the existing WeatherRiskService to assess. Idempotent per user +
-        crop + location within 24h (the same re-assessment won't re-notify).
+        Uses WeatherService and DiseaseRiskService to assess crop risk.
+        Duplicate assessments for the same user/crop/location are suppressed.
         """
-        # Validate user exists
         user = await self.db.get(User, user_id)
+
         if not user:
-            logger.warning("notify_weather_risk_user_missing", user_id=user_id)
+            logger.warning(
+                "notify_weather_risk_user_missing",
+                user_id=user_id,
+            )
             return None
 
-        # Validate crop exists
         crop = await self.db.get(Crop, crop_id)
+
         if not crop:
-            logger.warning("notify_weather_risk_crop_missing", crop_id=crop_id)
+            logger.warning(
+                "notify_weather_risk_crop_missing",
+                crop_id=crop_id,
+            )
             return None
 
         try:
             weather_result = await WeatherService().get_current(lat, lng)
+
             risk_out = await DiseaseRiskService(self.db).assess_crop(
-                crop_id, weather_result.data, is_fallback=weather_result.is_fallback
+                crop_id,
+                weather_result.data,
+                is_fallback=weather_result.is_fallback,
             )
+
         except WeatherProviderError:
-            logger.warning("notify_weather_risk_provider_failed", user_id=user_id, crop_id=crop_id)
+            logger.warning(
+                "notify_weather_risk_provider_failed",
+                user_id=user_id,
+                crop_id=crop_id,
+            )
             return None
+
         except Exception as exc:
-            logger.error(
+            logger.exception(
                 "notify_weather_risk_assess_failed",
                 user_id=user_id,
                 crop_id=crop_id,
                 error=str(exc),
             )
-            raise
+            return None
 
-        # Find the highest-risk disease above the threshold
         for risk in risk_out.risks:
-            if risk.risk_level in notify_levels:
-                payload = {
-                    "crop_id": crop_id,
-                    "crop_name": crop.name,
-                    "disease_id": risk.disease_id,
-                    "disease_name": risk.disease_name,
-                    "risk_level": risk.risk_level,
-                    "risk_score": risk.risk_score,
-                    "lat": lat,
-                    "lng": lng,
-                    "is_fallback": weather_result.is_fallback,
-                }
-                type_ = (
-                    NotificationType.DISEASE_RISK
-                    if risk.risk_level == "critical"
-                    else NotificationType.WEATHER_RISK
+            if risk.risk_level not in notify_levels:
+                continue
+
+            payload = {
+                "crop_id": crop_id,
+                "crop_name": crop.name,
+                "disease_id": risk.disease_id,
+                "disease_name": risk.disease_name,
+                "risk_level": risk.risk_level,
+                "risk_score": risk.risk_score,
+                "lat": lat,
+                "lng": lng,
+                "is_fallback": weather_result.is_fallback,
+            }
+
+            notification_type = (
+                NotificationType.DISEASE_RISK
+                if risk.risk_level == "critical"
+                else NotificationType.WEATHER_RISK
+            )
+
+            if await _notification_exists(
+                self.db,
+                user_id,
+                notification_type,
+                payload,
+            ):
+                logger.info(
+                    "notify_weather_risk_idempotent_skip",
+                    user_id=user_id,
+                    crop_id=crop_id,
+                    type=notification_type.value,
                 )
+                return None
 
-                # Idempotency check
-                if await _notification_exists(self.db, user_id, type_, payload):
-                    logger.info(
-                        "notify_weather_risk_idempotent_skip",
-                        user_id=user_id,
-                        crop_id=crop_id,
-                        type=type_.value,
-                    )
-                    return None
+            risk_kind = (
+                "disease"
+                if notification_type == NotificationType.DISEASE_RISK
+                else "weather"
+            )
 
-                risk_kind = "disease" if type_ == NotificationType.DISEASE_RISK else "weather"
-                title = f"{risk.risk_level.capitalize()} {risk_kind} risk for {crop.name}"
-                message = risk.explanation
+            title = (
+                f"{risk.risk_level.capitalize()} "
+                f"{risk_kind} risk for {crop.name}"
+            )
 
-                return await self.notify.create(
-                    user_id,
-                    type=type_,
-                    title=title,
-                    message=message,
-                    payload=payload,
-                    idempotency_key=(
-                        f"weather-risk:{user_id}:{crop_id}:{risk.disease_id}:"
-                        f"{datetime.now(UTC).date().isoformat()}:{lat:.4f}:{lng:.4f}"
-                    ),
-                )
+            return await self.notify.create(
+                user_id,
+                type=notification_type,
+                title=title,
+                message=risk.explanation,
+                payload=payload,
+                idempotency_key=(
+                    f"weather-risk:{user_id}:{crop_id}:{risk.disease_id}:"
+                    f"{datetime.now(UTC).date().isoformat()}:"
+                    f"{lat:.4f}:{lng:.4f}"
+                ),
+            )
+
         return None
 
     # ── 2. Calendar / task reminder ────────────────────────────────────────
@@ -188,67 +224,103 @@ class NotificationTriggerService:
         *,
         hours_before: int = 24,
     ) -> list[Notification]:
-        """Create reminders for every upcoming, incomplete task in a schedule.
+        """Create notifications for upcoming incomplete tasks.
 
-        Called periodically (e.g. by a scheduler) to find tasks due within
-        ``hours_before`` and notify the farmer. Idempotent per task (each
-        task has a unique scan_id + kind + due_at combination).
+        Tasks due within ``hours_before`` are notified. Duplicate reminders
+        for the same task and due date are prevented.
         """
         user = await self.db.get(User, user_id)
+
         if not user:
-            logger.warning("notify_task_reminder_user_missing", user_id=user_id)
+            logger.warning(
+                "notify_task_reminder_user_missing",
+                user_id=user_id,
+            )
             return []
 
-        now = datetime.now(UTC)
-        cutoff = now + timedelta(hours=hours_before)
-        schedule = await self.db.scalar(
-            select(CropSchedule).where(
-                CropSchedule.id == schedule_id,
-                CropSchedule.user_id == user_id,
+        try:
+            now = datetime.now(UTC)
+            cutoff = now + timedelta(hours=hours_before)
+
+            schedule = await self.db.scalar(
+                select(CropSchedule).where(
+                    CropSchedule.id == schedule_id,
+                    CropSchedule.user_id == user_id,
+                )
             )
-        )
-        if not schedule:
-            logger.warning(
-                "notify_task_reminder_schedule_missing",
+
+            if not schedule:
+                logger.warning(
+                    "notify_task_reminder_schedule_missing",
+                    user_id=user_id,
+                    schedule_id=schedule_id,
+                )
+                return []
+
+            # SQLite commonly stores datetimes without timezone information.
+            # Normalize query boundaries to match the database representation.
+            is_sqlite = self.db.get_bind().dialect.name == "sqlite"
+
+            db_now = now.replace(tzinfo=None) if is_sqlite else now
+            db_cutoff = cutoff.replace(tzinfo=None) if is_sqlite else cutoff
+
+            tasks = await self.db.scalars(
+                select(CalendarTask)
+                .where(
+                    CalendarTask.schedule_id == schedule_id,
+                    CalendarTask.due_at >= db_now,
+                    CalendarTask.due_at <= db_cutoff,
+                    CalendarTask.completed_at.is_(None),
+                )
+                .order_by(CalendarTask.due_at, CalendarTask.id)
+            )
+
+            created: list[Notification] = []
+
+            for task in tasks:
+                due_at = ensure_aware(task.due_at)
+
+                payload = {
+                    "schedule_id": schedule_id,
+                    "task_id": task.id,
+                    "task_kind": task.kind,
+                    "task_title": task.title,
+                    "due_at": due_at.isoformat(),
+                }
+
+                if await _notification_exists(
+                    self.db,
+                    user_id,
+                    NotificationType.TASK_REMINDER,
+                    payload,
+                    since_hours=48,
+                ):
+                    continue
+
+                notification = await self.notify.create(
+                    user_id,
+                    type=NotificationType.TASK_REMINDER,
+                    title=f"Upcoming task: {task.title}",
+                    message=f"Due {due_at.strftime('%Y-%m-%d %H:%M UTC')}",
+                    payload=payload,
+                    idempotency_key=(
+                        f"calendar-task:{task.id}:{due_at.isoformat()}"
+                    ),
+                )
+
+                if notification is not None:
+                    created.append(notification)
+
+            return created
+
+        except Exception as exc:
+            logger.exception(
+                "notify_task_reminder_failed",
                 user_id=user_id,
                 schedule_id=schedule_id,
+                error=str(exc),
             )
             return []
-
-        is_sqlite = self.db.get_bind().dialect.name == "sqlite"
-        db_now = now.replace(tzinfo=None) if is_sqlite else now
-        db_cutoff = cutoff.replace(tzinfo=None) if is_sqlite else cutoff
-        tasks = await self.db.scalars(
-            select(CalendarTask)
-            .where(
-                CalendarTask.schedule_id == schedule_id,
-                CalendarTask.due_at >= db_now,
-                CalendarTask.due_at <= db_cutoff,
-                CalendarTask.completed_at.is_(None),
-            )
-            .order_by(CalendarTask.due_at, CalendarTask.id)
-        )
-
-        created: list[Notification] = []
-        for task in tasks:
-            due_at = ensure_aware(task.due_at)
-            payload = {
-                "schedule_id": schedule_id,
-                "task_id": task.id,
-                "task_kind": task.kind,
-                "task_title": task.title,
-                "due_at": due_at.isoformat(),
-            }
-            notification = await self.notify.create(
-                user_id,
-                type=NotificationType.TASK_REMINDER,
-                title=f"Upcoming task: {task.title}",
-                message=f"Due {due_at.strftime('%Y-%m-%d %H:%M UTC')}",
-                payload=payload,
-                idempotency_key=f"calendar-task:{task.id}:{due_at.isoformat()}",
-            )
-            created.append(notification)
-        return created
 
     # ── 3. Treatment / recovery reminder ──────────────────────────────────
 
@@ -257,63 +329,106 @@ class NotificationTriggerService:
         user_id: int,
         scan_id: int,
     ) -> Notification | None:
-        """Create treatment_reminder based on recovery tracker timeline.
+        """Create a treatment reminder based on recovery tracker history.
 
-        If the latest recovery log suggests a follow-up treatment (based on
-        the documented resume intervals), notify the farmer. Idempotent per
-        scan + last_log_id.
+        Uses the latest recovery log and documented treatment resume intervals
+        to determine whether a follow-up treatment reminder is due.
         """
         user = await self.db.get(User, user_id)
+
         if not user:
-            logger.warning("notify_treatment_reminder_user_missing", user_id=user_id)
-            return None
-
-        from app.models.scan import Scan
-
-        scan = await self.db.get(Scan, scan_id)
-        if not scan or scan.user_id != user_id:
             logger.warning(
-                "notify_treatment_reminder_scan_missing",
+                "notify_treatment_reminder_user_missing",
                 user_id=user_id,
-                scan_id=scan_id,
             )
             return None
 
-        tracker_out = await RecoveryTrackerService(self.db).tracker(scan)
-        if not tracker_out.timeline:
+        try:
+            from app.models.scan import Scan
+
+            scan = await self.db.get(Scan, scan_id)
+
+            if not scan or scan.user_id != user_id:
+                logger.warning(
+                    "notify_treatment_reminder_scan_missing",
+                    user_id=user_id,
+                    scan_id=scan_id,
+                )
+                return None
+
+            tracker_out = await RecoveryTrackerService(self.db).tracker(scan)
+
+            if not tracker_out.timeline:
+                return None
+
+            last_log = tracker_out.timeline[-1]
+
+            if last_log.progress == "recovered" or last_log.applied_at is None:
+                return None
+
+            from app.services.calendar import TREATMENT_RESUME_DAYS
+
+            applied_at = ensure_aware(last_log.applied_at)
+
+            offset_days = TREATMENT_RESUME_DAYS.get(
+                last_log.progress or "no-change",
+                5,
+            )
+
+            next_due = applied_at + timedelta(days=offset_days)
+            now = datetime.now(UTC)
+
+            # Remind within 24 hours of the due time, but do not send
+            # reminders for treatments that are more than 7 days overdue.
+            if next_due > now + timedelta(hours=24):
+                return None
+
+            if next_due < now - timedelta(days=7):
+                return None
+
+            payload = {
+                "scan_id": scan_id,
+                "recovery_log_id": last_log.id,
+                "disease_name": scan.disease_name,
+                "last_progress": last_log.progress,
+                "last_applied_at": applied_at.isoformat(),
+                "next_due_at": next_due.isoformat(),
+            }
+
+            if await _notification_exists(
+                self.db,
+                user_id,
+                NotificationType.TREATMENT_REMINDER,
+                payload,
+                since_hours=48,
+            ):
+                return None
+
+            return await self.notify.create(
+                user_id,
+                type=NotificationType.TREATMENT_REMINDER,
+                title=f"Treatment follow-up for {scan.disease_name}",
+                message=(
+                    "Next treatment due based on last "
+                    f"{last_log.progress} response"
+                ),
+                payload=payload,
+                idempotency_key=(
+                    f"treatment-follow-up:{scan_id}:"
+                    f"{last_log.id}:{next_due.isoformat()}"
+                ),
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "notify_treatment_reminder_failed",
+                user_id=user_id,
+                scan_id=scan_id,
+                error=str(exc),
+            )
             return None
 
-        last_log = tracker_out.timeline[-1]
-        if last_log.progress == "recovered" or last_log.applied_at is None:
-            return None
-
-        from app.services.calendar import TREATMENT_RESUME_DAYS
-
-        applied_at = ensure_aware(last_log.applied_at)
-        offset_days = TREATMENT_RESUME_DAYS.get(last_log.progress or "no-change", 5)
-        next_due = applied_at + timedelta(days=offset_days)
-        now = datetime.now(UTC)
-        if next_due > now + timedelta(hours=24) or next_due < now - timedelta(days=7):
-            return None
-
-        payload = {
-            "scan_id": scan_id,
-            "recovery_log_id": last_log.id,
-            "disease_name": scan.disease_name,
-            "last_progress": last_log.progress,
-            "last_applied_at": applied_at.isoformat(),
-            "next_due_at": next_due.isoformat(),
-        }
-        return await self.notify.create(
-            user_id,
-            type=NotificationType.TREATMENT_REMINDER,
-            title=f"Treatment follow-up for {scan.disease_name}",
-            message=f"Next treatment due based on last {last_log.progress} response",
-            payload=payload,
-            idempotency_key=(f"treatment-follow-up:{scan_id}:{last_log.id}:{next_due.isoformat()}"),
-        )
-
-    # ── 4. Marketplace message ────────────────────────────────────────────
+    # ── 4. Marketplace message ───────────────────────────────────────────────
 
     async def notify_marketplace_message(
         self,
@@ -326,16 +441,17 @@ class NotificationTriggerService:
         listing_id: int | None = None,
         product_id: int | None = None,
     ) -> Notification | None:
-        """Create marketplace_message notification when a new message arrives.
+        """Create a marketplace message notification.
 
-        Called from MessagingService.send_message after the message is
-        persisted. The recipient is the *other* participant. Idempotent per
-        conversation + message (the message ID is in the payload).
+        Called after a message is persisted. The recipient is the other
+        conversation participant. Notifications are idempotent per message.
         """
         user = await self.db.get(User, recipient_id)
+
         if not user:
             logger.warning(
-                "notify_marketplace_message_recipient_missing", recipient_id=recipient_id
+                "notify_marketplace_message_recipient_missing",
+                recipient_id=recipient_id,
             )
             return None
 
@@ -344,10 +460,13 @@ class NotificationTriggerService:
             "sender_id": sender_id,
             "sender_name": sender_name,
         }
+
         if message_id is not None:
             payload["message_id"] = message_id
+
         if listing_id:
             payload["listing_id"] = listing_id
+
         if product_id:
             payload["product_id"] = product_id
 
@@ -359,14 +478,11 @@ class NotificationTriggerService:
         ):
             return None
 
-        title = f"New message from {sender_name}"
-        message = "You have a new marketplace inquiry"
-
         return await self.notify.create(
             recipient_id,
             type=NotificationType.MARKETPLACE_MESSAGE,
-            title=title,
-            message=message,
+            title=f"New message from {sender_name}",
+            message="You have a new marketplace inquiry",
             payload=payload,
             idempotency_key=(
                 f"marketplace-message:{recipient_id}:{message_id}"
@@ -375,7 +491,7 @@ class NotificationTriggerService:
             ),
         )
 
-    # ── 5. Review received ─────────────────────────────────────────────────
+    # ── 5. Review received ────────────────────────────────────────────────
 
     async def notify_review_received(
         self,
@@ -387,14 +503,17 @@ class NotificationTriggerService:
         rating: int,
         reviewer_name: str,
     ) -> Notification | None:
-        """Create review_received notification when a new review is posted.
+        """Create a review notification after a review is posted.
 
-        Called from ReviewsService.create after the review is persisted.
-        Idempotent per review_id.
+        Idempotent per review.
         """
         user = await self.db.get(User, seller_id)
+
         if not user:
-            logger.warning("notify_review_received_seller_missing", seller_id=seller_id)
+            logger.warning(
+                "notify_review_received_seller_missing",
+                seller_id=seller_id,
+            )
             return None
 
         payload = {
@@ -402,8 +521,10 @@ class NotificationTriggerService:
             "rating": rating,
             "reviewer_name": reviewer_name,
         }
+
         if listing_id:
             payload["listing_id"] = listing_id
+
         if product_id:
             payload["product_id"] = product_id
 
@@ -416,14 +537,12 @@ class NotificationTriggerService:
             return None
 
         stars = "★" * rating + "☆" * (5 - rating)
-        title = f"New {rating}-star review from {reviewer_name}"
-        message = f"You received a new review: {stars}"
 
         return await self.notify.create(
             seller_id,
             type=NotificationType.REVIEW_RECEIVED,
-            title=title,
-            message=message,
+            title=f"New {rating}-star review from {reviewer_name}",
+            message=f"You received a new review: {stars}",
             payload=payload,
             idempotency_key=f"review-received:{seller_id}:{review_id}",
         )
@@ -434,16 +553,20 @@ class NotificationTriggerService:
         self,
         user_id: int,
         *,
-        event: Literal["placed", "confirmed", "shipped", "delivered", "cancelled"],
+        event: Literal[
+            "placed",
+            "confirmed",
+            "shipped",
+            "delivered",
+            "cancelled",
+        ],
         order_id: int,
         details: dict | None = None,
     ) -> Notification | None:
-        """Create order_update notification for order lifecycle events.
+        """Create an order update notification.
 
-        **Note:** No order system exists in the codebase yet (M4 has
-        marketplace listings/products/messaging/reviews but no orders).
-        This method is a stub that logs and returns None. When an order
-        system is added (future milestone), this will be implemented.
+        No order system exists in the codebase yet. This is a placeholder
+        until order lifecycle functionality is implemented.
         """
         logger.info(
             "notify_order_update_stub",
@@ -452,6 +575,7 @@ class NotificationTriggerService:
             order_id=order_id,
             note="order system not implemented — returning None",
         )
+
         return None
 
     # ── 7. System notification ─────────────────────────────────────────────
@@ -464,21 +588,32 @@ class NotificationTriggerService:
         *,
         payload: dict | None = None,
     ) -> Notification | None:
-        """Create a system notification (admin announcements, platform updates).
+        """Create a system notification.
 
-        Idempotent per user + title + message within 7 days.
+        Uses a stable hash for idempotency so identical announcements
+        do not create duplicate notifications for the same user.
         """
         user = await self.db.get(User, user_id)
+
         if not user:
-            logger.warning("notify_system_user_missing", user_id=user_id)
+            logger.warning(
+                "notify_system_user_missing",
+                user_id=user_id,
+            )
             return None
 
         full_payload = payload or {}
+
         stable_data = json.dumps(
-            {"title": title.strip(), "message": message.strip(), "payload": full_payload},
+            {
+                "title": title.strip(),
+                "message": message.strip(),
+                "payload": full_payload,
+            },
             sort_keys=True,
             separators=(",", ":"),
         )
+
         digest = hashlib.sha256(stable_data.encode("utf-8")).hexdigest()
 
         return await self.notify.create(
@@ -490,7 +625,7 @@ class NotificationTriggerService:
             idempotency_key=f"system:{user_id}:{digest}",
         )
 
-    # ── Bulk: broadcast system notification to all users ──────────────────
+    # ── Bulk: broadcast system notification to all users ────────────────
 
     async def broadcast_system(
         self,
@@ -500,17 +635,29 @@ class NotificationTriggerService:
         payload: dict | None = None,
         role_filter: str | None = None,
     ) -> int:
-        """Send a system notification to all users (optionally filtered by role).
+        """Broadcast a system notification to active users.
 
-        Returns the number of notifications created.
+        Optionally restrict recipients by role. Returns the number of
+        notifications created.
         """
         stmt = select(User).where(User.status == "active")
+
         if role_filter:
             stmt = stmt.where(User.role == role_filter)
+
         users = await self.db.scalars(stmt)
 
         count = 0
+
         for user in users.all():
-            if await self.notify_system(user.id, title, message, payload=payload):
+            notification = await self.notify_system(
+                user.id,
+                title,
+                message,
+                payload=payload,
+            )
+
+            if notification is not None:
                 count += 1
+
         return count

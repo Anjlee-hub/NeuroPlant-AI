@@ -1,20 +1,22 @@
-"""Soil recommendation service (M3, Task 3).
 
-Read-only access to the active ``SoilRecommendationCatalog``, mirroring
-:mod:`app.services.recommendations`. The engine is fully data-driven: every
-guidance area and severity note comes from the seeded ``SoilRecommendation``
-rows (curated in ``app.db.soil_seed_data``) — controllers never hardcode advice.
+"""
+Soil recommendation service (M3, Task 3).
 
-``SoilContext`` is the explicit, future-ready seam: today it carries the signals
+Read-only access to the active SoilRecommendationCatalog, mirroring
+app.services.recommendations. The engine is fully data-driven: every
+guidance area and severity note comes from the seeded SoilRecommendation
+rows (curated in app.db.soil_seed_data) — controllers never hardcode advice.
+
+SoilContext is the explicit, future-ready seam: today it carries the signals
 the scan already knows (crop, disease, severity, confidence). Weather,
 location, and real soil-test data will be added as context fields later and
-flow through the same :meth:`SoilRecommendationService.health` pipeline without
+flow through the same SoilRecommendationService.health pipeline without
 changing the API — the schema is extended, not redesigned.
 
 The computed soil health is a 0–5 estimate built from the crop's seeded base
 rating, then adjusted for disease severity and low detection confidence. The
 rating policy (penalties + label thresholds) lives here as documented constants;
-the *content* (which severity moves the score how much, what to suggest) lives
+the content (which severity moves the score how much, what to suggest) lives
 in the seed catalog.
 """
 
@@ -31,17 +33,30 @@ from app.models.catalog import Disease
 from app.models.scan import Scan
 from app.models.soil import SoilRecommendation, SoilRecommendationCatalog
 from app.schemas.recommendation import RecommendationDiseaseOut
-from app.schemas.soil import SoilHealthOut, SoilRecommendationCatalogOut, SoilRecommendationOut
+from app.schemas.soil import (
+    SoilHealthOut,
+    SoilRecommendationCatalogOut,
+    SoilRecommendationOut,
+)
 
 logger = get_logger(__name__)
 
-# ── Soil-health rating policy ─────────────────────────────────────────────
-# These are documented *policy* constants (not content): the base score per
-# seeded rating, the severity penalty, and the low-confidence penalty.
+# ---------------------------------------------------------------------------
+# Soil-health rating policy
+# ---------------------------------------------------------------------------
 
-BASE_HEALTH_SCORE: dict[str, float] = {"excellent": 5.0, "good": 4.0, "fair": 3.0, "poor": 2.0}
+BASE_HEALTH_SCORE: dict[str, float] = {
+    "excellent": 5.0,
+    "good": 4.0,
+    "fair": 3.0,
+    "poor": 2.0,
+}
 
-SEVERITY_PENALTY: dict[str, float] = {"severe": 1.0, "moderate": 0.5, "low": 0.0}
+SEVERITY_PENALTY: dict[str, float] = {
+    "severe": 1.0,
+    "moderate": 0.5,
+    "low": 0.0,
+}
 
 CONFIDENCE_LOW_THRESHOLD: float = 0.55
 CONFIDENCE_PENALTY: float = 0.5
@@ -50,6 +65,7 @@ LOW_CONFIDENCE_NOTE = (
     "Detection confidence is low — re-scan or confirm the diagnosis before acting "
     "on this soil advice."
 )
+
 UNAVAILABLE_CONFIDENCE_NOTE = (
     "Model confidence is unavailable — confirm the diagnosis before acting on this soil advice."
 )
@@ -75,8 +91,8 @@ class SoilContext:
     """Signals that shape soil advice today — the future-ready extension seam.
 
     New signals (weather, location, soil-test results) become new optional
-    fields here and feed :meth:`SoilRecommendationService.health`; the rest of
-    the service and every endpoint stay unchanged.
+    fields here and feed SoilRecommendationService.health; the rest of the
+    service and every endpoint stay unchanged.
     """
 
     disease_id: int | None
@@ -94,17 +110,22 @@ class SoilRecommendationService:
     async def _active_catalog(self) -> SoilRecommendationCatalog:
         """The one active soil catalog (503 when the seeder never ran)."""
         catalog = await self.db.scalar(
-            select(SoilRecommendationCatalog).where(SoilRecommendationCatalog.is_active.is_(True))
+            select(SoilRecommendationCatalog).where(
+                SoilRecommendationCatalog.is_active.is_(True)
+            )
         )
+
         if catalog is None:
             raise SoilCatalogUnavailableError(
                 "The soil catalog has not been seeded yet; run `python -m app.db.seed`."
             )
+
         return catalog
 
     async def catalog(self) -> SoilRecommendationCatalogOut:
-        """Metadata for the active soil catalog version, incl. plan count."""
+        """Metadata for the active soil catalog version, including plan count."""
         catalog = await self._active_catalog()
+
         count = (
             await self.db.scalar(
                 select(func.count())
@@ -113,6 +134,7 @@ class SoilRecommendationService:
             )
             or 0
         )
+
         return SoilRecommendationCatalogOut(
             version=catalog.version,
             description=catalog.description,
@@ -131,40 +153,67 @@ class SoilRecommendationService:
         """Full soil plan for one catalog disease, adapted to severity/confidence."""
         catalog = await self._active_catalog()
         row = await self._load(catalog.id, disease_id)
+
         if row is None:
             raise SoilNotFoundError(
                 f"No soil plan found for disease {disease_id} in catalog {catalog.version}"
             )
-        return self._to_out(catalog, row, severity=severity, confidence=confidence)
+
+        return self._to_out(
+            catalog,
+            row,
+            severity=severity,
+            confidence=confidence,
+        )
 
     async def for_scan(self, scan: Scan) -> SoilRecommendationOut:
-        """Soil plan for the disease a scan predicted, adapted to the scan's
-        severity + confidence (by id, then by name)."""
+        """Soil plan for the disease a scan predicted, adapted to scan severity
+        and confidence (by id, then by name).
+        """
         catalog = await self._active_catalog()
         row: SoilRecommendation | None = None
+
         if scan.disease_id is not None:
             row = await self._load(catalog.id, scan.disease_id)
+
         if row is None and scan.disease_name:
             row = await self._load_by_name(catalog.id, scan.disease_name)
+
         if row is None:
             raise SoilNotFoundError(
-                f"No soil plan found for scan {scan.id} ({scan.disease_name or 'unknown'}) "
-                f"in catalog {catalog.version}"
+                f"No soil plan found for scan {scan.id} "
+                f"({scan.disease_name or 'unknown'}) in catalog {catalog.version}"
             )
+
         result = self._to_out(
-            catalog, row, severity=scan.severity, confidence=scan.confidence
+            catalog,
+            row,
+            severity=scan.severity,
+            confidence=scan.confidence,
         )
+
         if scan.confidence is None:
-            result = result.model_copy(update={"confidence_note": UNAVAILABLE_CONFIDENCE_NOTE})
+            result = result.model_copy(
+                update={"confidence_note": UNAVAILABLE_CONFIDENCE_NOTE}
+            )
+
         return result
 
-    # ── Internals ──────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------
+    # Internal catalog loading
+    # -----------------------------------------------------------------------
 
-    async def _load(self, catalog_id: int, disease_id: int) -> SoilRecommendation | None:
-        """A soil-plan row with its disease (and crop) eagerly loaded."""
+    async def _load(
+        self,
+        catalog_id: int,
+        disease_id: int,
+    ) -> SoilRecommendation | None:
+        """Load a soil-plan row with its disease and crop eagerly loaded."""
         return await self.db.scalar(
             select(SoilRecommendation)
-            .options(selectinload(SoilRecommendation.disease).selectinload(Disease.crop))
+            .options(
+                selectinload(SoilRecommendation.disease).selectinload(Disease.crop)
+            )
             .where(
                 SoilRecommendation.catalog_id == catalog_id,
                 SoilRecommendation.disease_id == disease_id,
@@ -172,12 +221,16 @@ class SoilRecommendationService:
         )
 
     async def _load_by_name(
-        self, catalog_id: int, disease_name: str
+        self,
+        catalog_id: int,
+        disease_name: str,
     ) -> SoilRecommendation | None:
-        """A soil-plan row whose catalog disease name matches ``disease_name``."""
+        """Load a soil-plan row whose disease name matches."""
         return await self.db.scalar(
             select(SoilRecommendation)
-            .options(selectinload(SoilRecommendation.disease).selectinload(Disease.crop))
+            .options(
+                selectinload(SoilRecommendation.disease).selectinload(Disease.crop)
+            )
             .join(Disease, Disease.id == SoilRecommendation.disease_id)
             .where(
                 SoilRecommendation.catalog_id == catalog_id,
@@ -198,9 +251,10 @@ class SoilRecommendationService:
         crop_name = disease.crop.common_name if disease.crop is not None else None
 
         raw_severity_notes = (row.severity_notes or {}).get(severity)
+
         if raw_severity_notes is None:
             severity_notes: list[str] = []
-        elif isinstance(raw_severity_notes, str):  # tolerate a single-string seed
+        elif isinstance(raw_severity_notes, str):
             severity_notes = [raw_severity_notes]
         else:
             severity_notes = list(raw_severity_notes)
@@ -225,7 +279,11 @@ class SoilRecommendationService:
             micronutrients=list(row.micronutrients or []),
             compost=row.compost,
             mulching=row.mulching,
-            soil_health=self.health(row, severity=severity, confidence=confidence),
+            soil_health=self.health(
+                row,
+                severity=severity,
+                confidence=confidence,
+            ),
             soil_suitability=row.soil_suitability,
             improvement_suggestions=improvement,
             disease_soil_notes=row.disease_soil_notes,
@@ -239,7 +297,9 @@ class SoilRecommendationService:
             ),
         )
 
-    # ── Soil health scoring ────────────────────────────────────────────
+    # -----------------------------------------------------------------------
+    # Soil-health scoring
+    # -----------------------------------------------------------------------
 
     @staticmethod
     def health(
@@ -250,26 +310,32 @@ class SoilRecommendationService:
     ) -> SoilHealthOut:
         """Compute the 0–5 soil-health estimate and a plain-language reason.
 
-        ``base_soil_health`` (seeded per crop) sets the starting score; disease
+        base_soil_health (seeded per crop) sets the starting score; disease
         severity and low detection confidence reduce it. When real soil-test
-        data arrives it becomes another input here — this is the single
-        extension point for future context.
+        data arrives it becomes another input here — the single extension point
+        for future context.
         """
         base = BASE_HEALTH_SCORE.get(row.base_soil_health or "fair", 3.0)
 
         reasons: list[str] = []
         severity_penalty = SEVERITY_PENALTY.get(severity or "", 0.0)
+
         if severity_penalty > 0:
             reasons.append(f"{severity} disease severity")
 
         low_confidence = (
             confidence is not None and confidence < CONFIDENCE_LOW_THRESHOLD
         )
+
         if low_confidence:
             reasons.append("low detection confidence")
 
-        penalty = severity_penalty + (CONFIDENCE_PENALTY if low_confidence else 0.0)
+        penalty = severity_penalty + (
+            CONFIDENCE_PENALTY if low_confidence else 0.0
+        )
+
         score = round(max(1.0, min(5.0, base - penalty)), 2)
+
         label = "poor"
         for candidate, threshold in _LABEL_THRESHOLDS:
             if score >= threshold:
@@ -281,4 +347,9 @@ class SoilRecommendationService:
             if reasons
             else "Based on the crop's usual soil preferences."
         )
-        return SoilHealthOut(label=label, score=score, summary=summary)
+
+        return SoilHealthOut(
+            label=label,
+            score=score,
+            summary=summary,
+        )

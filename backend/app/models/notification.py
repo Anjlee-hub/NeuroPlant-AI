@@ -1,3 +1,4 @@
+
 """Notification model (M5, Task 2).
 
 In-app notifications with user ownership, typed payloads, and a scheduling
@@ -14,15 +15,13 @@ from datetime import datetime
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
-    JSON,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
-)
-from sqlalchemy import (
     Enum as SAEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -31,7 +30,7 @@ from app.db.session import Base
 from app.models.base import TimestampMixin
 
 
-class NotificationType(str, PyEnum):  # noqa: UP042 — retain the existing str(Enum) behavior
+class NotificationType(str, PyEnum):
     """Stable type keys for client grouping/filtering.
 
     These are the M5+ types needed across milestones. They are decoupled from
@@ -85,6 +84,12 @@ class Notification(Base, TimestampMixin):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

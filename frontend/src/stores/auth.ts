@@ -32,6 +32,7 @@ async function loadUser(): Promise<User> {
 export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   loading: false,
+  hydrated: false,
   challenge: null,
   hydrated: false,
 

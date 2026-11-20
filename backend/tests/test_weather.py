@@ -11,8 +11,6 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
-from sqlalchemy import select
-
 from app.db.seed import seed_catalog
 from app.db.session import async_session_factory
 from app.main import app
@@ -33,7 +31,7 @@ from app.services.weather import (
     weather_to_out,
 )
 from app.services.weather_risk import CropNotFoundError, DiseaseRiskService, pathogen_class
-
+from sqlalchemy import select
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -98,9 +96,7 @@ def _openweather_payload(
 
 
 def _fungal_disease() -> Disease:
-    return Disease(
-        id=1, crop_id=1, name="Early Blight", pathogen_type="Fungus (Alternaria solani)"
-    )
+    return Disease(id=1, crop_id=1, name="Early Blight", pathogen_type="Fungus (Alternaria solani)")
 
 
 # ── Provider interface & normalized schema ────────────────────────────────
@@ -140,7 +136,10 @@ async def test_mock_provider_is_deterministic():
 
 async def test_mock_provider_overrides_force_a_scenario():
     data = await MockWeatherProvider(
-        temperature_c=32.0, humidity_percent=95.0, rainfall_mm=6.0, wind_speed_ms=0.5,
+        temperature_c=32.0,
+        humidity_percent=95.0,
+        rainfall_mm=6.0,
+        wind_speed_ms=0.5,
         condition="rain",
     ).current(10.0, 77.0)
     assert data.temperature_c == 32.0
@@ -204,7 +203,9 @@ async def test_openweather_timeout_raises_typed_error():
 
 
 async def test_openweather_malformed_json_raises_typed_error():
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, content=b"<html>nope</html>"))
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, content=b"<html>nope</html>")
+    )
     provider = OpenWeatherProvider("k", timeout_seconds=2.0, transport=transport)
     with pytest.raises(WeatherMalformedResponseError):
         await provider.current(10.0, 77.0)
@@ -250,9 +251,9 @@ async def test_service_raises_when_fallback_disabled():
 
 
 async def test_service_healthy_provider_no_fallback():
-    result = await WeatherService(provider=MockWeatherProvider(), fallback_enabled=True).get_current(
-        10.0, 77.0
-    )
+    result = await WeatherService(
+        provider=MockWeatherProvider(), fallback_enabled=True
+    ).get_current(10.0, 77.0)
     assert result.is_fallback is False
     assert result.data.provider == "mock"
 

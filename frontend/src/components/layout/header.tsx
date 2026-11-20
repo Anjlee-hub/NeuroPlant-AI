@@ -1,4 +1,5 @@
 ﻿import {
+  Activity,
   CalendarDays,
   CloudUpload,
   History,
@@ -26,6 +27,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/stores/auth";
 
 const NAV_ITEMS: Array<{
   to: string;

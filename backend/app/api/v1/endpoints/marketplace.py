@@ -354,23 +354,17 @@ async def get_cart(user: CurrentUser, db: Db) -> CartOut:
 
 
 @router.post("/cart/items", response_model=CartOut)
-async def add_cart_item(
-    payload: CartItemIn, user: CurrentUser, db: Db
-) -> CartOut:
+async def add_cart_item(payload: CartItemIn, user: CurrentUser, db: Db) -> CartOut:
     return await MarketplaceService(db).add_to_cart(user, payload)
 
 
 @router.delete("/cart/items/{item_id}", response_model=CartOut)
-async def remove_cart_item(
-    item_id: int, user: CurrentUser, db: Db
-) -> CartOut:
+async def remove_cart_item(item_id: int, user: CurrentUser, db: Db) -> CartOut:
     return await MarketplaceService(db).remove_from_cart(user, item_id)
 
 
 @router.post("/checkout", response_model=OrderOut, status_code=201)
-async def checkout(
-    payload: CheckoutIn, user: CurrentUser, db: Db
-) -> OrderOut:
+async def checkout(payload: CheckoutIn, user: CurrentUser, db: Db) -> OrderOut:
     return await MarketplaceService(db).checkout(user, payload)
 
 
