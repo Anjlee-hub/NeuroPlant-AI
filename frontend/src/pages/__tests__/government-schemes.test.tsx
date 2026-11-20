@@ -18,6 +18,10 @@ const apiMock = vi.hoisted(() => ({
   listGovernmentSchemes: vi.fn(),
   getGovernmentScheme: vi.fn(),
   checkSchemeEligibility: vi.fn(),
+  listSavedGovernmentSchemes: vi.fn(),
+  getSavedGovernmentSchemeStatus: vi.fn(),
+  saveGovernmentScheme: vi.fn(),
+  removeSavedGovernmentScheme: vi.fn(),
 }));
 
 vi.mock("@/stores/auth", () => ({
@@ -35,9 +39,12 @@ const scheme: GovernmentScheme = {
   id: 7,
   name: "Verified irrigation support",
   category: "irrigation",
+  department: "Official test department",
+  status: "active",
   description: "Published scheme description.",
   benefits: "Published benefits.",
   state_codes: ["KA"],
+  district_codes: [],
   crops: ["rice"],
   farmer_categories: ["small"],
   eligibility_requirements: ["Meet the published rules."],
@@ -95,6 +102,10 @@ describe("GovernmentSchemesPage", () => {
       explanation: "Confirm with the official authority.",
       legal_determination: false,
     } satisfies EligibilityCheck);
+    apiMock.listSavedGovernmentSchemes.mockResolvedValue([]);
+    apiMock.getSavedGovernmentSchemeStatus.mockResolvedValue({ saved: false });
+    apiMock.saveGovernmentScheme.mockResolvedValue({ saved: true });
+    apiMock.removeSavedGovernmentScheme.mockResolvedValue({ saved: false });
   });
 
   it("requires authentication and links to sign in", async () => {
@@ -136,14 +147,14 @@ describe("GovernmentSchemesPage", () => {
     await user.type(screen.getByLabelText("Scheme category"), "irrigation");
 
     await waitFor(() => {
-      expect(apiMock.listGovernmentSchemes).toHaveBeenLastCalledWith({
+      expect(apiMock.listGovernmentSchemes).toHaveBeenLastCalledWith(expect.objectContaining({
         state_code: "KA",
         crop_name: "rice",
         farmer_category: "small",
         category: "irrigation",
         page: 1,
         page_size: 20,
-      });
+      }));
     });
 
     await user.click(screen.getByRole("button", { name: "Details & check eligibility" }));

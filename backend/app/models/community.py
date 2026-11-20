@@ -68,3 +68,18 @@ class CommunityVote(Base, TimestampMixin):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
     )
+
+
+class CommunityBookmark(Base, TimestampMixin):
+    __tablename__ = "community_bookmarks"
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", name="uq_community_bookmark"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )

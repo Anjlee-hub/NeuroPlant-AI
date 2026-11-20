@@ -2,7 +2,7 @@ from io import BytesIO
 
 from app.models.user import User
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 
 async def _register(client, phone: str, name: str = "Tester") -> dict[str, str]:
@@ -179,3 +179,46 @@ async def test_community_like_toggle_returns_counts_and_user_state(client):
     assert unliked.status_code == 200
     assert unliked.json()["like_count"] == 0
     assert unliked.json()["is_liked"] is False
+
+
+async def test_community_bookmarks_persist_and_are_user_specific(client):
+    owner = await _register(client, "919000000108")
+    farmer = await _register(client, "919000000109")
+    post = await _create_post(client, owner)
+    save_url = f"/api/v1/community/posts/{post['id']}/save"
+
+    assert post["created_at"]
+    assert post["is_saved"] is False
+    saved = await client.post(save_url, headers=farmer)
+    replayed_save = await client.post(save_url, headers=farmer)
+    assert saved.status_code == replayed_save.status_code == 200
+    assert saved.json()["saved"] is True
+    assert replayed_save.json()["saved"] is True
+
+    farmer_feed = await client.get("/api/v1/community/posts", headers=farmer)
+    owner_feed = await client.get("/api/v1/community/posts", headers=owner)
+    saved_posts = await client.get("/api/v1/community/saved", headers=farmer)
+    assert farmer_feed.json()[0]["is_saved"] is True
+    assert owner_feed.json()[0]["is_saved"] is False
+    assert [item["id"] for item in saved_posts.json()] == [post["id"]]
+
+    removed = await client.delete(save_url, headers=farmer)
+    assert removed.status_code == 200
+    assert removed.json()["saved"] is False
+    assert (await client.get("/api/v1/community/saved", headers=farmer)).json() == []
+
+
+async def test_community_feed_works_before_bookmark_migration(client, db):
+    await db.execute(text("DROP TABLE community_bookmarks"))
+    await db.commit()
+    headers = await _register(client, "919000000110")
+
+    post = await _create_post(client, headers)
+    feed = await client.get("/api/v1/community/posts", headers=headers)
+    saved = await client.get("/api/v1/community/saved", headers=headers)
+
+    assert post["is_saved"] is False
+    assert feed.status_code == 200, feed.text
+    assert [item["id"] for item in feed.json()] == [post["id"]]
+    assert saved.status_code == 503
+    assert "migration" in saved.json()["detail"].lower()

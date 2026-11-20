@@ -99,7 +99,11 @@ class RecommendationService:
             if row is not None:
                 return self._to_out(catalog, row)
         if scan.disease_name:
-            row = await self._load_by_name(catalog.id, scan.disease_name)
+            row = await self._load_by_name(
+                catalog.id,
+                scan.disease_name,
+                crop_id=scan.crop_id,
+            )
             if row is not None:
                 return self._to_out(catalog, row)
         raise RecommendationNotFoundError(
@@ -123,10 +127,10 @@ class RecommendationService:
         )
 
     async def _load_by_name(
-        self, catalog_id: int, disease_name: str
+        self, catalog_id: int, disease_name: str, *, crop_id: int | None = None
     ) -> DiseaseRecommendation | None:
-        """A plan row whose catalog disease name matches ``disease_name``."""
-        return await self.db.scalar(
+        """A crop-scoped, case-insensitive disease-name match."""
+        statement = (
             select(DiseaseRecommendation)
             .options(
                 selectinload(DiseaseRecommendation.disease).selectinload(Disease.crop),
@@ -134,9 +138,12 @@ class RecommendationService:
             .join(Disease, Disease.id == DiseaseRecommendation.disease_id)
             .where(
                 DiseaseRecommendation.catalog_id == catalog_id,
-                Disease.name == disease_name,
+                func.lower(Disease.name) == disease_name.strip().lower(),
             )
         )
+        if crop_id is not None:
+            statement = statement.where(Disease.crop_id == crop_id)
+        return await self.db.scalar(statement)
 
     @staticmethod
     def _to_out(

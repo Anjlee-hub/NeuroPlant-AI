@@ -2,9 +2,12 @@ export interface GovernmentScheme {
   id: number;
   name: string;
   category: string;
+  department: string;
+  status: "active" | "closed" | "unverified";
   description: string;
   benefits: string | null;
   state_codes: string[];
+  district_codes: string[];
   crops: string[];
   farmer_categories: string[];
   eligibility_requirements: string[];
@@ -30,17 +33,22 @@ export interface GovernmentSchemePage {
 
 export interface SchemeFilters {
   state_code?: string;
+  district_code?: string;
   crop_name?: string;
   farmer_category?: string;
   category?: string;
+  search?: string;
+  status?: "active" | "closed" | "unverified";
   page?: number;
   page_size?: number;
 }
 
 export interface EligibilityCheckInput {
   state_code?: string;
+  district_code?: string;
   crop_name?: string;
   farmer_category?: string;
+  landholding_acres?: number;
 }
 
 export interface EligibilityCheck {

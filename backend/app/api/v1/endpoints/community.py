@@ -11,9 +11,11 @@ from app.schemas.community import (
     PostCreate,
     PostResponse,
     PostUpdate,
+    SavedPostResponse,
     VoteResponse,
 )
 from app.services import community
+from app.services.community import CommunityBookmarksUnavailableError
 
 router = APIRouter(prefix="/community", tags=["Community"])
 
@@ -45,6 +47,47 @@ async def list_community_posts(
     user: User = Depends(get_current_user),
 ):
     return await community.get_posts(db, user.id)
+
+
+@router.get("/saved", response_model=list[PostResponse])
+async def list_saved_community_posts(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        return await community.get_posts(db, user.id, saved_only=True)
+    except CommunityBookmarksUnavailableError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@router.post("/posts/{post_id}/save", response_model=SavedPostResponse)
+async def save_community_post(
+    post_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        saved = await community.set_post_saved(db, post_id, user.id, True)
+    except CommunityBookmarksUnavailableError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    if saved is None:
+        raise HTTPException(404, "Post not found")
+    return SavedPostResponse(saved=saved)
+
+
+@router.delete("/posts/{post_id}/save", response_model=SavedPostResponse)
+async def unsave_community_post(
+    post_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        saved = await community.set_post_saved(db, post_id, user.id, False)
+    except CommunityBookmarksUnavailableError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    if saved is None:
+        raise HTTPException(404, "Post not found")
+    return SavedPostResponse(saved=saved)
 
 
 @router.patch("/posts/{post_id}", response_model=PostResponse)

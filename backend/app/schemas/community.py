@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -33,8 +35,10 @@ class PostResponse(BaseModel):
     category: str
     is_active: bool
     farmer: CommunityFarmer
+    created_at: datetime
     like_count: int = 0
     is_liked: bool = False
+    is_saved: bool = False
 
 
 class CommentCreate(BaseModel):
@@ -61,3 +65,7 @@ class VoteResponse(BaseModel):
     message: str
     like_count: int
     is_liked: bool
+
+
+class SavedPostResponse(BaseModel):
+    saved: bool

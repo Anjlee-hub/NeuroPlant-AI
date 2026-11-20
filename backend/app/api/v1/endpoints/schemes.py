@@ -41,6 +41,9 @@ async def list_schemes(
     crop_name: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
     farmer_category: Annotated[str | None, Query(min_length=1, max_length=80)] = None,
     category: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
+    district_code: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    search: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+    status: Annotated[str | None, Query(pattern="^(active|closed|unverified)$")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> GovernmentSchemePageOut:
@@ -50,6 +53,9 @@ async def list_schemes(
         crop_name=crop_name,
         farmer_category=farmer_category,
         category=category,
+        district_code=district_code,
+        search=search,
+        status=status,
         page=page,
         page_size=page_size,
     )
@@ -66,6 +72,49 @@ async def list_schemes(
             else SCHEME_SOURCE_UNAVAILABLE
         ),
     )
+
+
+@router.get("/saved", response_model=list[GovernmentSchemeOut])
+async def list_saved_schemes(
+    user: CurrentUser,
+    db: Db,
+) -> list[GovernmentSchemeOut]:
+    schemes = await GovernmentSchemeService(db).list_saved(user.id)
+    return [_scheme_out(scheme) for scheme in schemes]
+
+
+@router.get("/saved/status/{scheme_id}", response_model=dict[str, bool])
+async def saved_status(
+    scheme_id: int,
+    user: CurrentUser,
+    db: Db,
+) -> dict[str, bool]:
+    saved = await GovernmentSchemeService(db).is_saved(user.id, scheme_id)
+    return {"saved": saved}
+
+
+@router.post("/saved/{scheme_id}", response_model=dict[str, bool])
+async def save_scheme(
+    scheme_id: int,
+    user: CurrentUser,
+    db: Db,
+) -> dict[str, bool]:
+    saved = await GovernmentSchemeService(db).save(user.id, scheme_id)
+    if not saved:
+        raise HTTPException(status_code=404, detail="Scheme not found.")
+    return {"saved": True}
+
+
+@router.delete("/saved/{scheme_id}", response_model=dict[str, bool])
+async def remove_saved_scheme(
+    scheme_id: int,
+    user: CurrentUser,
+    db: Db,
+) -> dict[str, bool]:
+    removed = await GovernmentSchemeService(db).remove_saved(user.id, scheme_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Saved scheme not found.")
+    return {"saved": False}
 
 
 @router.get("/{scheme_id}", response_model=GovernmentSchemeOut)
@@ -100,5 +149,8 @@ async def add_scheme(
     db: Db,
 ) -> GovernmentSchemeOut:
     """Add externally sourced scheme information; only administrators may curate it."""
-    scheme = await GovernmentSchemeService(db).create(payload)
+    try:
+        scheme = await GovernmentSchemeService(db).create(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _scheme_out(scheme)

@@ -5,8 +5,9 @@ One row per detection run. Design notes:
 - ``media_items`` is the source-agnostic image seam (upload | camera | drone |
   satellite | iot) so the Crop Doctor and future ingestion adapters reuse the
   same shape; M2 stores a single upload item.
-- ``client_scan_id`` is the offline idempotency key (client-generated UUID) —
-  the sync endpoint re-sends it and the server returns the existing row.
+- ``client_scan_id`` is the globally unique offline idempotency key
+  (client-generated UUID) — the sync endpoint re-sends it and the server
+  returns the existing row for that user.
 - ``sync_status`` / ``sync_error`` / ``synced_at`` prepare the offline queue
   (Task 6) without implementing it yet.
 - ``processed_image_path`` / ``heatmap_path`` are the explainability hooks for
@@ -39,8 +40,10 @@ class Scan(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # Offline idempotency key — client-generated, globally unique.
-    client_scan_id: Mapped[str] = mapped_column(String(36), unique=True, index=True, nullable=False)
+    # Offline idempotency key — client-generated and globally unique.
+    client_scan_id: Mapped[str] = mapped_column(
+        String(36), unique=True, index=True, nullable=False
+    )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )

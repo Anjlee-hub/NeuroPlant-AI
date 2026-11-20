@@ -8,6 +8,7 @@ codes, idempotency over HTTP) is covered in test_scan_api.py.
 
 import asyncio
 import base64
+import sqlite3
 import uuid
 from io import BytesIO
 
@@ -26,9 +27,11 @@ from app.services.scan_pipeline import (
     StorageFailedError,
     UnsupportedFormatError,
 )
+from app.services.scans import ScanService
 from app.services.storage import LocalStorageService
 from fastapi import UploadFile
 from PIL import Image
+from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import Headers
 
 
@@ -234,6 +237,29 @@ async def test_scan_persists_unavailable_confidence(db, tmp_path):
     assert scan.confidence is None
     assert scan.ai_metadata["confidence"] == {"top": None, "level": "unavailable"}
     assert scan.ai_metadata["top5"][0]["confidence"] is None
+
+
+async def test_non_client_scan_integrity_error_is_not_mapped_as_duplicate(
+    db, tmp_path, monkeypatch
+):
+    async def fail_create(_service, _payload):
+        raise IntegrityError(
+            "INSERT INTO scans (...)",
+            {},
+            sqlite3.IntegrityError("NOT NULL constraint failed: scans.confidence"),
+        )
+
+    monkeypatch.setattr(ScanService, "create", fail_create)
+    service = _service(db, tmp_path, detection=_StubDetection(confidence=None))
+
+    with pytest.raises(IntegrityError) as caught:
+        await service.process_upload(
+            user_id=1,
+            files=[_upload(_jpeg_bytes())],
+            client_scan_id=_client_id(22),
+        )
+
+    assert "NOT NULL constraint failed: scans.confidence" in str(caught.value.orig)
 
 
 async def test_heatmap_failure_degrades_gracefully(db, tmp_path):

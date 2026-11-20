@@ -43,7 +43,7 @@ describe("LoginPage", () => {
     renderLogin();
 
     expect(screen.getByLabelText("Phone or email")).toBeInTheDocument();
-    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password", { selector: "input" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe("LoginPage", () => {
     authMock.login.mockResolvedValue("ok");
 
     await user.type(screen.getByLabelText("Phone or email"), "+919876543210");
-    await user.type(screen.getByLabelText("Password"), "s3cret");
+    await user.type(screen.getByLabelText("Password", { selector: "input" }), "s3cret");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(authMock.login).toHaveBeenCalledWith(
@@ -71,7 +71,7 @@ describe("LoginPage", () => {
     authMock.login.mockResolvedValue("mfa");
 
     await user.type(screen.getByLabelText("Phone or email"), "farmer@example.com");
-    await user.type(screen.getByLabelText("Password"), "s3cret");
+    await user.type(screen.getByLabelText("Password", { selector: "input" }), "s3cret");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     await vi.waitFor(() => {

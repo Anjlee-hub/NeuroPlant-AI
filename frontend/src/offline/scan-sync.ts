@@ -1,5 +1,9 @@
 import { api } from "@/lib/api";
-import { addCompletedSync, type SyncEntry } from "@/offline/db";
+import {
+  addCompletedSync,
+  replaceSyncPayload,
+  type SyncEntry,
+} from "@/offline/db";
 import { registerSyncHandler } from "@/offline/sync";
 import { useSyncUi } from "@/offline/sync-store";
 import type { ScanSyncItem, ScanSyncOut } from "@/types/scan";
@@ -24,6 +28,8 @@ export class ScanSyncItemError extends Error {
   }
 }
 
+const inFlightSyncs = new Map<number, Promise<void>>();
+
 /**
  * Upload one queued scan to `POST /scans/sync` and reflect the outcome.
  *
@@ -35,20 +41,55 @@ export class ScanSyncItemError extends Error {
  *  - per-item failure: surface the message (and count the attempt) so the
  *    queue screen can show a retryable error / conflict badge.
  */
-export async function syncScanEntry(entry: SyncEntry): Promise<void> {
-  const payload = entry.payload as ScanSyncPayload;
+export function syncScanEntry(entry: SyncEntry): Promise<void> {
+  const queueEntryId = entry.id;
+  if (queueEntryId === undefined) return syncScanEntryOnce(entry);
 
-  let result: ScanSyncOut;
-  try {
-    result = await api.syncScans([payload]);
-  } catch (err) {
-    // Network / transport failure: entry stays queued for retry.
-    const message = err instanceof Error ? err.message : "Scan sync failed";
-    useSyncUi.getState().recordFailed(message);
-    throw err;
+  const pending = inFlightSyncs.get(queueEntryId);
+  if (pending) return pending;
+
+  const sync = syncScanEntryOnce(entry).finally(() => {
+    if (inFlightSyncs.get(queueEntryId) === sync) inFlightSyncs.delete(queueEntryId);
+  });
+  inFlightSyncs.set(queueEntryId, sync);
+  return sync;
+}
+
+async function syncScanEntryOnce(entry: SyncEntry): Promise<void> {
+  let payload = entry.payload as ScanSyncPayload;
+
+  const send = async (item: ScanSyncPayload): Promise<ScanSyncOut> => {
+    try {
+      return await api.syncScans([item]);
+    } catch (err) {
+      // Network / transport failure: entry stays queued for retry.
+      const message = err instanceof Error ? err.message : "Scan sync failed";
+      useSyncUi.getState().recordFailed(message);
+      throw err;
+    }
+  };
+
+  let result = await send(payload);
+  let item = result.results[0];
+  if (item?.status === "failed" && item.error?.code === CONFLICT_CODE) {
+    if (entry.id === undefined) {
+      const message = "Cannot safely retry a scan without its queue entry ID";
+      useSyncUi.getState().recordFailed(message);
+      throw new ScanSyncItemError(CONFLICT_CODE, message);
+    }
+    const replacement: ScanSyncPayload = {
+      ...payload,
+      client_scan_id: crypto.randomUUID(),
+    };
+    if (!(await replaceSyncPayload(entry.id, replacement))) {
+      const message = "The queued scan was removed before its ID could be refreshed";
+      useSyncUi.getState().recordFailed(message);
+      throw new ScanSyncItemError(CONFLICT_CODE, message);
+    }
+    payload = replacement;
+    result = await send(payload);
+    item = result.results[0];
   }
-
-  const item = result.results[0];
   if (!item || item.status === "failed") {
     const code = item?.error?.code ?? "sync_failed";
     const message = item?.error?.message ?? "Scan sync failed";

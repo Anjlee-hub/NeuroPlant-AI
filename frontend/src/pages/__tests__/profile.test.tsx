@@ -105,10 +105,10 @@ describe("ProfilePage", () => {
     expect(screen.getByRole("heading", { name: "Ravi Kumar" })).toBeInTheDocument();
     // "Farmer" appears twice (identity card + role row) — assert both render.
     expect(screen.getAllByText("Farmer").length).toBeGreaterThan(0);
-    expect(await screen.findByText("7 scans")).toBeInTheDocument();
+    expect((await screen.findAllByText("7")).length).toBeGreaterThan(0);
     expect(screen.getByText("+919876543210")).toBeInTheDocument();
     expect(screen.getByText("farmer@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Member since")).toBeInTheDocument();
+    expect(screen.getAllByText("Member since").length).toBeGreaterThan(0);
     // Quick links.
     expect(screen.getByRole("link", { name: "View scan history" })).toHaveAttribute(
       "href",

@@ -2,7 +2,17 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -11,14 +21,24 @@ from app.models.base import TimestampMixin
 
 class GovernmentScheme(Base, TimestampMixin):
     __tablename__ = "government_schemes"
-    __table_args__ = (Index("ix_government_schemes_active_verified", "is_active", "is_verified"),)
+    __table_args__ = (
+        Index("ix_government_schemes_active_verified", "is_active", "is_verified"),
+        Index("ix_government_schemes_status", "status"),
+        UniqueConstraint("name", name="uq_government_schemes_name"),
+        UniqueConstraint("source_url", name="uq_government_schemes_source_url"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    department: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="Official department"
+    )
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     benefits: Mapped[str | None] = mapped_column(Text, nullable=True)
     state_codes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    district_codes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     crops: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     farmer_categories: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     eligibility_requirements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
@@ -54,3 +74,19 @@ class SchemeUsageEvent(Base):
     state_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     crop_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SavedGovernmentScheme(Base, TimestampMixin):
+    __tablename__ = "saved_government_schemes"
+    __table_args__ = (
+        Index("ix_saved_government_schemes_user_scheme", "user_id", "scheme_id"),
+        UniqueConstraint("user_id", "scheme_id", name="uq_saved_government_scheme"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    scheme_id: Mapped[int] = mapped_column(
+        ForeignKey("government_schemes.id", ondelete="CASCADE"), index=True, nullable=False
+    )

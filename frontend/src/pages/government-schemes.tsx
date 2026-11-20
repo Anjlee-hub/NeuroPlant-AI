@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,6 +7,8 @@ import {
   Search,
   ShieldCheck,
   ShieldQuestion,
+  Bookmark,
+  BookmarkCheck,
   XCircle,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -19,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select } from "@/components/ui/select";
 import { StateCard } from "@/components/ui/state-card";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
@@ -29,32 +32,45 @@ const PAGE_SIZE = 20;
 export function GovernmentSchemesPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [stateCode, setStateCode] = useState("");
+  const [districtCode, setDistrictCode] = useState("");
   const [cropName, setCropName] = useState("");
   const [farmerCategory, setFarmerCategory] = useState("");
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "active" | "closed" | "unverified" | ""
+  >("");
   const [page, setPage] = useState(1);
   const [selectedSchemeId, setSelectedSchemeId] = useState<number | null>(null);
   const [eligibilityState, setEligibilityState] = useState("");
   const [eligibilityCrop, setEligibilityCrop] = useState("");
   const [eligibilityCategory, setEligibilityCategory] = useState("");
+  const [eligibilityDistrict, setEligibilityDistrict] = useState("");
+  const [eligibilityLandholding, setEligibilityLandholding] = useState("");
 
   const schemesQuery = useQuery({
     queryKey: [
       "government-schemes",
       stateCode,
+      districtCode,
       cropName,
       farmerCategory,
       category,
+      search,
+      statusFilter,
       page,
     ],
     queryFn: () =>
       api.listGovernmentSchemes({
         state_code: stateCode.trim() || undefined,
+        district_code: districtCode.trim() || undefined,
         crop_name: cropName.trim() || undefined,
         farmer_category: farmerCategory.trim() || undefined,
         category: category.trim() || undefined,
+        search: search.trim() || undefined,
+        status: statusFilter || undefined,
         page,
         page_size: PAGE_SIZE,
       }),
@@ -77,6 +93,31 @@ export function GovernmentSchemesPage() {
     }) => api.checkSchemeEligibility(schemeId, payload),
   });
 
+  const savedQuery = useQuery({
+    queryKey: ["saved-government-schemes"],
+    queryFn: () => api.listSavedGovernmentSchemes(),
+    enabled: !!user,
+  });
+  const saveMutation = useMutation({
+    mutationFn: (schemeId: number) => api.saveGovernmentScheme(schemeId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["saved-government-schemes"] });
+      void queryClient.invalidateQueries({ queryKey: ["saved-government-scheme-status"] });
+    },
+  });
+  const removeSavedMutation = useMutation({
+    mutationFn: (schemeId: number) => api.removeSavedGovernmentScheme(schemeId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["saved-government-schemes"] });
+      void queryClient.invalidateQueries({ queryKey: ["saved-government-scheme-status"] });
+    },
+  });
+  const selectedSavedQuery = useQuery({
+    queryKey: ["saved-government-scheme-status", selectedSchemeId],
+    queryFn: () => api.getSavedGovernmentSchemeStatus(selectedSchemeId!),
+    enabled: !!user && selectedSchemeId !== null,
+  });
+
   if (!user) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
@@ -94,16 +135,6 @@ export function GovernmentSchemesPage() {
   }
 
   const items = schemesQuery.data?.items ?? [];
-  const visibleItems = items.filter((scheme) => {
-    const term = search.trim().toLocaleLowerCase();
-    return (
-      !term ||
-      [scheme.name, scheme.description, scheme.category, scheme.source_name]
-        .join(" ")
-        .toLocaleLowerCase()
-        .includes(term)
-    );
-  });
 
   function updateFilter(setter: (value: string) => void, value: string) {
     setter(value);
@@ -113,9 +144,12 @@ export function GovernmentSchemesPage() {
   function openScheme(scheme: GovernmentScheme) {
     setSelectedSchemeId(scheme.id);
     setEligibilityState(stateCode);
+    setEligibilityDistrict(districtCode);
     setEligibilityCrop(cropName);
     setEligibilityCategory(farmerCategory);
     eligibilityMutation.reset();
+    saveMutation.reset();
+    removeSavedMutation.reset();
   }
 
   function checkEligibility(event: FormEvent<HTMLFormElement>) {
@@ -127,6 +161,13 @@ export function GovernmentSchemesPage() {
     if (eligibilityCrop.trim()) payload.crop_name = eligibilityCrop.trim();
     if (eligibilityCategory.trim()) {
       payload.farmer_category = eligibilityCategory.trim();
+    }
+    if (eligibilityDistrict.trim()) payload.district_code = eligibilityDistrict.trim();
+    if (eligibilityLandholding.trim()) {
+      const landholding = Number(eligibilityLandholding);
+      if (Number.isFinite(landholding) && landholding >= 0) {
+        payload.landholding_acres = landholding;
+      }
     }
 
     eligibilityMutation.reset();
@@ -161,6 +202,13 @@ export function GovernmentSchemesPage() {
             onChange={(value) => updateFilter(setStateCode, value)}
           />
           <FilterField
+            id="scheme-district-filter"
+            label={t("schemes.district")}
+            placeholder={t("schemes.districtPlaceholder")}
+            value={districtCode}
+            onChange={(value) => updateFilter(setDistrictCode, value)}
+          />
+          <FilterField
             id="scheme-crop-filter"
             label={t("schemes.crop")}
             placeholder={t("schemes.cropPlaceholder")}
@@ -183,6 +231,30 @@ export function GovernmentSchemesPage() {
               onChange={(event) => updateFilter(setCategory, event.target.value)}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="scheme-status-filter">{t("schemes.status")}</Label>
+            <Select
+              id="scheme-status-filter"
+              value={statusFilter}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (
+                  value === "" ||
+                  value === "active" ||
+                  value === "closed" ||
+                  value === "unverified"
+                ) {
+                  setStatusFilter(value);
+                  setPage(1);
+                }
+              }}
+            >
+              <option value="">{t("common.all")}</option>
+              <option value="active">{t("schemes.statusActive")}</option>
+              <option value="closed">{t("schemes.statusClosed")}</option>
+              <option value="unverified">{t("schemes.statusUnverified")}</option>
+            </Select>
+          </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-4">
             <Label htmlFor="scheme-search">{t("schemes.searchPageLabel")}</Label>
             <div className="relative">
@@ -201,6 +273,32 @@ export function GovernmentSchemesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {savedQuery.data && savedQuery.data.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-base">{t("schemes.savedTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {savedQuery.data.map((scheme) => (
+              <Button
+                key={scheme.id}
+                variant="outline"
+                className="h-auto justify-start whitespace-normal text-left"
+                onClick={() => openScheme(scheme)}
+              >
+                <BookmarkCheck className="mr-2 size-4 shrink-0" />
+                {scheme.name}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      {savedQuery.isError && (
+        <p className="mt-4 text-sm text-destructive" role="alert">
+          {t("schemes.savedError")}: {errorMessage(savedQuery.error)}
+        </p>
+      )}
 
       {schemesQuery.isPending ? (
         <div className="mt-6 grid gap-4 md:grid-cols-2" role="status" aria-label={t("schemes.loading")}>
@@ -231,7 +329,7 @@ export function GovernmentSchemesPage() {
           <p className="mt-5 text-sm text-muted-foreground" aria-live="polite">
             {t("schemes.resultCount", { count: schemesQuery.data?.total ?? 0 })}
           </p>
-          {visibleItems.length === 0 ? (
+          {items.length === 0 ? (
             <StateCard
               className="mt-3"
               icon={Search}
@@ -240,7 +338,7 @@ export function GovernmentSchemesPage() {
             />
           ) : (
             <section aria-label={t("schemes.listLabel")} className="mt-3 grid gap-4 md:grid-cols-2">
-              {visibleItems.map((scheme) => (
+              {items.map((scheme) => (
                 <SchemeCard
                   key={scheme.id}
                   scheme={scheme}
@@ -308,20 +406,74 @@ export function GovernmentSchemesPage() {
                       {selectedScheme.category}
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedSchemeId(null);
-                      eligibilityMutation.reset();
-                    }}
-                  >
-                    {t("schemes.closeDetails")}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        saveMutation.isPending ||
+                        removeSavedMutation.isPending ||
+                        selectedSavedQuery.isPending ||
+                        selectedSavedQuery.isError
+                      }
+                      onClick={() => {
+                        if (selectedSavedQuery.data?.saved) {
+                          removeSavedMutation.mutate(selectedScheme.id);
+                        } else {
+                          saveMutation.mutate(selectedScheme.id);
+                        }
+                      }}
+                    >
+                      {selectedSavedQuery.data?.saved ? (
+                        <BookmarkCheck className="mr-2 size-4" />
+                      ) : (
+                        <Bookmark className="mr-2 size-4" />
+                      )}
+                      {selectedSavedQuery.data?.saved
+                        ? t("schemes.removeSaved")
+                        : t("schemes.save")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedSchemeId(null);
+                        eligibilityMutation.reset();
+                      }}
+                    >
+                      {t("schemes.closeDetails")}
+                    </Button>
+                  </div>
                 </div>
+                {(selectedSavedQuery.isError ||
+                  saveMutation.isError ||
+                  removeSavedMutation.isError) && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {t("schemes.savedError")}:{" "}
+                    {errorMessage(
+                      selectedSavedQuery.error ??
+                        saveMutation.error ??
+                        removeSavedMutation.error,
+                    )}
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="space-y-6">
                 <p className="whitespace-pre-line text-sm">{selectedScheme.description}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">{selectedScheme.department}</Badge>
+                  <Badge variant={
+                    selectedScheme.status === "active" && selectedScheme.is_verified
+                      ? "success"
+                      : "outline"
+                  }>
+                    {selectedScheme.status === "closed"
+                    ? t("schemes.statusClosed")
+                    : selectedScheme.status === "unverified" || !selectedScheme.is_verified
+                      ? t("schemes.statusUnverified")
+                      : t("schemes.statusActive")}
+                  </Badge>
+                </div>
                 {selectedScheme.benefits && (
                   <InfoBlock title={t("schemes.benefits")} text={selectedScheme.benefits} />
                 )}
@@ -348,6 +500,9 @@ export function GovernmentSchemesPage() {
                 )}
                 <div className="flex flex-wrap gap-2 text-sm">
                   {selectedScheme.state_codes.map((item) => (
+                    <Badge key={item} variant="secondary">{item}</Badge>
+                  ))}
+                  {selectedScheme.district_codes.map((item) => (
                     <Badge key={item} variant="secondary">{item}</Badge>
                   ))}
                   {selectedScheme.crops.map((item) => (
@@ -403,7 +558,7 @@ export function GovernmentSchemesPage() {
                     {t("schemes.eligibilityDisclaimer")}
                   </p>
                   <form
-                    className="mt-4 grid gap-4 sm:grid-cols-3"
+                    className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                     onSubmit={checkEligibility}
                   >
                     <FilterField
@@ -421,13 +576,32 @@ export function GovernmentSchemesPage() {
                       onChange={setEligibilityCrop}
                     />
                     <FilterField
+                      id="eligibility-district"
+                      label={t("schemes.district")}
+                      placeholder={t("schemes.districtPlaceholder")}
+                      value={eligibilityDistrict}
+                      onChange={setEligibilityDistrict}
+                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="eligibility-landholding">{t("schemes.landholding")}</Label>
+                      <Input
+                        id="eligibility-landholding"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={eligibilityLandholding}
+                        placeholder={t("schemes.landholdingPlaceholder")}
+                        onChange={(event) => setEligibilityLandholding(event.target.value)}
+                      />
+                    </div>
+                    <FilterField
                       id="eligibility-farmer-category"
                       label={t("schemes.farmerCategory")}
                       placeholder={t("schemes.categoryPlaceholder")}
                       value={eligibilityCategory}
                       onChange={setEligibilityCategory}
                     />
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-2 lg:col-span-3">
                       <Button type="submit" disabled={eligibilityMutation.isPending}>
                         {eligibilityMutation.isPending
                           ? t("schemes.checking")
@@ -499,10 +673,21 @@ function SchemeCard({
           <div>
             <CardTitle className="text-lg">{scheme.name}</CardTitle>
             <p className="mt-2 text-sm text-muted-foreground">{scheme.category}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{scheme.department}</p>
           </div>
-          <Badge variant={scheme.is_verified ? "success" : "outline"}>
-            {scheme.is_verified ? t("schemes.verified") : t("schemes.unverified")}
-          </Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant={
+              scheme.status === "active" && scheme.is_verified
+                ? "success"
+                : "outline"
+            }>
+              {scheme.status === "closed"
+                ? t("schemes.statusClosed")
+                : scheme.status === "unverified" || !scheme.is_verified
+                  ? t("schemes.statusUnverified")
+                  : t("schemes.statusActive")}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

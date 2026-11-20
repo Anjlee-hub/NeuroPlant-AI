@@ -2,10 +2,11 @@ import io
 
 from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.community import (
+    CommunityBookmark,
     CommunityComment,
     CommunityPost,
     CommunityVote,
@@ -22,6 +23,9 @@ from app.schemas.community import (
 from app.services.storage import get_storage_service
 
 MAX_COMMUNITY_IMAGE_BYTES = 10 * 1024 * 1024
+BOOKMARKS_UNAVAILABLE_MESSAGE = (
+    "Community bookmarks are unavailable until the community-bookmarks migration is applied."
+)
 COMMUNITY_IMAGE_CONTENT_TYPES = {
     "image/jpeg",
     "image/png",
@@ -30,6 +34,17 @@ COMMUNITY_IMAGE_CONTENT_TYPES = {
     "image/gif",
     "image/tiff",
 }
+
+
+class CommunityBookmarksUnavailableError(Exception):
+    """The database has not yet been migrated to persist post bookmarks."""
+
+
+async def _bookmarks_table_exists(db: AsyncSession) -> bool:
+    connection = await db.connection()
+    return await connection.run_sync(
+        lambda sync_connection: inspect(sync_connection).has_table("community_bookmarks")
+    )
 
 
 async def upload_post_image(user_id: int, file: UploadFile) -> str:
@@ -72,12 +87,20 @@ async def create_post(db: AsyncSession, user_id: int, data: PostCreate) -> PostR
     return await _post_response(db, post, user_id)
 
 
-async def get_posts(db: AsyncSession, user_id: int) -> list[PostResponse]:
-    posts = (
-        await db.scalars(
-            select(CommunityPost).where(CommunityPost.is_active).order_by(CommunityPost.id.desc())
-        )
-    ).all()
+async def get_posts(
+    db: AsyncSession, user_id: int, *, saved_only: bool = False
+) -> list[PostResponse]:
+    bookmarks_available = await _bookmarks_table_exists(db)
+    if saved_only and not bookmarks_available:
+        raise CommunityBookmarksUnavailableError(BOOKMARKS_UNAVAILABLE_MESSAGE)
+
+    statement = select(CommunityPost).where(CommunityPost.is_active)
+    if saved_only:
+        statement = statement.join(
+            CommunityBookmark,
+            CommunityBookmark.post_id == CommunityPost.id,
+        ).where(CommunityBookmark.user_id == user_id)
+    posts = (await db.scalars(statement.order_by(CommunityPost.id.desc()))).all()
     if not posts:
         return []
 
@@ -93,11 +116,24 @@ async def get_posts(db: AsyncSession, user_id: int) -> list[PostResponse]:
     counts = {
         post_id: (like_count, bool(is_liked)) for post_id, like_count, is_liked in votes.all()
     }
+    saved_ids: set[int] = set()
+    if bookmarks_available:
+        saved_ids = set(
+            (
+                await db.scalars(
+                    select(CommunityBookmark.post_id).where(
+                        CommunityBookmark.user_id == user_id,
+                        CommunityBookmark.post_id.in_([post.id for post in posts]),
+                    )
+                )
+            ).all()
+        )
     return [
         PostResponse.model_validate(post).model_copy(
             update={
                 "like_count": counts.get(post.id, (0, False))[0],
                 "is_liked": counts.get(post.id, (0, False))[1],
+                "is_saved": post.id in saved_ids,
             }
         )
         for post in posts
@@ -114,9 +150,51 @@ async def _post_response(db: AsyncSession, post: CommunityPost, user_id: int) ->
             CommunityVote.user_id == user_id,
         )
     )
+    is_saved = False
+    if await _bookmarks_table_exists(db):
+        is_saved = (await db.scalar(
+            select(CommunityBookmark.id).where(
+                CommunityBookmark.post_id == post.id,
+                CommunityBookmark.user_id == user_id,
+            )
+        )) is not None
     return PostResponse.model_validate(post).model_copy(
-        update={"like_count": like_count or 0, "is_liked": is_liked is not None}
+        update={
+            "like_count": like_count or 0,
+            "is_liked": is_liked is not None,
+            "is_saved": is_saved,
+        }
     )
+
+
+async def set_post_saved(
+    db: AsyncSession, post_id: int, user_id: int, saved: bool
+) -> bool | None:
+    if not await _bookmarks_table_exists(db):
+        raise CommunityBookmarksUnavailableError(BOOKMARKS_UNAVAILABLE_MESSAGE)
+
+    post = await db.scalar(
+        select(CommunityPost).where(
+            CommunityPost.id == post_id,
+            CommunityPost.is_active,
+        )
+    )
+    if post is None:
+        return None
+
+    bookmark = await db.scalar(
+        select(CommunityBookmark).where(
+            CommunityBookmark.post_id == post_id,
+            CommunityBookmark.user_id == user_id,
+        )
+    )
+    if saved and bookmark is None:
+        db.add(CommunityBookmark(post_id=post_id, user_id=user_id))
+        await db.commit()
+    elif not saved and bookmark is not None:
+        await db.delete(bookmark)
+        await db.commit()
+    return saved
 
 
 async def update_post(

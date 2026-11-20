@@ -194,6 +194,33 @@ async def test_duplicate_client_scan_id_returns_existing(client, db):
     assert second.json()["id"] == first.json()["id"]
 
 
+async def test_two_distinct_client_scan_ids_create_distinct_scans(client, db):
+    await seed_catalog(db)
+    headers = await _auth_headers(client, "+919000000028")
+
+    first = await _upload(client, headers, client_scan_id=_client_id(28))
+    second = await _upload(client, headers, client_scan_id=_client_id(29))
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    assert first.json()["id"] != second.json()["id"]
+    assert first.json()["client_scan_id"] != second.json()["client_scan_id"]
+
+
+async def test_same_client_scan_id_conflicts_across_authenticated_users(client, db):
+    await seed_catalog(db)
+    owner = await _auth_headers(client, "+919000000026")
+    other = await _auth_headers(client, "+919000000027")
+    client_scan_id = _client_id(26)
+
+    first = await _upload(client, owner, client_scan_id=client_scan_id)
+    second = await _upload(client, other, client_scan_id=client_scan_id)
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 409, second.text
+    assert second.json()["error"]["code"] == "duplicate_client_scan_id"
+
+
 # ── Downstream failures ──────────────────────────────────────────────────
 
 

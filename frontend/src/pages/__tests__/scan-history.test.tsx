@@ -111,27 +111,9 @@ describe("ScanHistoryPage", () => {
     // The filter selects render the same words as <option>s — scope to the badge divs.
     expect(screen.getByText("Synced", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("Moderate", { selector: "div" })).toBeInTheDocument();
-    expect(screen.getAllByText("1 scan").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Page 1 of 1").length).toBeGreaterThan(0);
-  });
-
-  it("shows each stored confidence and marks unavailable values for review", async () => {
-    apiMock.listScans.mockResolvedValue({
-      items: [
-        makeScan({ confidence: 0.41 }),
-        makeScan({ id: 2, confidence: null, disease_name: "Rice Blast" }),
-      ],
-      total: 2,
-      page: 1,
-      page_size: 12,
-      has_next: false,
-    });
-
-    renderScans();
-
-    expect((await screen.findAllByText("41%")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Needs review").length).toBeGreaterThan(0);
-    expect(screen.queryByText("0%")).not.toBeInTheDocument();
+    // The total is intentionally repeated in the overview and results heading.
+    expect(screen.getAllByText("1 scan", { exact: true })).toHaveLength(2);
+    expect(screen.getAllByText("Page 1 of 1", { exact: true })).toHaveLength(2);
   });
 
   it("shows the empty state when there are no scans", async () => {

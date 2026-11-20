@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Leaf,
   ScanLine,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Stethoscope,
@@ -46,6 +47,28 @@ import type { Scan, ScanExplain, ScanPartType } from "@/types/scan";
 const PART_TYPES: ScanPartType[] = ["leaf", "fruit", "stem", "plant", "whole"];
 
 type Phase = "form" | "submitting" | "result" | "error";
+
+function logScanDiagnostic(
+  event: string,
+  details: Record<string, string | number | null>,
+): void {
+  if (import.meta.env.MODE === "development") {
+    console.info(`[scan-debug] ${event}`, details);
+  }
+}
+
+function scanErrorDetails(error: unknown): {
+  status: number | null;
+  code: string | null;
+} {
+  if (typeof error !== "object" || error === null) {
+    return { status: null, code: null };
+  }
+  return {
+    status: "status" in error && typeof error.status === "number" ? error.status : null,
+    code: "code" in error && typeof error.code === "string" ? error.code : null,
+  };
+}
 
 function ResultRow({
   label,
@@ -89,13 +112,17 @@ function SectionHeading({
 function ResultView({
   scan,
   explain,
+  explainError,
   cropName,
   onNewScan,
+  onRetryExplain,
 }: {
   scan: Scan;
   explain: ScanExplain | null;
+  explainError: string | null;
   cropName: string | null;
   onNewScan: () => void;
+  onRetryExplain: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -161,6 +188,22 @@ function ResultView({
           </dl>
         </CardContent>
       </Card>
+
+      {explainError && !explain && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+        >
+          <p>Additional diagnosis details could not be loaded: {explainError}</p>
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={onRetryExplain}
+          >
+            Retry details
+          </Button>
+        </div>
+      )}
 
       {explain && (
         <div className="grid gap-5 lg:grid-cols-2">
@@ -321,7 +364,9 @@ export function ScanCropPage() {
   const queryClient = useQueryClient();
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const clientScanIdRef = useRef<string | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -330,8 +375,13 @@ export function ScanCropPage() {
   const [phase, setPhase] = useState<Phase>("form");
   const [result, setResult] = useState<Scan | null>(null);
   const [explain, setExplain] = useState<ScanExplain | null>(null);
+  const [explainError, setExplainError] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
 
   const cropsQuery = useQuery({
     queryKey: ["crops"],
@@ -346,6 +396,88 @@ export function ScanCropPage() {
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    return () => {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOpen(false);
+  };
+
+  const openCamera = async (preferredFacing: "environment" | "user" = facingMode) => {
+    setCameraError("");
+    setCameraLoading(true);
+    setCameraOpen(true);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t("scanCrop.camera.unsupported"));
+      setCameraLoading(false);
+      return;
+    }
+
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: preferredFacing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          void videoRef.current.play().catch(() => undefined);
+        }
+      });
+      setFacingMode(preferredFacing);
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setCameraError(t("scanCrop.camera.permissionDenied"));
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setCameraError(t("scanCrop.camera.notFound"));
+      } else {
+        setCameraError(t("scanCrop.camera.startError"));
+      }
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  const switchCamera = async () => {
+    await openCamera(facingMode === "environment" ? "user" : "environment");
+  };
+
+  const captureImage = () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      setCameraError(t("scanCrop.camera.previewStarting"));
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError(t("scanCrop.camera.captureError"));
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setCameraError(t("scanCrop.camera.imageError"));
+        return;
+      }
+      const captured = new File([blob], `crop-camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+      pickFile(captured);
+      stopCamera();
+    }, "image/jpeg", 0.92);
+  };
+
   const pickFile = (picked: File | null) => {
     if (!picked) return;
 
@@ -356,11 +488,13 @@ export function ScanCropPage() {
     }
 
     setFile(picked);
+    clientScanIdRef.current = null;
     setPreviewUrl(URL.createObjectURL(picked));
     setPhase("form");
     setErrorMsg("");
     setResult(null);
     setExplain(null);
+    setExplainError(null);
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -370,17 +504,19 @@ export function ScanCropPage() {
   };
 
   const reset = () => {
+    stopCamera();
     setFile(null);
+    clientScanIdRef.current = null;
     setPreviewUrl(null);
     setCropId("");
     setPartType("");
     setPhase("form");
     setResult(null);
     setExplain(null);
+    setExplainError(null);
     setErrorMsg("");
 
     if (uploadInputRef.current) uploadInputRef.current.value = "";
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   const submit = async () => {
@@ -390,12 +526,46 @@ export function ScanCropPage() {
     setErrorMsg("");
 
     try {
-      const scan = await api.uploadScan({
-        files: [file],
-        clientScanId: crypto.randomUUID(),
-        cropId: cropId ? Number(cropId) : null,
-        partType: partType ? (partType as ScanPartType) : null,
-      });
+      clientScanIdRef.current ??= crypto.randomUUID();
+      const upload = async (clientScanId: string, attempt: number) => {
+        logScanDiagnostic("upload-request", {
+          attempt,
+          client_scan_id: clientScanId,
+        });
+        try {
+          return await api.uploadScan({
+            files: [file],
+            clientScanId,
+            cropId: cropId ? Number(cropId) : null,
+            partType: partType ? (partType as ScanPartType) : null,
+          });
+        } catch (err) {
+          const details = scanErrorDetails(err);
+          logScanDiagnostic("upload-error", {
+            attempt,
+            client_scan_id: clientScanId,
+            status: details.status,
+            code: details.code,
+          });
+          throw err;
+        }
+      };
+      let scan: Scan;
+      try {
+        scan = await upload(clientScanIdRef.current, 1);
+      } catch (err) {
+        if (scanErrorDetails(err).code !== "duplicate_client_scan_id") {
+          throw err;
+        }
+        const conflictingId = clientScanIdRef.current;
+        const replacementId = crypto.randomUUID();
+        clientScanIdRef.current = replacementId;
+        logScanDiagnostic("conflict-retry", {
+          previous_client_scan_id: conflictingId,
+          replacement_client_scan_id: replacementId,
+        });
+        scan = await upload(replacementId, 2);
+      }
 
       void queryClient.invalidateQueries({ queryKey: ["scans"] });
 
@@ -404,8 +574,10 @@ export function ScanCropPage() {
 
       try {
         setExplain(await api.getScanExplain(scan.id));
-      } catch {
+        setExplainError(null);
+      } catch (explainErr) {
         setExplain(null);
+        setExplainError(errorMessage(explainErr));
       }
     } catch (err) {
       setErrorMsg(errorMessage(err));
@@ -458,17 +630,90 @@ export function ScanCropPage() {
           </div>
         </header>
 
+        {cameraOpen && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scan-camera-dialog-title"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") stopCamera();
+            }}
+          >
+            <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-card shadow-2xl">
+              <h2 id="scan-camera-dialog-title" className="sr-only">
+                {t("scanCrop.camera.dialogTitle")}
+              </h2>
+              <div className="relative aspect-[4/3] max-h-[70vh] min-h-[300px] overflow-hidden bg-black sm:aspect-video">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover"
+                  aria-label={t("scanCrop.camera.previewLabel")}
+                />
+                <div className="pointer-events-none absolute inset-[12%] rounded-2xl border-4 border-green-400/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.15)]">
+                  <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                    {t("scanCrop.camera.frameHint")}
+                  </span>
+                </div>
+                {cameraLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-semibold text-white">
+                    {t("scanCrop.camera.starting")}
+                  </div>
+                )}
+                {cameraError && (
+                  <div className="absolute inset-x-4 bottom-4 rounded-xl bg-destructive px-4 py-3 text-sm text-destructive-foreground">
+                    {cameraError}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 p-4">
+                <Button variant="outline" autoFocus onClick={stopCamera}>
+                  {t("scanCrop.camera.cancel")}
+                </Button>
+                <Button
+                  size="lg"
+                  className="min-w-32 rounded-full"
+                  onClick={captureImage}
+                  disabled={cameraLoading || !!cameraError}
+                >
+                  <Camera className="mr-2 size-5" />
+                  {t("scanCrop.camera.capture")}
+                </Button>
+                <Button variant="outline" onClick={() => void switchCamera()}>
+                  <RefreshCw className="mr-2 size-4" />
+                  {t("scanCrop.camera.switch")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {phase === "result" && result ? (
           <ResultView
             scan={result}
             explain={explain}
+            explainError={explainError}
+            onRetryExplain={() => {
+              setExplainError(null);
+              void api
+                .getScanExplain(result.id)
+                .then((details) => {
+                  setExplain(details);
+                  setExplainError(null);
+                })
+                .catch((explainErr: unknown) => {
+                  setExplainError(errorMessage(explainErr));
+                });
+            }}
             cropName={
-              selectedCrop ??
               (result.crop_id != null
                 ? cropsQuery.data?.find(
                     (crop) => crop.id === result.crop_id,
                   )?.name ?? null
-                : null)
+                : null) ?? selectedCrop ?? null
             }
             onNewScan={reset}
           />
@@ -612,7 +857,7 @@ export function ScanCropPage() {
                           </Button>
                           <Button
                             variant="outline"
-                            onClick={() => cameraInputRef.current?.click()}
+                            onClick={() => void openCamera()}
                           >
                             <Camera className="mr-2 size-4" />
                             {t("scanCrop.cameraPhoto")}
@@ -634,19 +879,6 @@ export function ScanCropPage() {
                     }}
                   />
 
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    data-testid="scan-camera-input"
-                    onChange={(event) => {
-                      pickFile(event.target.files?.[0] ?? null);
-                      event.target.value = "";
-                    }}
-                  />
-
                   {file && (
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button
@@ -660,7 +892,7 @@ export function ScanCropPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => cameraInputRef.current?.click()}
+                        onClick={() => void openCamera()}
                       >
                         <Camera className="mr-2 size-4" />
                         {t("scanCrop.cameraPhoto")}

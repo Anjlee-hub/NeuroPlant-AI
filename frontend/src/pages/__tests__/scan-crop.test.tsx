@@ -169,10 +169,9 @@ describe("ScanCropPage", () => {
       "href",
       "/scans/11",
     );
-    expect(screen.getByRole("link", { name: "View scan history" })).toHaveAttribute(
-      "href",
-      "/scans",
-    );
+    const historyLinks = screen.getAllByRole("link", { name: "View scan history" });
+    expect(historyLinks.length).toBeGreaterThan(0);
+    historyLinks.forEach((link) => expect(link).toHaveAttribute("href", "/scans"));
   });
 
   it("surfaces a readable error when the upload fails", async () => {
@@ -191,5 +190,82 @@ describe("ScanCropPage", () => {
     expect(await screen.findByText("Couldn't analyze the photo")).toBeInTheDocument();
     expect(screen.getByText("bad image")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("reuses the same client scan ID when retrying an upload", async () => {
+    const user = userEvent.setup();
+    renderCrop();
+    apiMock.uploadScan
+      .mockRejectedValueOnce(new Error("network timeout"))
+      .mockResolvedValueOnce(makeScan());
+    apiMock.getScanExplain.mockResolvedValue(explain);
+
+    fireEvent.change(screen.getByTestId("scan-upload-input"), {
+      target: {
+        files: [new File(["jpeg-bytes"], "leaf.jpg", { type: "image/jpeg" })],
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "Analyze photo" }));
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Analyze photo" }));
+
+    expect(await screen.findByRole("heading", { name: "Late Blight" })).toBeInTheDocument();
+    const firstId = apiMock.uploadScan.mock.calls[0][0].clientScanId;
+    const retryId = apiMock.uploadScan.mock.calls[1][0].clientScanId;
+    expect(retryId).toBe(firstId);
+  });
+
+  it("uses a fresh client scan ID only after a duplicate-ID conflict", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+      .mockReturnValueOnce("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    renderCrop();
+    apiMock.uploadScan
+      .mockRejectedValueOnce(
+        Object.assign(new Error("client_scan_id conflicts with an existing scan"), {
+          status: 409,
+          code: "duplicate_client_scan_id",
+        }),
+      )
+      .mockResolvedValueOnce(makeScan());
+    apiMock.getScanExplain.mockResolvedValue(explain);
+
+    fireEvent.change(screen.getByTestId("scan-upload-input"), {
+      target: {
+        files: [new File(["jpeg-bytes"], "leaf.jpg", { type: "image/jpeg" })],
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "Analyze photo" }));
+
+    expect(await screen.findByRole("heading", { name: "Late Blight" })).toBeInTheDocument();
+    expect(apiMock.uploadScan.mock.calls.map(([payload]) => payload.clientScanId)).toEqual([
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    ]);
+  });
+
+  it("shows and retries missing detailed diagnosis data", async () => {
+    const user = userEvent.setup();
+    renderCrop();
+    apiMock.uploadScan.mockResolvedValue(makeScan());
+    apiMock.getScanExplain
+      .mockRejectedValueOnce(new Error("details unavailable"))
+      .mockResolvedValueOnce(explain);
+
+    fireEvent.change(screen.getByTestId("scan-upload-input"), {
+      target: {
+        files: [new File(["jpeg-bytes"], "leaf.jpg", { type: "image/jpeg" })],
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "Analyze photo" }));
+
+    expect(
+      await screen.findByText(
+        "Additional diagnosis details could not be loaded: details unavailable",
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry details" }));
+    expect(await screen.findByText("The AI focused on the leaf spots.")).toBeInTheDocument();
   });
 });

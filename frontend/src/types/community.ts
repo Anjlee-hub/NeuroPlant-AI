@@ -6,9 +6,11 @@
   image_url: string | null;
   category: string;
   is_active: boolean;
+  created_at: string;
   farmer: CommunityFarmer;
   like_count: number;
   is_liked: boolean;
+  is_saved: boolean;
 }
 
 export interface CommunityFarmer {

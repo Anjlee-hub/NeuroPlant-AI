@@ -328,8 +328,8 @@ class ScanSyncItemIn(BaseModel):
 
     Mirrors the multipart ``POST /scans`` fields but transports images as
     base64 so the whole offline queue uploads in a single JSON batch.
-    Idempotency is per ``client_scan_id`` — re-sending an already-synced id
-    returns the existing authoritative row instead of duplicating it.
+    Re-sending an already-synced ID for the same user returns that user's
+    authoritative row. IDs owned by another user remain conflicts, not replays.
     """
 
     model_config = ConfigDict(
