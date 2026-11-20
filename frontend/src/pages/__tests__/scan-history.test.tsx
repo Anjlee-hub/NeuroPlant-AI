@@ -107,19 +107,20 @@ describe("ScanHistoryPage", () => {
 
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(await screen.findByText("Late Blight")).toBeInTheDocument();
-    expect(screen.getByText("92%")).toBeInTheDocument();
+    expect(screen.getAllByText("92%").length).toBeGreaterThan(0);
     // The filter selects render the same words as <option>s — scope to the badge divs.
     expect(screen.getByText("Synced", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("Moderate", { selector: "div" })).toBeInTheDocument();
-    expect(screen.getByText("1 scan")).toBeInTheDocument();
-    expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
+    // The total is intentionally repeated in the overview and results heading.
+    expect(screen.getAllByText("1 scan", { exact: true })).toHaveLength(2);
+    expect(screen.getAllByText("Page 1 of 1", { exact: true })).toHaveLength(2);
   });
 
   it("shows the empty state when there are no scans", async () => {
     renderScans();
 
     expect(await screen.findByText("No scans yet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Scan a crop" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Scan a crop" }).length).toBeGreaterThan(0);
   });
 
   it("shows an error state and refetches on retry", async () => {
@@ -137,7 +138,7 @@ describe("ScanHistoryPage", () => {
     renderScans();
 
     expect(await screen.findByText("Couldn't load your scans")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Retry" }));
+    await user.click(screen.getAllByRole("button", { name: "Retry" })[0]);
 
     expect(await screen.findByText("Late Blight")).toBeInTheDocument();
   });

@@ -27,6 +27,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock }));
 
 import { MessagesDetailPage } from "@/pages/messages-detail";
 import { MessagesListPage } from "@/pages/messages-list";
+import { MarketplaceHubPage } from "@/pages/marketplace-dashboard";
 
 const seller = {
   id: 20,
@@ -109,6 +110,30 @@ function renderDetail(id = 1) {
       {
         path: "/marketplace/messages/:conversationId",
         element: <MessagesDetailPage />,
+      },
+    ],
+    { initialEntries: [`/marketplace/messages/${id}`] },
+  );
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+function renderMarketplaceDetail(id = 1) {
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/marketplace",
+        element: <MarketplaceHubPage />,
+        children: [
+          {
+            path: "messages/:conversationId",
+            element: <MessagesDetailPage />,
+          },
+        ],
       },
     ],
     { initialEntries: [`/marketplace/messages/${id}`] },
@@ -205,6 +230,7 @@ describe("MessagesDetailPage (/marketplace/messages/:id)", () => {
     });
     apiMock.markConversationRead.mockResolvedValue({ conversation_id: 1, unread_count: 0 });
     apiMock.closeConversation.mockResolvedValue({ ...makeConversation(), status: "closed" });
+    apiMock.listConversations.mockResolvedValue([makeConversation()]);
   });
 
   it("asks to sign in when no user is authenticated", async () => {
@@ -233,6 +259,27 @@ describe("MessagesDetailPage (/marketplace/messages/:id)", () => {
     await vi.waitFor(() =>
       expect(apiMock.markConversationRead).toHaveBeenCalledWith(1),
     );
+  });
+
+  it("refreshes the Marketplace unread badge after a conversation is read", async () => {
+    apiMock.listConversations
+      .mockResolvedValueOnce([makeConversation()])
+      .mockResolvedValue([makeConversation({ unread_count: 0 })]);
+    let finishMarkRead: (result: { conversation_id: number; unread_count: number }) => void = () => {};
+    apiMock.markConversationRead.mockReturnValue(
+      new Promise((resolve) => {
+        finishMarkRead = resolve;
+      }),
+    );
+    renderMarketplaceDetail();
+
+    expect(await screen.findByLabelText("1 unread messages")).toBeInTheDocument();
+    finishMarkRead({ conversation_id: 1, unread_count: 0 });
+    await vi.waitFor(() =>
+      expect(screen.queryByLabelText("1 unread messages")).not.toBeInTheDocument(),
+    );
+    expect(apiMock.markConversationRead).toHaveBeenCalledWith(1);
+    expect(apiMock.listConversations).toHaveBeenCalledTimes(2);
   });
 
   it("sends a new message from the composer", async () => {

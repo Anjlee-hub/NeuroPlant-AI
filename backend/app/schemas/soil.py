@@ -68,7 +68,9 @@ class SoilRecommendationOut(BaseModel):
     severity: str | None = Field(description="low | moderate | severe (echoed from the scan)")
     severity_notes: list[str] = Field(default_factory=list)
     confidence: float | None = Field(description="Detection confidence echoed from the scan")
-    confidence_note: str | None = Field(description="Set when confidence is low")
+    confidence_note: str | None = Field(
+        description="Set when confidence is low or unavailable for a scan"
+    )
 
 
 class SoilRecommendationCatalogOut(BaseModel):

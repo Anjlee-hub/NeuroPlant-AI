@@ -25,6 +25,7 @@ from datetime import datetime
 
 import numpy as np
 from fastapi import UploadFile
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +37,7 @@ from app.ai.gradcam import (
 )
 from app.ai.preprocess import ImageValidationError, Preprocessor
 from app.ai.types import ImageData, InferenceError
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.scan import Scan
 from app.schemas.scan import ScanCreate, ScanSyncItemIn, SyncImageIn
@@ -44,6 +46,20 @@ from app.services.scans import ScanService, _now_naive_utc
 from app.services.storage import StorageService
 
 logger = get_logger(__name__)
+
+
+def _is_client_scan_id_unique_violation(exc: IntegrityError) -> bool:
+    original = exc.orig
+    constraint_name = getattr(original, "constraint_name", None)
+    if constraint_name is not None:
+        return constraint_name == "ix_scans_client_scan_id"
+
+    message = str(original).casefold().replace('"', "").replace("`", "")
+    sqlite_error_name = getattr(original, "sqlite_errorname", None)
+    return (
+        message == "unique constraint failed: scans.client_scan_id"
+        and sqlite_error_name in (None, "SQLITE_CONSTRAINT_UNIQUE")
+    )
 
 
 class ScanPipelineError(Exception):
@@ -300,11 +316,36 @@ class ScanPipelineService:
         )
         try:
             scan = await scans.create(payload)
-        except IntegrityError:
-            # Lost a race on the unique client_scan_id — treat as a replay.
+        except IntegrityError as exc:
             await self.db.rollback()
-            existing = await scans.find_by_client_id(client_scan_id, user_id)
-            if existing is not None:
+            existing = await self.db.scalar(
+                select(Scan).where(Scan.client_scan_id == client_scan_id)
+            )
+            unique_client_id_violation = _is_client_scan_id_unique_violation(exc)
+            if get_settings().environment == "development":
+                diagnostics = {
+                    "exception_class": type(exc).__name__,
+                    "original_exception_class": type(exc.orig).__name__,
+                    "original_error_message": str(exc.orig),
+                    "sqlite_error_name": getattr(exc.orig, "sqlite_errorname", None),
+                    "constraint_name": getattr(exc.orig, "constraint_name", None),
+                    "operation": "insert_scan",
+                    "client_scan_id": client_scan_id,
+                    "existing_scan_found": existing is not None,
+                    "existing_scan_same_user": (
+                        existing.user_id == user_id if existing is not None else None
+                    ),
+                    "existing_scan_soft_deleted": (
+                        existing.deleted_at is not None if existing is not None else None
+                    ),
+                }
+                if unique_client_id_violation:
+                    logger.warning("scan_insert_integrity_error", **diagnostics)
+                else:
+                    logger.error("scan_insert_integrity_error", **diagnostics)
+            if not unique_client_id_violation or existing is None:
+                raise
+            if existing.user_id == user_id and existing.deleted_at is None:
                 return existing, False
             raise DuplicateScanError("client_scan_id conflicts with an existing scan") from None
         return scan, True

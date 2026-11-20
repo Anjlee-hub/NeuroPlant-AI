@@ -293,6 +293,18 @@ async def test_scan_recommendations_resolves_by_name_when_no_disease_id(client, 
     assert resp.json()["disease"]["name"] == "Early Blight"
 
 
+async def test_scan_recommendations_name_fallback_ignores_case(client, db):
+    await _seed_all()
+    headers = await _register(client, "+919000000028")
+    user_id = await _user_id(client, db, "+919000000028")
+    scan_id = await _make_scan(user_id, None, "early blight")
+
+    resp = await client.get(f"/api/v1/scans/{scan_id}/recommendations", headers=headers)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["disease"]["name"] == "Early Blight"
+
+
 async def test_scan_recommendations_404_when_no_plan(client, db):
     await _seed_all()
     headers = await _register(client, "+919000000007")

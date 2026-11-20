@@ -67,6 +67,7 @@ export function ListingForm({
     listing?.availability ?? "available",
   );
   const [images, setImages] = useState<string[]>(listing?.images ?? []);
+  const [imagesPending, setImagesPending] = useState(false);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -258,14 +259,18 @@ export function ListingForm({
 
         <div className="flex flex-col gap-1.5 sm:col-span-2">
           <Label>{t("marketplace.form.imagesLabel")}</Label>
-          <ListingImageUploader initialUrls={images} onChange={setImages} />
+          <ListingImageUploader
+            initialUrls={images}
+            onChange={setImages}
+            onPendingChange={setImagesPending}
+          />
         </div>
       </div>
 
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
 
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving || imagesPending}>
           {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {saving ? t("marketplace.form.saving") : t("marketplace.form.save")}
         </Button>

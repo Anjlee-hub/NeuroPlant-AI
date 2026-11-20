@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, Navigate, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Header } from "@/components/layout/header";
+import { ThemeProvider } from "@/app/theme-provider";
 import type { CropListing, CropListingStats } from "@/types/marketplace";
 
 const authMock = vi.hoisted(() => ({
@@ -14,14 +16,25 @@ const apiMock = vi.hoisted(() => ({
   getCropListingStats: vi.fn(),
   updateCropListing: vi.fn(),
   deleteCropListing: vi.fn(),
+  listConversations: vi.fn(),
 }));
 
 vi.mock("@/stores/auth", () => ({
-  useAuth: () => ({ user: authMock.user, loading: false }),
+  useAuth: (selector?: (state: {
+    user: typeof authMock.user;
+    loading: boolean;
+    logout: () => void;
+  }) => unknown) => {
+    const state = { user: authMock.user, loading: false, logout: vi.fn() };
+    return selector ? selector(state) : state;
+  },
 }));
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 
-import { MarketplaceDashboardPage } from "@/pages/marketplace-dashboard";
+import {
+  MarketplaceDashboardPage,
+  MarketplaceHubPage,
+} from "@/pages/marketplace-dashboard";
 
 /** One listing with sensible defaults; tests override the fields they care about. */
 function makeListing(overrides: Partial<CropListing> = {}): CropListing {
@@ -77,6 +90,107 @@ function renderPage() {
   );
 }
 
+describe("MarketplaceHubPage", () => {
+  it("keeps Marketplace as the only marketplace item in the main sidebar", () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "*",
+          element: <Header collapsed={false} onToggleSidebar={() => {}} />,
+        },
+      ],
+      { initialEntries: ["/marketplace/browse"] },
+    );
+
+    render(
+      <ThemeProvider>
+        <RouterProvider router={router} />
+      </ThemeProvider>,
+    );
+
+    const mainNavigation = within(
+      screen.getByRole("navigation", { name: "Main navigation" }),
+    );
+    expect(
+      mainNavigation.getAllByRole("link", { name: "Marketplace" }),
+    ).toHaveLength(1);
+    for (const removedEntry of [
+      "Buy",
+      "My Shop",
+      "Plant Protection & Farm Inputs",
+      "Messages",
+      "Saved items",
+      "My reviews",
+    ]) {
+      expect(
+        mainNavigation.queryByRole("link", { name: removedEntry }),
+      ).not.toBeInTheDocument();
+    }
+  });
+
+  it("defaults to crop browsing and switches between the unified sections", async () => {
+    const user = userEvent.setup();
+    authMock.user = { id: 1, name: "Tester" };
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/marketplace",
+          element: <MarketplaceHubPage />,
+          children: [
+            {
+              index: true,
+              element: <Navigate to="/marketplace/browse" replace />,
+            },
+            { path: "browse", element: <div>Browse Crops section</div> },
+            { path: "listings", element: <div>My Listings section</div> },
+            { path: "shop", element: <div>My Shop section</div> },
+            { path: "products", element: <div>Plant Protection & Farm Inputs section</div> },
+            { path: "messages", element: <div>Messages section</div> },
+          ],
+        },
+      ],
+      { initialEntries: ["/marketplace"] },
+    );
+
+    apiMock.listConversations.mockResolvedValue([{ unread_count: 3 }]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("Browse Crops section")).toBeInTheDocument();
+    const sections = within(
+      screen.getByRole("navigation", { name: "Marketplace sections" }),
+    );
+    const links = sections.getAllByRole("link");
+    expect(links).toHaveLength(6);
+    expect(links.map((link) => link.textContent?.trim())).toEqual([
+      "My Shop",
+      "Browse Crops",
+      "Plant Protection & Farm Inputs",
+      expect.stringContaining("Messages"),
+      "Saved items",
+      "My reviews",
+    ]);
+    expect(await screen.findByLabelText("3 unread messages")).toBeInTheDocument();
+    expect(sections.getByRole("link", { name: /Messages/ })).toHaveAttribute(
+      "href",
+      "/marketplace/messages",
+    );
+    expect(sections.getByRole("link", { name: "Saved items" })).toHaveAttribute(
+      "href",
+      "/marketplace/favorites",
+    );
+
+    const shopLink = sections.getByRole("link", { name: "My Shop" });
+    await user.click(shopLink);
+    expect(await screen.findByText("My Shop section")).toBeInTheDocument();
+    expect(shopLink).toHaveAttribute("aria-current", "page");
+  });
+});
+
 describe("MarketplaceDashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -111,6 +225,16 @@ describe("MarketplaceDashboardPage", () => {
     expect(screen.getByText("40")).toBeInTheDocument();
     expect(screen.getByText("30")).toBeInTheDocument();
     expect(screen.getByText("Nashik")).toBeInTheDocument();
+  });
+
+  it("shows a fallback if a listing image cannot be loaded", async () => {
+    authMock.user = { id: 1, name: "Tester" };
+    renderPage();
+
+    const image = await screen.findByRole("img", { name: "Tomato" });
+    fireEvent.error(image);
+
+    expect(screen.getByRole("img", { name: "Tomato" }).tagName).toBe("DIV");
   });
 
   it("shows an empty state with a create CTA when there are no listings", async () => {

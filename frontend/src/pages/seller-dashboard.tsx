@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Store } from "lucide-react";
+import {
+  Clock3,
+  MapPin,
+  Pencil,
+  Phone,
+  Plus,
+  Store,
+  Truck,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ProductForm } from "@/components/marketplace/product-form";
 import { ProductStatsCards } from "@/components/marketplace/product-stats-cards";
@@ -19,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StateCard } from "@/components/ui/state-card";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
-import type { Product, ProductAvailability } from "@/types/marketplace";
+import type { Product, ProductAvailability, SellerProfile } from "@/types/marketplace";
 
 /**
  * Seller portal dashboard (M4 Task 4) — the seller's shop profile, product
@@ -45,6 +55,7 @@ export function SellerDashboardPage() {
     open: boolean;
     product?: Product;
   }>({ open: false, product: undefined });
+  const [editingProfile, setEditingProfile] = useState(false);
 
   const shopQuery = useQuery({
     queryKey: SELLER_SHOP_KEY,
@@ -130,6 +141,7 @@ export function SellerDashboardPage() {
   };
 
   const shop = shopQuery.data;
+  const shopMissing = shopQuery.isError && isNotFoundError(shopQuery.error);
   const products = productsQuery.data ?? [];
   const filtered = products.filter((product) => matchesFilters(product, filters));
 
@@ -152,7 +164,7 @@ export function SellerDashboardPage() {
       <div className="mt-6 flex flex-col gap-6">
         {shopQuery.isPending || productsQuery.isPending || statsQuery.isPending ? (
           <DashboardSkeleton />
-        ) : shopQuery.isError || productsQuery.isError || statsQuery.isError ? (
+        ) : (shopQuery.isError && !shopMissing) || productsQuery.isError || statsQuery.isError ? (
           <StateCard icon={Store} title={t("sellerPortal.errorTitle")} body={t("sellerPortal.errorBody")} tone="destructive">
             <Button variant="outline" onClick={() => void shopQuery.refetch()}>
               {t("common.retry")}
@@ -160,22 +172,30 @@ export function SellerDashboardPage() {
           </StateCard>
         ) : (
           <>
-            {shop && (
-              <section aria-labelledby="shop-profile-heading">
-                <h2 id="shop-profile-heading" className="text-lg font-semibold">
-                  {t("sellerPortal.profile.title")}
+            {!shop || editingProfile ? (
+              <section aria-labelledby="shop-profile-heading" className="rounded-xl border bg-card p-5 sm:p-6">
+                <h2 id="shop-profile-heading" className="mb-5 text-lg font-semibold">
+                  {shop ? t("sellerPortal.editProfile") : t("sellerPortal.profile.title")}
                 </h2>
                 <ShopProfileForm
-                  shop={shop}
+                  shop={shop ?? null}
+                  showCancel={!!shop}
                   onSaved={(saved) => {
                     queryClient.setQueryData(SELLER_SHOP_KEY, saved);
+                    setEditingProfile(false);
                   }}
-                  onCancel={() => {}}
+                  onCancel={() => setEditingProfile(false)}
                 />
               </section>
+            ) : (
+              <Storefront
+                shop={shop}
+                onEdit={() => setEditingProfile(true)}
+                onAddProduct={handleNewProduct}
+              />
             )}
 
-            {statsQuery.data && <ProductStatsCards stats={statsQuery.data} />}
+            {shop && statsQuery.data && <ProductStatsCards stats={statsQuery.data} />}
 
             <SellerInquiriesSection currentUserId={user.id} />
 
@@ -197,17 +217,22 @@ export function SellerDashboardPage() {
                 </p>
               )
             ) : (
-              <section className="flex flex-col gap-4">
-                {filtered.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    busy={busyId === product.id}
-                    onEdit={handleEdit}
-                    onAvailability={handleAvailability}
-                    onDelete={handleDelete}
-                  />
-                ))}
+              <section aria-labelledby="shop-products-heading" className="flex flex-col gap-4">
+                <h2 id="shop-products-heading" className="text-xl font-semibold">
+                  {t("sellerPortal.storefront.catalog")}
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filtered.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      busy={busyId === product.id}
+                      onEdit={handleEdit}
+                      onAvailability={handleAvailability}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
               </section>
             )}
           </>
@@ -219,8 +244,6 @@ export function SellerDashboardPage() {
           product={showProductForm.product}
           onCancel={() => setShowProductForm({ open: false, product: undefined })}
           onSaved={() => {
-            // The form submits to the API itself; on save we refresh the
-            // catalog + stats and close the dialog.
             invalidate();
             setShowProductForm({ open: false, product: undefined });
           }}
@@ -228,6 +251,116 @@ export function SellerDashboardPage() {
       )}
     </div>
   );
+}
+
+function Storefront({
+  shop,
+  onEdit,
+  onAddProduct,
+}: {
+  shop: SellerProfile;
+  onEdit: () => void;
+  onAddProduct: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <section aria-labelledby="storefront-heading" className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="relative h-40 bg-gradient-to-r from-brand-800 to-brand-600 sm:h-56">
+        {shop.banner_url && (
+          <img
+            src={shop.banner_url}
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+          />
+        )}
+      </div>
+      <div className="px-5 pb-5 sm:px-7 sm:pb-7">
+        <div className="-mt-12 flex flex-wrap items-end justify-between gap-4">
+          <div className="flex size-24 items-center justify-center overflow-hidden rounded-xl border-4 border-card bg-card shadow-md sm:size-28">
+            {shop.logo_url ? (
+              <img src={shop.logo_url} alt={t("sellerPortal.storefront.logoAlt")} className="size-full object-cover" />
+            ) : (
+              <Store className="size-10 text-brand-700 dark:text-brand-300" aria-hidden />
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 pb-1">
+            <Button variant="outline" onClick={onEdit}>
+              <Pencil className="size-4" aria-hidden />
+              {t("sellerPortal.editProfile")}
+            </Button>
+            <Button onClick={onAddProduct}>
+              <Plus className="size-4" aria-hidden />
+              {t("sellerPortal.addProduct")}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="storefront-heading" className="text-2xl font-bold tracking-tight">
+              {shop.shop_name || shop.owner_name}
+            </h2>
+            <Badge variant={shop.delivery_available ? "success" : "secondary"}>
+              <Truck className="mr-1 size-3.5" aria-hidden />
+              {t(
+                shop.delivery_available
+                  ? "sellerPortal.storefront.deliveryAvailable"
+                  : "sellerPortal.storefront.deliveryUnavailable",
+              )}
+            </Badge>
+          </div>
+          {shop.description && (
+            <p className="mt-2 max-w-3xl whitespace-pre-line text-sm text-muted-foreground">
+              {shop.description}
+            </p>
+          )}
+        </div>
+
+        <dl className="mt-6 grid gap-4 border-t pt-5 sm:grid-cols-3">
+          <StorefrontDetail
+            icon={MapPin}
+            label={t("sellerPortal.profile.addressLabel")}
+            value={shop.address || t("sellerPortal.storefront.notProvided")}
+          />
+          <StorefrontDetail
+            icon={Phone}
+            label={t("sellerPortal.profile.phoneLabel")}
+            value={shop.phone || t("sellerPortal.storefront.notProvided")}
+          />
+          <StorefrontDetail
+            icon={Clock3}
+            label={t("sellerPortal.profile.openingHoursLabel")}
+            value={shop.opening_hours || t("sellerPortal.storefront.notProvided")}
+          />
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+function StorefrontDetail({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-3">
+      <Icon className="mt-0.5 size-4 shrink-0 text-brand-700 dark:text-brand-300" aria-hidden />
+      <div className="min-w-0">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="mt-0.5 break-words text-sm font-medium">{value}</dd>
+      </div>
+    </div>
+  );
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return error instanceof Error && "status" in error && error.status === 404;
 }
 
 /** Client-side filter predicate over the seller's own products. */

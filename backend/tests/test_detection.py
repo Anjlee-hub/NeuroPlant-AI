@@ -10,11 +10,11 @@ deferred to Task 4's ``POST /scans`` tests.
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 from app.ai.classifiers import (
-    BASELINE_CONFIDENCE,
     LocalTensorFlowClassifier,
     RuleBaselineClassifier,
     build_disease_classifier,
@@ -64,7 +64,7 @@ def test_rule_baseline_is_deterministic():
     first = clf.predict(_IMAGE).top
     second = clf.predict(_IMAGE).top
     assert first.disease_name == second.disease_name
-    assert first.confidence == BASELINE_CONFIDENCE
+    assert first.confidence is None
     assert clf.model_info.provider == "baseline"
 
 
@@ -113,6 +113,94 @@ def test_local_tf_provider_metadata():
     assert clf.model_info.provider == "local_tf"
     assert clf.model_info.name == "effnet"
     assert clf.model_info.version == "v2"
+
+
+class _FakeTensor:
+    def __init__(self, value):
+        self.value = value
+
+    def numpy(self):
+        return self.value
+
+
+class _FakeNN:
+    @staticmethod
+    def softmax(scores):
+        shifted = scores - np.max(scores)
+        values = np.exp(shifted)
+        return _FakeTensor(values / values.sum())
+
+
+class _FakeModel:
+    def __init__(self, output, activation_name):
+        self.output = output
+        activation = SimpleNamespace(__name__=activation_name)
+        self.layers = [SimpleNamespace(activation=activation)]
+
+    def __call__(self, _batch, training=False):
+        return self.output
+
+
+class _FakePreprocessor:
+    def preprocess(self, _image):
+        return np.zeros((224, 224, 3), dtype=np.float32)
+
+
+@pytest.mark.parametrize(
+    ("scores", "expected_confidence"),
+    [
+        ([0.12, 0.73, 0.15], 0.73),
+        ([0.61, 0.08, 0.31], 0.61),
+    ],
+)
+def test_local_tf_uses_predicted_class_probability(scores, expected_confidence, monkeypatch):
+    catalog = _catalog()
+    clf = LocalTensorFlowClassifier(catalog, "unused")
+    clf._model = _FakeModel(np.array([scores]), "softmax")
+    clf._tensorflow = SimpleNamespace(nn=_FakeNN())
+    monkeypatch.setattr("app.ai.classifiers.get_preprocessor", lambda _name: _FakePreprocessor())
+
+    prediction = clf.predict(_IMAGE)
+
+    index_to_name = {index: name for name, index in catalog.label_map.items()}
+    expected_name = index_to_name[int(np.argmax(scores))]
+    assert prediction.top.disease_name == expected_name
+    assert prediction.top.confidence == pytest.approx(expected_confidence)
+
+
+def test_local_tf_softmaxes_logits_once(monkeypatch):
+    catalog = _catalog()
+    scores = np.array([[0.5, 2.0, -0.5]])
+    clf = LocalTensorFlowClassifier(catalog, "unused")
+    clf._model = _FakeModel(scores, "linear")
+    clf._tensorflow = SimpleNamespace(nn=_FakeNN())
+    monkeypatch.setattr("app.ai.classifiers.get_preprocessor", lambda _name: _FakePreprocessor())
+
+    prediction = clf.predict(_IMAGE)
+
+    expected = np.exp(scores[0] - np.max(scores[0]))
+    expected /= expected.sum()
+    assert prediction.top.confidence == pytest.approx(float(expected[1]))
+    assert prediction.top.disease_name == {
+        index: name for name, index in catalog.label_map.items()
+    }[1]
+
+
+@pytest.mark.parametrize(
+    ("output", "error"),
+    [
+        (np.array([[0.2, 0.8]]), "output shape"),
+        (np.array([[np.nan, 0.2, 0.8]]), "non-finite"),
+    ],
+)
+def test_local_tf_rejects_invalid_model_output(output, error, monkeypatch):
+    clf = LocalTensorFlowClassifier(_catalog(), "unused")
+    clf._model = _FakeModel(output, "linear")
+    clf._tensorflow = SimpleNamespace(nn=_FakeNN())
+    monkeypatch.setattr("app.ai.classifiers.get_preprocessor", lambda _name: _FakePreprocessor())
+
+    with pytest.raises(InferenceError, match=error):
+        clf.predict(_IMAGE)
 
 
 def test_local_tf_explainer_unavailable_without_artifact():
@@ -274,3 +362,4 @@ def test_confidence_level_bands():
     assert confidence_level(0.7) == "medium"
     assert confidence_level(0.6) == "medium"
     assert confidence_level(0.5) == "low"
+    assert confidence_level(None) == "unavailable"

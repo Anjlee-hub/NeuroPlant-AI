@@ -115,16 +115,20 @@ export function AiDiagnosis({ explain }: { explain: ScanExplain | null }) {
                       </span>
                       <span className="truncate font-medium">{ranking.disease_name}</span>
                     </span>
-                    <span className="shrink-0 font-semibold">
-                      {formatPercent(ranking.confidence)}
-                    </span>
+                      <span className="shrink-0 font-semibold">
+                        {ranking.confidence === null
+                          ? t("scanHistory.needsReview")
+                          : formatPercent(ranking.confidence)}
+                      </span>
                   </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-brand-500"
-                      style={{ width: `${Math.round(ranking.confidence * 100)}%` }}
-                    />
-                  </div>
+                    {ranking.confidence !== null && (
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-brand-500"
+                          style={{ width: `${Math.round(ranking.confidence * 100)}%` }}
+                        />
+                      </div>
+                    )}
                 </li>
               ))}
             </ol>

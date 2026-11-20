@@ -6,6 +6,8 @@ import {
   CircleMarker,
   Popup,
 } from "react-leaflet";
+import { useTranslation } from "react-i18next";
+import { api, type CurrentWeather } from "@/lib/api";
 
 type Service = {
   id: number;
@@ -14,6 +16,21 @@ type Service = {
   latitude: number;
   longitude: number;
   distance: number;
+};
+
+type OverpassElement = {
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: {
+    lat: number;
+    lon: number;
+  };
+  tags?: Record<string, string>;
+};
+
+type OverpassResponse = {
+  elements: OverpassElement[];
 };
 
 function calculateDistance(
@@ -39,13 +56,13 @@ function getCategory(tags: Record<string, string>) {
   const shop = (tags.shop || "").toLowerCase();
 
   const categories: Record<string, string> = {
-    agrarian: "Agricultural Supply Store",
-    seeds: "Seed Shop",
-    fertilizer: "Fertilizer Shop",
-    agricultural_machinery: "Farm Equipment Store",
+    agrarian: "maps.categories.supplyStore",
+    seeds: "maps.categories.seedShop",
+    fertilizer: "maps.categories.fertilizerShop",
+    agricultural_machinery: "maps.categories.equipmentStore",
   };
 
-  return categories[shop] || "Agricultural Service";
+  return categories[shop] || "maps.categories.service";
 }
 
 async function findNearbyServices(lat: number, lon: number) {
@@ -69,20 +86,23 @@ async function findNearbyServices(lat: number, lon: number) {
     throw new Error("Could not load nearby agricultural services.");
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as OverpassResponse;
 
   return data.elements
-    .filter((item: any) => item.tags?.name)
-    .map((item: any) => {
+    .filter((item: OverpassElement) => item.tags?.name)
+    .map((item: OverpassElement) => {
       const latitude = item.lat ?? item.center?.lat;
       const longitude = item.lon ?? item.center?.lon;
+      const name = item.tags?.name;
 
-      if (latitude == null || longitude == null) return null;
+      if (latitude == null || longitude == null || name == null) {
+        return null;
+      }
 
       return {
         id: item.id,
-        name: item.tags.name,
-        category: getCategory(item.tags),
+        name,
+        category: getCategory(item.tags ?? {}),
         latitude,
         longitude,
         distance: calculateDistance(lat, lon, latitude, longitude),
@@ -102,6 +122,7 @@ async function findNearbyServices(lat: number, lon: number) {
 }
 
 export default function Maps() {
+  const { t } = useTranslation();
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -111,13 +132,37 @@ export default function Maps() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [locationName, setLocationName] = useState("");
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
+
+  const loadLocationDetails = async (lat: number, lon: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+      );
+      if (response.ok) {
+        const data = (await response.json()) as { display_name?: string };
+        setLocationName(data.display_name ?? "");
+      }
+    } catch {
+      setLocationName("");
+    }
+
+    try {
+      setWeather(await api.getCurrentWeather(lat, lon));
+    } catch {
+      setWeather(null);
+    }
+  };
 
   const getLocation = () => {
     setError("");
     setServices([]);
 
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
+      setError(t("maps.geolocationUnsupported"));
       return;
     }
 
@@ -129,6 +174,7 @@ export default function Maps() {
         const lon = position.coords.longitude;
 
         setLocation({ latitude: lat, longitude: lon });
+        await loadLocationDetails(lat, lon);
         setLoading(false);
         setSearching(true);
 
@@ -137,7 +183,7 @@ export default function Maps() {
           setServices(results);
         } catch {
           setError(
-            "Unable to load nearby services. Please try again later."
+            t("maps.loadServicesError")
           );
         } finally {
           setSearching(false);
@@ -145,7 +191,7 @@ export default function Maps() {
       },
       () => {
         setError(
-          "Unable to access your location. Please allow location permission."
+          t("maps.locationPermissionError")
         );
         setLoading(false);
       },
@@ -153,15 +199,37 @@ export default function Maps() {
     );
   };
 
+  const applyManualLocation = async () => {
+    const lat = Number(manualLat);
+    const lon = Number(manualLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      setError(t("maps.invalidCoordinates"));
+      return;
+    }
+    setError("");
+    setLoading(true);
+    setSearching(true);
+    setLocation({ latitude: lat, longitude: lon });
+    await loadLocationDetails(lat, lon);
+    try {
+      setServices(await findNearbyServices(lat, lon));
+    } catch {
+      setError(t("maps.loadServicesError"));
+    } finally {
+      setLoading(false);
+      setSearching(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="mx-auto max-w-6xl">
         <h1 className="mb-2 text-3xl font-bold text-green-800">
-          Agricultural Services Map
+          {t("maps.title")}
         </h1>
 
         <p className="mb-6 text-gray-600">
-          Find your location and explore nearby agricultural services.
+          {t("maps.subtitle")}
         </p>
 
         <button
@@ -170,23 +238,47 @@ export default function Maps() {
           className="mb-5 rounded-lg bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800 disabled:opacity-50"
         >
           {loading
-            ? "Getting location..."
+            ? t("maps.gettingLocation")
             : searching
-              ? "Searching nearby services..."
-              : "Find My Location"}
+              ? t("maps.searching")
+              : t("maps.findLocation")}
         </button>
 
+        <div className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="manual-lat">{t("maps.latitude")}</label>
+            <input id="manual-lat" value={manualLat} onChange={(event) => setManualLat(event.target.value)} type="number" step="any" className="rounded-lg border px-3 py-2" placeholder="12.9716" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="manual-lng">{t("maps.longitude")}</label>
+            <input id="manual-lng" value={manualLng} onChange={(event) => setManualLng(event.target.value)} type="number" step="any" className="rounded-lg border px-3 py-2" placeholder="77.5946" />
+          </div>
+          <button type="button" disabled={loading || searching} onClick={() => void applyManualLocation()} className="rounded-lg border border-green-700 px-4 py-2 font-semibold text-green-800 hover:bg-green-50 disabled:opacity-50">
+            {t("maps.useManualLocation")}
+          </button>
+        </div>
+
         {error && (
-          <p className="mb-4 rounded-lg bg-red-100 p-3 text-red-700">
+          <p className="mb-4 rounded-lg bg-red-100 p-3 text-red-700" role="alert">
             {error}
           </p>
         )}
 
         {location && (
           <div className="mb-5 rounded-lg bg-green-100 p-4 text-green-900">
-            <h2 className="font-semibold">Your Current Location</h2>
-            <p>Latitude: {location.latitude.toFixed(6)}</p>
-            <p>Longitude: {location.longitude.toFixed(6)}</p>
+            <h2 className="font-semibold">{t("maps.currentLocation")}</h2>
+            {locationName && <p className="mt-1">{locationName}</p>}
+            <p>{t("maps.latitudeValue", { value: location.latitude.toFixed(6) })}</p>
+            <p>{t("maps.longitudeValue", { value: location.longitude.toFixed(6) })}</p>
+          </div>
+        )}
+
+        {weather && (
+          <div className="mb-5 grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-4">
+            <div><p className="text-xs text-gray-500">{t("maps.temperature")}</p><p className="font-bold">{weather.temperature_c.toFixed(1)} °C</p></div>
+            <div><p className="text-xs text-gray-500">{t("maps.humidity")}</p><p className="font-bold">{weather.humidity_percent.toFixed(0)}%</p></div>
+            <div><p className="text-xs text-gray-500">{t("maps.rainfall")}</p><p className="font-bold">{weather.rainfall_mm.toFixed(1)} mm</p></div>
+            <div><p className="text-xs text-gray-500">{t("maps.wind")}</p><p className="font-bold">{weather.wind_speed_ms.toFixed(1)} m/s</p></div>
           </div>
         )}
 
@@ -211,7 +303,7 @@ export default function Maps() {
                   fillOpacity: 1,
                 }}
               >
-                <Popup>Your Current Location</Popup>
+                <Popup>{t("maps.currentLocation")}</Popup>
               </CircleMarker>
 
               {services.map((service) => (
@@ -228,16 +320,16 @@ export default function Maps() {
                   <Popup>
                     <strong>{service.name}</strong>
                     <br />
-                    {service.category}
+                    {t(service.category)}
                     <br />
-                    Distance: {service.distance.toFixed(2)} km
+                    {t("maps.distance", { distance: service.distance.toFixed(2) })}
                   </Popup>
                 </CircleMarker>
               ))}
             </MapContainer>
           ) : (
             <div className="flex h-[450px] items-center justify-center bg-gray-100 text-center text-gray-600">
-              Click "Find My Location" to display the map.
+              {t("maps.mapPrompt")}
             </div>
           )}
         </div>
@@ -245,19 +337,18 @@ export default function Maps() {
         {location && (
           <section>
             <h2 className="mb-4 text-2xl font-bold text-green-800">
-              Nearby Agricultural Services
+              {t("maps.nearbyTitle")}
             </h2>
 
             {searching && (
               <p className="text-gray-600">
-                Searching for agricultural services within 10 km...
+                {t("maps.searchingServices")}
               </p>
             )}
 
             {!searching && services.length === 0 && !error && (
               <p className="rounded-lg bg-yellow-100 p-4 text-yellow-800">
-                No agricultural services were found nearby. Try again later
-                or check another location.
+                {t("maps.noServices")}
               </p>
             )}
 
@@ -272,7 +363,7 @@ export default function Maps() {
                   </h3>
                   <p className="text-gray-600">{service.category}</p>
                   <p className="mt-2 text-sm text-gray-700">
-                    Distance: {service.distance.toFixed(2)} km
+                    {t("maps.distance", { distance: service.distance.toFixed(2) })}
                   </p>
                   <a
                     href={`https://www.openstreetmap.org/?mlat=${service.latitude}&mlon=${service.longitude}#map=17/${service.latitude}/${service.longitude}`}
@@ -280,7 +371,7 @@ export default function Maps() {
                     rel="noreferrer"
                     className="mt-3 inline-block font-semibold text-blue-700 hover:underline"
                   >
-                    View on Map
+                    {t("maps.viewOnMap")}
                   </a>
                 </div>
               ))}

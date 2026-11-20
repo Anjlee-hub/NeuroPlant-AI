@@ -14,6 +14,7 @@ import { api, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useAuth } from "@/stores/auth";
 import type { ConversationDetail } from "@/types/messages";
+import { CONVERSATIONS_KEY } from "@/pages/messages-list";
 
 export const CONVERSATION_KEY = ["conversation"] as const;
 
@@ -43,6 +44,11 @@ export function MessagesDetailPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CONVERSATION_KEY }),
   });
 
+  const markReadMutation = useMutation({
+    mutationFn: () => api.markConversationRead(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY }),
+  });
+
   const closeMutation = useMutation({
     mutationFn: () => api.closeConversation(id),
     onSuccess: (updated) => {
@@ -53,14 +59,12 @@ export function MessagesDetailPage() {
   });
 
   // Mark the other side's messages as read once, when we open a thread with
-  // unread. Refires on refetch while unread > 0, which is the desired nudge.
+  // unread, then refresh inbox counts so the Marketplace badge updates.
   const unreadCount = conversationQuery.data?.unread_count;
   useEffect(() => {
-    if (!unreadCount) return;
-    api.markConversationRead(id).catch(() => {
-      /* best-effort; the next open refetches */
-    });
-  }, [unreadCount, id]);
+    if (!unreadCount || markReadMutation.isPending || markReadMutation.isSuccess || markReadMutation.isError) return;
+    markReadMutation.mutate();
+  }, [unreadCount, id, markReadMutation]);
 
   // Keep the newest message in view after sends/loads.
   useEffect(() => {
@@ -216,6 +220,11 @@ export function MessagesDetailPage() {
           </div>
 
           <footer className="border-t p-4">
+            {markReadMutation.isError && (
+              <p role="alert" className="mb-2 text-sm text-destructive">
+                {errorMessage(markReadMutation.error)}
+              </p>
+            )}
             {conversation.status === "closed" ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Lock className="size-4" aria-hidden />

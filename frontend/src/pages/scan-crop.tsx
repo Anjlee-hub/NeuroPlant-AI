@@ -1,16 +1,23 @@
+
 import {
   AlertCircle,
   Camera,
   CheckCircle2,
+  ChevronRight,
+  CloudUpload,
   History,
   ImagePlus,
+  Leaf,
   ScanLine,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
   Stethoscope,
   Trash2,
-  Wand2,
+  WandSparkles,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -41,60 +48,132 @@ const PART_TYPES: ScanPartType[] = ["leaf", "fruit", "stem", "plant", "whole"];
 
 type Phase = "form" | "submitting" | "result" | "error";
 
-/** Label/value pair in the result summary. */
-function ResultRow({ label, children }: { label: string; children: ReactNode }) {
+function logScanDiagnostic(
+  event: string,
+  details: Record<string, string | number | null>,
+): void {
+  if (import.meta.env.MODE === "development") {
+    console.info(`[scan-debug] ${event}`, details);
+  }
+}
+
+function scanErrorDetails(error: unknown): {
+  status: number | null;
+  code: string | null;
+} {
+  if (typeof error !== "object" || error === null) {
+    return { status: null, code: null };
+  }
+  return {
+    status: "status" in error && typeof error.status === "number" ? error.status : null,
+    code: "code" in error && typeof error.code === "string" ? error.code : null,
+  };
+}
+
+function ResultRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 py-3 last:border-0">
       <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-right text-sm font-medium">{children}</dd>
+      <dd className="text-right text-sm font-semibold">{children}</dd>
     </div>
   );
 }
 
-/**
- * Post-upload diagnosis: disease, confidence/severity badges, crop/part,
- * Grad-CAM heatmap, top-5 rankings, AI explanation and advice. The scan is
- * already persisted by the backend — this renders the "live" result.
- */
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="mb-5">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+        {eyebrow}
+      </p>
+      <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      )}
+    </div>
+  );
+}
+
 function ResultView({
   scan,
   explain,
+  explainError,
   cropName,
   onNewScan,
+  onRetryExplain,
 }: {
   scan: Scan;
   explain: ScanExplain | null;
+  explainError: string | null;
   cropName: string | null;
   onNewScan: () => void;
+  onRetryExplain: () => void;
 }) {
   const { t } = useTranslation();
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center gap-2 text-sm font-medium text-brand-600 dark:text-brand-400">
-        <CheckCircle2 className="size-4" />
-        {t("scanCrop.savedNote")}
+    <div className="mt-8 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 text-green-900 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200">
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+            <CheckCircle2 className="size-5" />
+          </span>
+          <div>
+            <p className="font-semibold">{t("scanCrop.savedNote")}</p>
+            <p className="text-xs opacity-80">Your scan has been processed.</p>
+          </div>
+        </div>
+        <Badge variant="outline" className="border-green-300 text-green-800 dark:text-green-200">
+          <ShieldCheck className="mr-1 size-3" />
+          Diagnosis saved
+        </Badge>
       </div>
 
-      <Card className="mt-3">
-        <CardContent className="p-6">
-          <header className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-muted-foreground">{t("scanCrop.resultTitle")}</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight">{scan.disease_name}</h2>
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
+        <div className="h-1.5 bg-gradient-to-r from-green-700 via-green-500 to-lime-400" />
+        <CardContent className="p-5 sm:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {t("scanCrop.resultTitle")}
+              </p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                {scan.disease_name}
+              </h2>
             </div>
             <ConfidenceBadge value={scan.confidence} hint={t("scanCrop.confidence")} />
-          </header>
+          </div>
 
-          <dl className="mt-5 divide-y divide-border">
+          <dl className="mt-6 rounded-xl bg-muted/30 px-4">
             <ResultRow label={t("scanCrop.crop")}>
               {cropName ?? t("scanCrop.notSet")}
             </ResultRow>
             <ResultRow label={t("scanCrop.part")}>
-              {scan.part_type ? t(`scanCrop.parts.${scan.part_type}`) : t("scanCrop.notSet")}
+              {scan.part_type
+                ? t(`scanCrop.parts.${scan.part_type}`)
+                : t("scanCrop.notSet")}
             </ResultRow>
             <ResultRow label={t("scanCrop.severity")}>
-              {scan.severity ? <SeverityBadge severity={scan.severity} /> : t("scanCrop.notSet")}
+              {scan.severity ? (
+                <SeverityBadge severity={scan.severity} />
+              ) : (
+                t("scanCrop.notSet")
+              )}
             </ResultRow>
             <ResultRow label={t("scanCrop.stage")}>
               {scan.stage ?? t("scanCrop.notSet")}
@@ -102,7 +181,7 @@ function ResultView({
             {explain && (
               <ResultRow label={t("scanCrop.confidence")}>
                 <Badge variant={confidenceVariant(explain.confidence.top)}>
-                  {explain.confidence.level}
+                  {t(`scanDetail.levels.${explain.confidence.level}`)}
                 </Badge>
               </ResultRow>
             )}
@@ -110,84 +189,121 @@ function ResultView({
         </CardContent>
       </Card>
 
-      {/* ── AI explanation + advice ──────────────────────────────────── */}
-      {explain && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{t("scanDetail.explanation")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed">{explain.explanation}</p>
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-col gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{t("scanDetail.adviceTitle")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className={
-                    explain.confidence.level === "low"
-                      ? "flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                      : "flex items-start gap-2 rounded-md bg-muted/60 p-3 text-sm"
-                  }
-                >
-                  <p>{explain.confidence.advice}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {explain.overlay_url && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{t("scanDetail.heatmapTitle")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <img
-                    src={explain.overlay_url}
-                    alt={t("scanDetail.overlayTitle")}
-                    className="w-full rounded-md border"
-                    onError={(event) => {
-                      event.currentTarget.style.display = "none";
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            )}
-          </div>
+      {explainError && !explain && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+        >
+          <p>Additional diagnosis details could not be loaded: {explainError}</p>
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={onRetryExplain}
+          >
+            Retry details
+          </Button>
         </div>
       )}
 
-      {/* ── Top predictions ──────────────────────────────────────────── */}
+      {explain && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="size-5 text-primary" />
+                {t("scanDetail.explanation")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm leading-7 text-muted-foreground">
+                {explain.explanation}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="size-5 text-primary" />
+                {t("scanDetail.adviceTitle")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div
+                className={
+                  explain.confidence.level === "low" ||
+                  explain.confidence.level === "unavailable"
+                    ? "rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                    : "rounded-xl bg-muted/50 p-4 text-sm leading-6"
+                }
+              >
+                {explain.confidence.advice}
+              </div>
+            </CardContent>
+          </Card>
+
+          {explain.overlay_url && (
+            <Card className="rounded-2xl lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ScanLine className="size-5 text-primary" />
+                  {t("scanDetail.heatmapTitle")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <img
+                  src={explain.overlay_url}
+                  alt={t("scanDetail.overlayTitle")}
+                  className="mx-auto max-h-[480px] w-full rounded-xl border border-border object-contain"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {explain && explain.top5.length > 0 && (
-        <Card className="mt-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t("scanDetail.topPredictions")}</CardTitle>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("scanDetail.topPredictions")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <ol className="flex flex-col gap-2.5">
+            <ol className="space-y-4">
               {explain.top5.slice(0, 5).map((ranking, index) => (
                 <li key={`${ranking.disease_name}-${index}`}>
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                  <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
                         {index + 1}
                       </span>
-                      <span className="truncate font-medium">{ranking.disease_name}</span>
+                      <span className="truncate font-medium">
+                        {ranking.disease_name}
+                      </span>
                     </span>
-                    <span className="shrink-0 font-semibold">
-                      {formatPercent(ranking.confidence)}
+                    <span className="shrink-0 font-bold tabular-nums">
+                      {ranking.confidence === null
+                        ? t("scanHistory.needsReview")
+                        : formatPercent(ranking.confidence)}
                     </span>
                   </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-brand-500"
-                      style={{ width: `${Math.round(ranking.confidence * 100)}%` }}
-                    />
-                  </div>
+                  {ranking.confidence !== null && (
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-green-700 to-lime-500"
+                        style={{
+                          width: `${Math.max(
+                            0,
+                            Math.min(100, ranking.confidence * 100),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>
@@ -195,35 +311,45 @@ function ResultView({
         </Card>
       )}
 
-      {/* ── Treatment plan ─────────────────────────────────────────── */}
-      <div className="mt-6">
+      <section>
+        <SectionHeading
+          eyebrow="Next steps"
+          title="Recommended treatment"
+          description="Review the recommendations associated with this diagnosis."
+        />
         <RecommendationsPanel scanId={scan.id} />
-      </div>
+      </section>
 
-      {/* ── Soil plan ───────────────────────────────────────────────── */}
-      <div className="mt-6">
+      <section>
+        <SectionHeading
+          eyebrow="Field guidance"
+          title="Soil recommendations"
+          description="Explore the soil guidance available for this scan."
+        />
         <SoilRecommendationsPanel scanId={scan.id} />
-      </div>
+      </section>
 
-      {/* ── Actions ──────────────────────────────────────────────────── */}
-      <div className="mt-6 flex flex-wrap items-center gap-3 print:hidden">
+      <div className="flex flex-wrap gap-3 border-t border-border pt-5 print:hidden">
         <Button asChild>
           <Link to={`/scans/${scan.id}/doctor`}>
-            <Stethoscope />
+            <Stethoscope className="mr-2 size-4" />
             {t("doctor.title")}
           </Link>
         </Button>
         <Button asChild variant="outline">
-          <Link to={`/scans/${scan.id}`}>{t("scanCrop.viewDetails")}</Link>
+          <Link to={`/scans/${scan.id}`}>
+            {t("scanCrop.viewDetails")}
+            <ChevronRight className="ml-1 size-4" />
+          </Link>
         </Button>
         <Button asChild variant="outline">
           <Link to="/scans">
-            <History />
+            <History className="mr-2 size-4" />
             {t("scanCrop.viewHistory")}
           </Link>
         </Button>
         <Button variant="outline" onClick={onNewScan}>
-          <ScanLine />
+          <ScanLine className="mr-2 size-4" />
           {t("scanCrop.scanAnother")}
         </Button>
       </div>
@@ -231,22 +357,31 @@ function ResultView({
   );
 }
 
+
 export function ScanCropPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const clientScanIdRef = useRef<string | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [cropId, setCropId] = useState<string>("");
-  const [partType, setPartType] = useState<string>("");
+  const [cropId, setCropId] = useState("");
+  const [partType, setPartType] = useState("");
   const [phase, setPhase] = useState<Phase>("form");
   const [result, setResult] = useState<Scan | null>(null);
   const [explain, setExplain] = useState<ScanExplain | null>(null);
+  const [explainError, setExplainError] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
 
   const cropsQuery = useQuery({
     queryKey: ["crops"],
@@ -255,52 +390,194 @@ export function ScanCropPage() {
     staleTime: 5 * 60_000,
   });
 
-  // Revoke object URLs when the preview is replaced or the page unmounts.
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    return () => {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOpen(false);
+  };
+
+  const openCamera = async (preferredFacing: "environment" | "user" = facingMode) => {
+    setCameraError("");
+    setCameraLoading(true);
+    setCameraOpen(true);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t("scanCrop.camera.unsupported"));
+      setCameraLoading(false);
+      return;
+    }
+
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: preferredFacing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          void videoRef.current.play().catch(() => undefined);
+        }
+      });
+      setFacingMode(preferredFacing);
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setCameraError(t("scanCrop.camera.permissionDenied"));
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setCameraError(t("scanCrop.camera.notFound"));
+      } else {
+        setCameraError(t("scanCrop.camera.startError"));
+      }
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  const switchCamera = async () => {
+    await openCamera(facingMode === "environment" ? "user" : "environment");
+  };
+
+  const captureImage = () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      setCameraError(t("scanCrop.camera.previewStarting"));
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError(t("scanCrop.camera.captureError"));
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setCameraError(t("scanCrop.camera.imageError"));
+        return;
+      }
+      const captured = new File([blob], `crop-camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+      pickFile(captured);
+      stopCamera();
+    }, "image/jpeg", 0.92);
+  };
+
   const pickFile = (picked: File | null) => {
     if (!picked) return;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+    if (!picked.type.startsWith("image/")) {
+      setErrorMsg("Please select a valid image file.");
+      setPhase("error");
+      return;
+    }
+
     setFile(picked);
+    clientScanIdRef.current = null;
     setPreviewUrl(URL.createObjectURL(picked));
     setPhase("form");
+    setErrorMsg("");
+    setResult(null);
+    setExplain(null);
+    setExplainError(null);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    pickFile(event.dataTransfer.files?.[0] ?? null);
   };
 
   const reset = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    stopCamera();
     setFile(null);
+    clientScanIdRef.current = null;
     setPreviewUrl(null);
     setCropId("");
     setPartType("");
     setPhase("form");
     setResult(null);
     setExplain(null);
+    setExplainError(null);
     setErrorMsg("");
+
+    if (uploadInputRef.current) uploadInputRef.current.value = "";
   };
 
   const submit = async () => {
-    if (!file) return;
+    if (!file || phase === "submitting") return;
+
     setPhase("submitting");
+    setErrorMsg("");
+
     try {
-      const scan = await api.uploadScan({
-        files: [file],
-        clientScanId: crypto.randomUUID(),
-        cropId: cropId ? Number(cropId) : null,
-        partType: partType ? (partType as ScanPartType) : null,
-      });
-      // The scan is persisted server-side — drop stale history caches so it
-      // shows up in Scan History immediately.
+      clientScanIdRef.current ??= crypto.randomUUID();
+      const upload = async (clientScanId: string, attempt: number) => {
+        logScanDiagnostic("upload-request", {
+          attempt,
+          client_scan_id: clientScanId,
+        });
+        try {
+          return await api.uploadScan({
+            files: [file],
+            clientScanId,
+            cropId: cropId ? Number(cropId) : null,
+            partType: partType ? (partType as ScanPartType) : null,
+          });
+        } catch (err) {
+          const details = scanErrorDetails(err);
+          logScanDiagnostic("upload-error", {
+            attempt,
+            client_scan_id: clientScanId,
+            status: details.status,
+            code: details.code,
+          });
+          throw err;
+        }
+      };
+      let scan: Scan;
+      try {
+        scan = await upload(clientScanIdRef.current, 1);
+      } catch (err) {
+        if (scanErrorDetails(err).code !== "duplicate_client_scan_id") {
+          throw err;
+        }
+        const conflictingId = clientScanIdRef.current;
+        const replacementId = crypto.randomUUID();
+        clientScanIdRef.current = replacementId;
+        logScanDiagnostic("conflict-retry", {
+          previous_client_scan_id: conflictingId,
+          replacement_client_scan_id: replacementId,
+        });
+        scan = await upload(replacementId, 2);
+      }
+
       void queryClient.invalidateQueries({ queryKey: ["scans"] });
+
       setResult(scan);
       setPhase("result");
+
       try {
         setExplain(await api.getScanExplain(scan.id));
-      } catch {
-        setExplain(null); // prediction still shown; explain is best-effort
+        setExplainError(null);
+      } catch (explainErr) {
+        setExplain(null);
+        setExplainError(errorMessage(explainErr));
       }
     } catch (err) {
       setErrorMsg(errorMessage(err));
@@ -310,7 +587,7 @@ export function ScanCropPage() {
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
         <StateCard icon={ScanLine} title={t("scanCrop.authRequired")}>
           <Button asChild>
             <Link to="/login">{t("scanCrop.signIn")}</Link>
@@ -320,165 +597,511 @@ export function ScanCropPage() {
     );
   }
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("scanCrop.title")}</h1>
-        <p className="mt-1 text-muted-foreground">{t("scanCrop.subtitle")}</p>
-      </header>
+  const selectedCrop = cropId
+    ? cropsQuery.data?.find((crop) => crop.id === Number(cropId))?.name
+    : undefined;
 
-      {phase === "result" && result ? (
-        <ResultView
-          scan={result}
-          explain={explain}
-          cropName={
-            cropId
-              ? (cropsQuery.data?.find((crop) => crop.id === Number(cropId))?.name ?? null)
-              : result.crop_id != null
-                ? (cropsQuery.data?.find((crop) => crop.id === result.crop_id)?.name ?? null)
-                : null
-          }
-          onNewScan={reset}
-        />
-      ) : phase === "submitting" ? (
-        <Card className="mt-6">
-          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-            <div
-              className="size-10 animate-spin rounded-full border-4 border-muted border-t-brand-500"
-              role="status"
-              aria-label={t("scanCrop.submitting")}
-            />
-            <p className="text-sm font-medium">{t("scanCrop.submitting")}</p>
-            {previewUrl && (
-              <img
-                src={previewUrl}
-                alt={t("scanCrop.previewAlt")}
-                className="aspect-video w-full max-w-sm rounded-md border object-cover"
-              />
-            )}
-          </CardContent>
-        </Card>
-      ) : phase === "error" ? (
-        <StateCard
-          className="mt-6"
-          icon={AlertCircle}
-          title={t("scanCrop.errorTitle")}
-          body={errorMsg || t("scanCrop.errorBody")}
-          tone="destructive"
-        >
-          <Button variant="outline" onClick={() => setPhase("form")}>
-            <Wand2 />
-            {t("scanCrop.retry")}
-          </Button>
-        </StateCard>
-      ) : (
-        <Card className="mt-6">
-          <CardContent className="p-6 sm:p-8">
-            {/* ── Photo picker ──────────────────────────────────────── */}
+  return (
+    <div className="min-h-full bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-10">
+        {/* Page heading */}
+        <header className="mb-8">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary">
+            <Sparkles className="size-3.5" />
+            AI CROP INTELLIGENCE
+          </div>
+
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold">{t("scanCrop.photoTitle")}</h2>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => uploadInputRef.current?.click()}
-                >
-                  <ImagePlus />
-                  {file ? t("scanCrop.replacePhoto") : t("scanCrop.uploadPhoto")}
-                </Button>
-                <Button variant="outline" onClick={() => cameraInputRef.current?.click()}>
-                  <Camera />
-                  {t("scanCrop.cameraPhoto")}
-                </Button>
-                {file && (
-                  <Button variant="ghost" onClick={reset}>
-                    <Trash2 />
-                    {t("scanCrop.removePhoto")}
-                  </Button>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                {t("scanCrop.title")}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                {t("scanCrop.subtitle")}
+              </p>
+            </div>
+
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/scans">
+                <History className="mr-2 size-4" />
+                {t("scanCrop.viewHistory")}
+              </Link>
+            </Button>
+          </div>
+        </header>
+
+        {cameraOpen && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scan-camera-dialog-title"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") stopCamera();
+            }}
+          >
+            <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-card shadow-2xl">
+              <h2 id="scan-camera-dialog-title" className="sr-only">
+                {t("scanCrop.camera.dialogTitle")}
+              </h2>
+              <div className="relative aspect-[4/3] max-h-[70vh] min-h-[300px] overflow-hidden bg-black sm:aspect-video">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover"
+                  aria-label={t("scanCrop.camera.previewLabel")}
+                />
+                <div className="pointer-events-none absolute inset-[12%] rounded-2xl border-4 border-green-400/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.15)]">
+                  <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                    {t("scanCrop.camera.frameHint")}
+                  </span>
+                </div>
+                {cameraLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-semibold text-white">
+                    {t("scanCrop.camera.starting")}
+                  </div>
+                )}
+                {cameraError && (
+                  <div className="absolute inset-x-4 bottom-4 rounded-xl bg-destructive px-4 py-3 text-sm text-destructive-foreground">
+                    {cameraError}
+                  </div>
                 )}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{t("scanCrop.photoHint")}</p>
-
-              {/* Hidden inputs — the camera variant uses `capture` so
-                  mobile browsers open the camera directly. */}
-              <input
-                ref={uploadInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                data-testid="scan-upload-input"
-                onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
-              />
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                data-testid="scan-camera-input"
-                onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
-              />
-            </div>
-
-            {/* ── Preview ───────────────────────────────────────────── */}
-            {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt={t("scanCrop.previewAlt")}
-                className="mt-4 aspect-video w-full max-w-lg rounded-md border object-cover"
-              />
-            ) : (
-              <div className="mt-4 flex aspect-video w-full max-w-lg flex-col items-center justify-center gap-2 rounded-md border border-dashed bg-muted/40 text-center text-muted-foreground">
-                <ImagePlus className="size-8" />
-                <p className="text-sm">{t("scanCrop.noPhoto")}</p>
-              </div>
-            )}
-
-            {/* ── Crop + part ───────────────────────────────────────── */}
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="scan-crop" className="text-sm font-medium text-muted-foreground">
-                  {t("scanCrop.cropLabel")}
-                </Label>
-                <Select
-                  id="scan-crop"
-                  value={cropId}
-                  onChange={(event) => setCropId(event.target.value)}
+              <div className="flex flex-wrap items-center justify-center gap-3 p-4">
+                <Button variant="outline" autoFocus onClick={stopCamera}>
+                  {t("scanCrop.camera.cancel")}
+                </Button>
+                <Button
+                  size="lg"
+                  className="min-w-32 rounded-full"
+                  onClick={captureImage}
+                  disabled={cameraLoading || !!cameraError}
                 >
-                  <option value="">{t("scanCrop.cropPlaceholder")}</option>
-                  {(cropsQuery.data ?? []).map((crop) => (
-                    <option key={crop.id} value={crop.id}>
-                      {crop.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="scan-part" className="text-sm font-medium text-muted-foreground">
-                  {t("scanCrop.partLabel")}
-                </Label>
-                <Select
-                  id="scan-part"
-                  value={partType}
-                  onChange={(event) => setPartType(event.target.value)}
-                >
-                  <option value="">{t("scanCrop.partPlaceholder")}</option>
-                  {PART_TYPES.map((part) => (
-                    <option key={part} value={part}>
-                      {t(`scanCrop.parts.${part}`)}
-                    </option>
-                  ))}
-                </Select>
+                  <Camera className="mr-2 size-5" />
+                  {t("scanCrop.camera.capture")}
+                </Button>
+                <Button variant="outline" onClick={() => void switchCamera()}>
+                  <RefreshCw className="mr-2 size-4" />
+                  {t("scanCrop.camera.switch")}
+                </Button>
               </div>
             </div>
+          </div>
+        )}
 
-            <Button className="mt-6" size="lg" disabled={!file} onClick={() => void submit()}>
-              <ScanLine />
-              {t("scanCrop.submit")}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+        {phase === "result" && result ? (
+          <ResultView
+            scan={result}
+            explain={explain}
+            explainError={explainError}
+            onRetryExplain={() => {
+              setExplainError(null);
+              void api
+                .getScanExplain(result.id)
+                .then((details) => {
+                  setExplain(details);
+                  setExplainError(null);
+                })
+                .catch((explainErr: unknown) => {
+                  setExplainError(errorMessage(explainErr));
+                });
+            }}
+            cropName={
+              (result.crop_id != null
+                ? cropsQuery.data?.find(
+                    (crop) => crop.id === result.crop_id,
+                  )?.name ?? null
+                : null) ?? selectedCrop ?? null
+            }
+            onNewScan={reset}
+          />
+        ) : phase === "submitting" ? (
+          <Card className="overflow-hidden rounded-3xl">
+            <CardContent className="flex flex-col items-center gap-5 p-8 text-center sm:p-14">
+              <div className="relative flex size-20 items-center justify-center rounded-full bg-primary/10">
+                <Leaf className="size-9 animate-pulse text-primary" />
+                <span className="absolute inset-0 animate-ping rounded-full border border-primary/30" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">
+                  {t("scanCrop.submitting")}
+                </h2>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                  Your image is being processed. Please keep this page open.
+                </p>
+              </div>
+              {previewUrl && (
+                <img
+                  src={previewUrl}
+                  alt={t("scanCrop.previewAlt")}
+                  className="max-h-72 w-full max-w-sm rounded-2xl border object-cover"
+                />
+              )}
+              <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        ) : phase === "error" ? (
+          <div className="space-y-4">
+            <StateCard
+              icon={AlertCircle}
+              title={t("scanCrop.errorTitle")}
+              body={errorMsg || t("scanCrop.errorBody")}
+              tone="destructive"
+            >
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="outline" onClick={() => setPhase("form")}>
+                  <WandSparkles className="mr-2 size-4" />
+                  {t("scanCrop.retry")}
+                </Button>
+                <Button variant="ghost" onClick={reset}>
+                  {t("scanCrop.removePhoto")}
+                </Button>
+              </div>
+            </StateCard>
+          </div>
+        ) : (
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            {/* Main scan form */}
+            <div className="space-y-6">
+              <Card className="overflow-hidden rounded-3xl border-border/70 shadow-sm">
+                <div className="border-b border-border bg-muted/20 px-5 py-5 sm:px-7">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <ImagePlus className="size-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-bold">{t("scanCrop.photoTitle")}</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Upload a plant image or capture one using your camera.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <CardContent className="p-5 sm:p-7">
+                  <div
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      setDragActive(false);
+                    }}
+                    onDrop={handleDrop}
+                    className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all ${
+                      dragActive
+                        ? "border-primary bg-primary/10"
+                        : previewUrl
+                          ? "border-primary/30 bg-primary/[0.02]"
+                          : "border-border bg-muted/20 hover:border-primary/50"
+                    }`}
+                  >
+                    {previewUrl ? (
+                      <div className="p-3 sm:p-5">
+                        <div className="relative overflow-hidden rounded-xl bg-black/5">
+                          <img
+                            src={previewUrl}
+                            alt={t("scanCrop.previewAlt")}
+                            className="mx-auto max-h-[420px] w-full object-contain"
+                          />
+                          <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/65 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
+                            <CheckCircle2 className="size-3.5" />
+                            Image selected
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                              {file?.name}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {file
+                                ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                                : ""}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={reset}
+                          >
+                            <Trash2 className="mr-2 size-4" />
+                            {t("scanCrop.removePhoto")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[270px] flex-col items-center justify-center px-5 py-10 text-center sm:min-h-[320px]">
+                        <span className="mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                          <CloudUpload className="size-8" />
+                        </span>
+                        <h3 className="text-lg font-bold">
+                          {t("scanCrop.noPhoto")}
+                        </h3>
+                        <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                          Drag and drop your plant image here, or choose one
+                          of the options below.
+                        </p>
+                        <div className="mt-6 flex flex-wrap justify-center gap-3">
+                          <Button
+                            onClick={() => uploadInputRef.current?.click()}
+                          >
+                            <ImagePlus className="mr-2 size-4" />
+                            {t("scanCrop.uploadPhoto")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => void openCamera()}
+                          >
+                            <Camera className="mr-2 size-4" />
+                            {t("scanCrop.cameraPhoto")}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    data-testid="scan-upload-input"
+                    onChange={(event) => {
+                      pickFile(event.target.files?.[0] ?? null);
+                      event.target.value = "";
+                    }}
+                  />
+
+                  {file && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => uploadInputRef.current?.click()}
+                      >
+                        <ImagePlus className="mr-2 size-4" />
+                        {t("scanCrop.replacePhoto")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void openCamera()}
+                      >
+                        <Camera className="mr-2 size-4" />
+                        {t("scanCrop.cameraPhoto")}
+                      </Button>
+                    </div>
+                  )}
+
+                  <p className="mt-4 text-xs leading-5 text-muted-foreground">
+                    {t("scanCrop.photoHint")}
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Crop details */}
+              <Card className="rounded-3xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Leaf className="size-5 text-primary" />
+                    Crop information
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Provide additional details to help contextualize the scan.
+                  </p>
+                </CardHeader>
+
+                <CardContent className="grid gap-5 p-5 pt-0 sm:grid-cols-2 sm:p-6 sm:pt-0">
+                  <div className="flex flex-col gap-2">
+                    <Label
+                      htmlFor="scan-crop"
+                      className="text-sm font-semibold"
+                    >
+                      {t("scanCrop.cropLabel")}
+                    </Label>
+                    <Select
+                      id="scan-crop"
+                      value={cropId}
+                      onChange={(event) => setCropId(event.target.value)}
+                    >
+                      <option value="">
+                        {t("scanCrop.cropPlaceholder")}
+                      </option>
+                      {(cropsQuery.data ?? []).map((crop) => (
+                        <option key={crop.id} value={crop.id}>
+                          {crop.name}
+                        </option>
+                      ))}
+                    </Select>
+                    {cropsQuery.isLoading && (
+                      <p className="text-xs text-muted-foreground">
+                        Loading crops...
+                      </p>
+                    )}
+                    {cropsQuery.isError && (
+                      <p className="text-xs text-destructive">
+                        Unable to load crop options.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label
+                      htmlFor="scan-part"
+                      className="text-sm font-semibold"
+                    >
+                      {t("scanCrop.partLabel")}
+                    </Label>
+                    <Select
+                      id="scan-part"
+                      value={partType}
+                      onChange={(event) => setPartType(event.target.value)}
+                    >
+                      <option value="">
+                        {t("scanCrop.partPlaceholder")}
+                      </option>
+                      {PART_TYPES.map((part) => (
+                        <option key={part} value={part}>
+                          {t(`scanCrop.parts.${part}`)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Submit */}
+              <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <div>
+                  <p className="font-semibold">Ready to analyze your crop?</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {file
+                      ? "Your image is ready for AI diagnosis."
+                      : "Choose a plant image to enable diagnosis."}
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  className="rounded-xl"
+                  disabled={!file}
+                  onClick={() => void submit()}
+                >
+                  <ScanLine className="mr-2 size-4" />
+                  {t("scanCrop.submit")}
+                </Button>
+              </div>
+            </div>
+
+            {/* Guidance sidebar */}
+            <aside className="space-y-5">
+              <Card className="overflow-hidden rounded-3xl border-border/70">
+                <div className="bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-5 text-white">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-white/15">
+                    <Sparkles className="size-6" />
+                  </span>
+                  <h3 className="mt-4 text-lg font-bold">
+                    AI-powered crop diagnosis
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-green-50/85">
+                    Analyze plant images and review the diagnosis and guidance
+                    returned by NeuroPlant AI.
+                  </p>
+                </div>
+                <CardContent className="space-y-4 p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <ScanLine className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">Image analysis</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Submit a clear image of the affected plant.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <ShieldCheck className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">Confidence insights</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Review prediction confidence and available explanations.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Leaf className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">Treatment guidance</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Explore treatment and soil recommendations.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-border/70">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Tips for a better scan
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 text-sm text-muted-foreground">
+                    {[
+                      "Capture the affected plant part clearly.",
+                      "Use natural lighting when possible.",
+                      "Avoid blurry or distant images.",
+                      "Keep the affected area visible.",
+                    ].map((tip) => (
+                      <li key={tip} className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-border/70 bg-muted/20">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <History className="size-4 text-primary" />
+                    Previous scans
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    Access your previous crop diagnoses and scan records.
+                  </p>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full"
+                  >
+                    <Link to="/scans">
+                      View scan history
+                      <ChevronRight className="ml-1 size-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

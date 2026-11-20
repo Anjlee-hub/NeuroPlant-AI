@@ -43,4 +43,20 @@ describe("LanguageSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "हिन्दी" }));
     expect(document.documentElement.lang).toBe("hi");
   });
+
+  it("turns off automatic language selection after a manual language change", async () => {
+    const user = userEvent.setup();
+    render(<LanguageSwitcher />);
+
+    const automatic = screen.getByRole("switch", {
+      name: "Automatic local language",
+    });
+    await user.click(automatic);
+    expect(automatic).toHaveAttribute("aria-checked", "true");
+
+    await user.click(screen.getByRole("button", { name: "हिन्दी" }));
+
+    expect(automatic).toHaveAttribute("aria-checked", "false");
+    expect(localStorage.getItem("neuroplant.autoLocalLanguage")).toBe("false");
+  });
 });

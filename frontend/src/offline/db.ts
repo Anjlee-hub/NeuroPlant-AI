@@ -116,6 +116,24 @@ export async function removeSync(id: number): Promise<void> {
   await db.delete("syncQueue", id);
 }
 
+/** Replace a queued payload before retrying it under a fresh idempotency key. */
+export async function replaceSyncPayload(
+  id: number,
+  payload: unknown,
+): Promise<boolean> {
+  const db = await getDb();
+  const tx = db.transaction("syncQueue", "readwrite");
+  const entry = await tx.store.get(id);
+  if (!entry) {
+    await tx.done;
+    return false;
+  }
+  entry.payload = payload;
+  await tx.store.put(entry);
+  await tx.done;
+  return true;
+}
+
 /** Record a failed attempt (drives retry backoff / drop-after-N). */
 export async function markSyncFailed(
   id: number,

@@ -20,6 +20,8 @@ RUN adduser --disabled-password --gecos "" appuser
 # Install Python deps first (layer caching).
 COPY backend/pyproject.toml backend/README.md ./
 COPY backend/app ./app
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/alembic ./alembic
 RUN pip install --no-cache-dir .
 
 # ── API target ──────────────────────────────────────────────────────────

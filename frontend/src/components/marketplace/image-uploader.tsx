@@ -32,11 +32,14 @@ interface PendingImage {
 export function ListingImageUploader({
   initialUrls = [],
   onChange,
+  onPendingChange,
 }: {
   /** URLs already persisted (edit mode — a saved listing's `images`). */
   initialUrls?: string[];
   /** Called with the persisted URL list whenever it changes. */
   onChange: (urls: string[]) => void;
+  /** Called while picked files still need to be persisted. */
+  onPendingChange?: (hasPendingFiles: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [urls, setUrls] = useState<string[]>(initialUrls);
@@ -77,6 +80,7 @@ export function ListingImageUploader({
         preview: URL.createObjectURL(file),
       })),
     ]);
+    onPendingChange?.(true);
   };
 
   const uploadPending = async () => {
@@ -93,6 +97,7 @@ export function ListingImageUploader({
         return [];
       });
       onChange(next);
+      onPendingChange?.(false);
     } catch {
       // Keep the pending batch so the farmer can retry a transient failure.
       setError(t("marketplace.upload.error"));
@@ -109,7 +114,9 @@ export function ListingImageUploader({
 
   const removePending = (target: PendingImage) => {
     URL.revokeObjectURL(target.preview);
-    setPending((prev) => prev.filter((p) => p.id !== target.id));
+    const remaining = pending.filter((p) => p.id !== target.id);
+    setPending(remaining);
+    onPendingChange?.(remaining.length > 0);
   };
 
   return (

@@ -125,7 +125,7 @@ async def test_top5_empty_without_metadata(db):
 
 @pytest.mark.parametrize(
     ("confidence", "level"),
-    [(0.9, "high"), (0.7, "medium"), (0.4, "low")],
+    [(0.9, "high"), (0.7, "medium"), (0.4, "low"), (None, "unavailable")],
 )
 async def test_confidence_level_and_advice(db, confidence, level):
     payload = await ExplainService(db, _FakeStorage()).build(_scan(confidence=confidence))
@@ -158,6 +158,22 @@ async def test_explanation_omits_heatmap_and_stage_when_absent(db):
     payload = await ExplainService(db, _FakeStorage()).build(scan)
     assert "heatmap overlay" not in payload.explanation
     assert "consistent with" not in payload.explanation
+
+
+async def test_explanation_marks_unavailable_confidence_for_review(db):
+    payload = await ExplainService(db, _FakeStorage()).build(
+        _scan(
+            confidence=None,
+            heatmap_path=None,
+            ai_metadata={"top5": [{"disease_name": "Late Blight", "confidence": None}]},
+        )
+    )
+
+    assert payload.confidence.top is None
+    assert payload.confidence.level == "unavailable"
+    assert "unverified" in payload.confidence.advice
+    assert "confidence is unavailable" in payload.explanation
+    assert payload.top5[0].confidence is None
 
 
 # ── Degradation without a heatmap ────────────────────────────────────────

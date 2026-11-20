@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -161,6 +161,16 @@ describe("MarketplaceListingDetailPage", () => {
     // A thumbnail jumps straight to a photo.
     await userEvent.click(screen.getByRole("button", { name: "Thumbnail 1 of Tomato" }));
     expect(main).toHaveAttribute("src", "/media/marketplace/tomato.png");
+  });
+
+  it("shows a fallback when a detail-gallery image cannot be loaded", async () => {
+    renderPage();
+
+    fireEvent.error(await screen.findByRole("img", { name: "Photo of Tomato" }));
+
+    expect(
+      screen.getByRole("img", { name: "No photos for this listing." }),
+    ).toBeInTheDocument();
   });
 
   it("opens the lightbox and closes it on Escape", async () => {

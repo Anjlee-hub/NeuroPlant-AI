@@ -75,7 +75,7 @@ async def create_scan(
     ],
     client_scan_id: Annotated[
         str,
-        Form(description="Client-generated UUID; offline idempotency key"),
+        Form(description="Client-generated UUID; per-user offline idempotency key"),
     ],
     user: CurrentUser,
     db: Db,

@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 
 import { AvailabilityBadge } from "@/components/marketplace/availability-badge";
 import { Badge } from "@/components/ui/badge";
@@ -40,19 +41,26 @@ export function ListingCard({
   const { t } = useTranslation();
   const unitLabel = t(`marketplace.units.${listing.unit}`);
   const archived = listing.availability === "archived";
+  const imageUrl = listing.images?.[0];
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
   return (
     <article className="flex flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-center">
       {/* Photo / placeholder — first image, else an honest empty slot. */}
       <div className="aspect-square w-full shrink-0 overflow-hidden rounded-md bg-muted sm:w-24">
-        {listing.images?.[0] ? (
+        {imageUrl && failedImageUrl !== imageUrl ? (
           <img
-            src={listing.images[0]}
+            src={imageUrl}
             alt={listing.crop_name}
             className="h-full w-full object-cover"
+            onError={() => setFailedImageUrl(imageUrl)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+          <div
+            role="img"
+            aria-label={listing.crop_name}
+            className="flex h-full w-full items-center justify-center text-muted-foreground"
+          >
             <Store className="size-8" aria-hidden />
           </div>
         )}

@@ -656,7 +656,16 @@ class LocalConversationProvider:
             )
 
         crop = await self._crop_name(scan)
-        conf = f"{scan.confidence:.0%}"
+        conf = (
+            f"with {scan.confidence:.0%} confidence"
+            if scan.confidence is not None
+            else "but confidence is unavailable; please verify the diagnosis"
+        )
+        conf_hi = (
+            f"{scan.confidence:.0%} विश्वास"
+            if scan.confidence is not None
+            else "विश्वास उपलब्ध नहीं है; कृपया निदान की पुष्टि करें"
+        )
         sev = scan.severity or "unknown"
         sev_hi = _SEVERITY_HI.get(sev, sev)
         return AssistantReplyOut(
@@ -664,10 +673,10 @@ class LocalConversationProvider:
             lang=ctx.lang,
             message=pick(
                 ctx.lang,
-                f"Your latest scan of {crop or 'your crop'} shows {scan.disease_name} "
-                f"with {conf} confidence ({sev} severity).",
+                f"Your latest scan of {crop or 'your crop'} shows {scan.disease_name} {conf} "
+                f"({sev} severity).",
                 f"{crop or 'आपकी फसल'} के सबसे हालिया स्कैन में {scan.disease_name} "
-                f"दिखा — {conf} विश्वास ({sev_hi} गंभीरता)।",
+                f"दिखा — {conf_hi} ({sev_hi} गंभीरता)।",
             ),
             sections=[
                 self._scan_summary_section(scan, ctx.lang, crop),
@@ -1418,15 +1427,25 @@ class LocalConversationProvider:
         self, scan: Scan, lang: str, crop: str | None = None
     ) -> AssistantSection:
         crop = crop or "—"
+        confidence = (
+            f"{scan.confidence:.0%}"
+            if scan.confidence is not None
+            else "unavailable"
+        )
+        confidence_hi = (
+            f"{scan.confidence:.0%}"
+            if scan.confidence is not None
+            else "उपलब्ध नहीं"
+        )
         return AssistantSection(
             title=pick(lang, "What the scan shows", "स्कैन क्या दिखाता है"),
             body=pick(
                 lang,
                 f"Crop: {crop} · Part: {scan.part_type or '—'} · "
-                f"Confidence: {scan.confidence:.0%} · Severity: {scan.severity or '—'} · "
+                f"Confidence: {confidence} · Severity: {scan.severity or '—'} · "
                 f"Stage: {scan.stage or '—'} · Scanned: {scan.created_at:%d %b %Y}",
                 f"फसल: {crop} · भाग: {scan.part_type or '—'} · "
-                f"विश्वास: {scan.confidence:.0%} · गंभीरता: {scan.severity or '—'} · "
+                f"विश्वास: {confidence_hi} · गंभीरता: {scan.severity or '—'} · "
                 f"अवस्था: {scan.stage or '—'} · स्कैन: {scan.created_at:%d %b %Y}",
             ),
         )
@@ -1481,10 +1500,15 @@ async def build_project_snapshot(user: User, db: AsyncSession) -> str:
     if scan is None:
         lines.append("Scans: none yet (the farmer has not scanned any crop).")
     else:
+        confidence = (
+            f"{scan.confidence:.0%}"
+            if scan.confidence is not None
+            else "unavailable"
+        )
         lines.append(
             f"Latest scan ({scan.created_at:%d %b %Y}): crop_id={scan.crop_id}, "
             f"part={scan.part_type or 'n/a'}, predicted_disease={scan.disease_name or 'healthy'}, "
-            f"confidence={scan.confidence:.0%}, severity={scan.severity or 'n/a'}, "
+            f"confidence={confidence}, severity={scan.severity or 'n/a'}, "
             f"stage={scan.stage or 'n/a'}."
         )
         if scan.disease_id is not None:

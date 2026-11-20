@@ -17,6 +17,7 @@ export function ListingGallery({ images, name }: { images: string[]; name: strin
   const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
 
   if (images.length === 0) {
     return (
@@ -33,29 +34,46 @@ export function ListingGallery({ images, name }: { images: string[]; name: strin
 
   const total = images.length;
   const current = images[index];
+  const currentFailed = failedImages.has(current);
   const prev = (index - 1 + total) % total;
   const next = (index + 1) % total;
+  const markImageFailed = (src: string) => {
+    setFailedImages((previous) => new Set(previous).add(src));
+  };
 
   return (
     <div className="flex flex-col gap-3">
       {/* Main image + lightbox trigger. */}
       <div className="relative">
-        <img
-          src={current}
-          alt={t("marketplaceBuy.gallery.mainImage", { name })}
-          className="aspect-square w-full rounded-lg border object-cover"
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="absolute bottom-3 right-3 bg-background/80 backdrop-blur"
-          onClick={() => setLightboxOpen(true)}
-          aria-haspopup="dialog"
-          aria-label={t("marketplaceBuy.gallery.openLightbox")}
-        >
-          <ZoomIn className="size-4" aria-hidden />
-          {t("marketplaceBuy.gallery.openLightbox")}
-        </Button>
+        {currentFailed ? (
+          <div
+            className="flex aspect-square w-full items-center justify-center rounded-lg border bg-muted text-muted-foreground"
+            role="img"
+            aria-label={t("marketplaceBuy.detail.noImages")}
+          >
+            <ImageOff className="size-12" aria-hidden />
+          </div>
+        ) : (
+          <>
+            <img
+              src={current}
+              alt={t("marketplaceBuy.gallery.mainImage", { name })}
+              className="aspect-square w-full rounded-lg border object-cover"
+              onError={() => markImageFailed(current)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute bottom-3 right-3 bg-background/80 backdrop-blur"
+              onClick={() => setLightboxOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={t("marketplaceBuy.gallery.openLightbox")}
+            >
+              <ZoomIn className="size-4" aria-hidden />
+              {t("marketplaceBuy.gallery.openLightbox")}
+            </Button>
+          </>
+        )}
 
         {total > 1 && (
           <>
@@ -103,12 +121,17 @@ export function ListingGallery({ images, name }: { images: string[]; name: strin
               )}
               onClick={() => setIndex(i)}
             >
-              <img
-                src={src}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
+              {failedImages.has(src) ? (
+                <ImageOff className="mx-auto size-5 text-muted-foreground" aria-hidden />
+              ) : (
+                <img
+                  src={src}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  onError={() => markImageFailed(src)}
+                />
+              )}
             </button>
           ))}
         </div>

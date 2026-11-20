@@ -79,7 +79,7 @@ export function MarketplaceListingFormPage() {
 
   const backLink = (
     <Link
-      to="/marketplace"
+      to="/marketplace/listings"
       className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft className="size-4" aria-hidden />
@@ -102,9 +102,9 @@ export function MarketplaceListingFormPage() {
         onSaved={() => {
           queryClient.invalidateQueries({ queryKey: MARKETPLACE_LISTINGS_KEY });
           queryClient.invalidateQueries({ queryKey: MARKETPLACE_STATS_KEY });
-          navigate("/marketplace");
+          navigate("/marketplace/listings");
         }}
-        onCancel={() => navigate("/marketplace")}
+        onCancel={() => navigate("/marketplace/listings")}
       />
     </div>
   );

@@ -187,6 +187,7 @@ class MessagingService:
             conversation_id=conversation.id,
             sender_id=user.id,
             sender_name=user.name,
+            message_id=message.id,
             listing_id=conversation.listing_id,
             product_id=conversation.product_id,
         )

@@ -42,10 +42,6 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Confidence used for rule-baseline output — deliberately below the model
-# threshold so consumers can distinguish "best-effort" from real model output.
-BASELINE_CONFIDENCE = 0.6
-
 # Number of ranked candidates returned by the local TF provider (Task 5.2
 # stores the full top-5 as confidence metadata).
 TOP_K = 5
@@ -82,7 +78,7 @@ class RuleBaselineClassifier:
         name = self._index_to_name[index]
         top = PredictedDisease(
             disease_name=name,
-            confidence=BASELINE_CONFIDENCE,
+            confidence=None,
             disease_id=self._catalog.disease_ids.get(name),
             crop_id=self._catalog.disease_crops.get(name),
         )
@@ -178,8 +174,39 @@ class LocalTensorFlowClassifier:
             preprocessor = get_preprocessor("default")
             tensor = preprocessor.preprocess(image)  # (H, W, 3) float32
             batch = np.expand_dims(tensor, axis=0)  # (1, H, W, 3)
-            logits = self._model(batch, training=False)  # (1, C)
-            probs = tf.nn.softmax(logits[0]).numpy()
+            output = np.asarray(self._model(batch, training=False))
+            if output.shape != (1, self._catalog.class_count):
+                raise InferenceError(
+                    "model output shape does not match the catalog label count"
+                )
+            scores = output[0]
+            if not np.isfinite(scores).all():
+                raise InferenceError("model output contains non-finite scores")
+
+            final_layer = self._model.layers[-1] if self._model.layers else None
+            activation = getattr(final_layer, "activation", None)
+            activation_name = getattr(activation, "__name__", "")
+            has_softmax_output = (
+                activation_name == "softmax"
+                or type(final_layer).__name__.lower() == "softmax"
+            )
+            looks_like_probabilities = (
+                np.all(scores >= 0.0)
+                and np.all(scores <= 1.0)
+                and np.isclose(np.sum(scores), 1.0, atol=1e-5)
+            )
+            if has_softmax_output or looks_like_probabilities:
+                probs = scores
+            else:
+                probs = tf.nn.softmax(scores).numpy()
+            if (
+                not np.isfinite(probs).all()
+                or np.any(probs < 0.0)
+                or np.any(probs > 1.0)
+                or not np.isclose(np.sum(probs), 1.0, atol=1e-5)
+            ):
+                raise InferenceError("model did not produce a valid class-probability vector")
+
             order = np.argsort(probs)[::-1][:TOP_K]
             predictions: list[PredictedDisease] = []
             for idx in order:

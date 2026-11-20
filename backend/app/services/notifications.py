@@ -1,28 +1,20 @@
+
 """Notification service + transport interface + scheduling seam (M5, Task 2).
 
 Ownership: every notification belongs to exactly one user; the service
 enforces this by filtering every query with ``user_id`` and answering ``404``
-for ids the caller doesn't own (enumeration guard, consistent with
-scans/soil/recovery/messaging).
+for ids the caller doesn't own.
 
-Transport: push is NOT implemented. :class:`NotificationTransport` is a
-protocol so a real provider (FCM, APNs, Web Push, email, SMS) can be injected
-later. The default :class:`InAppTransport` is a no-op — notifications persist
-in the DB and the client polls ``/notifications``.
+Transport: push is NOT implemented. NotificationTransport is a protocol
+so a real provider can be injected later. The default InAppTransport is
+a no-op — notifications persist in the DB and the client polls.
 
-Scheduling: ``scheduled_at`` is a seam for future scheduled reminders (e.g. a
-treatment reminder the day before a calendar task). No background worker
-consumes it today. When Celery beat or similar arrives, it will query
-``WHERE scheduled_at <= now() AND sent_at IS NULL`` and call
-:meth:`NotificationService.dispatch_scheduled` which will set ``sent_at`` after
-delivery. ``sent_at`` is separate from ``read_at`` so a notification can be
-delivered (sent) but still unread.
+Scheduling: scheduled_at holds future deliveries. The dispatcher delivers
+due rows and sets sent_at after successful delivery. sent_at is separate
+from read_at so a notification can be delivered but remain unread.
 
-Creation is decoupled from weather/disease-risk: callers pass
-``type`` + ``title`` + ``message`` + optional ``payload``. The domain service
-that knows *when* to notify (weather risk crossing a threshold, a calendar
-task due, etc.) is the one that calls :meth:`NotificationService.create` —
-the notification layer knows nothing about weather or disease rules.
+Creation is decoupled from weather/disease-risk: callers pass type,
+title, message, and optional payload.
 """
 
 from __future__ import annotations
@@ -31,7 +23,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -41,23 +34,17 @@ from app.models.user import User
 logger = get_logger(__name__)
 
 
-# ── Constants (shared with API layer) ──────────────────────────────────────
+# ── Constants (shared with API layer) ────────────────────────────────────────
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 
 
-# ── Transport interface (push seam) ──────────────────────────────────────
+# ── Transport interface (push seam) ──────────────────────────────────────────
 
 
 class NotificationTransport(Protocol):
-    """Anything that can deliver a notification to a user.
-
-    Implementations will be injected by the application when a real provider
-    (FCM, APNs, Web Push, email, SMS) is configured. The default
-    :class:`InAppTransport` does nothing — the notification stays in the DB
-    and the client polls the list endpoint.
-    """
+    """Anything that can deliver a notification to a user."""
 
     async def send(self, user: User, notification: Notification) -> None: ...
 
@@ -67,10 +54,14 @@ class InAppTransport:
 
     async def send(self, user: User, notification: Notification) -> None:
         # No-op: in-app only. The row is already in the DB.
-        logger.debug("in_app_notification", user_id=user.id, notification_id=notification.id)
+        logger.debug(
+            "in_app_notification",
+            user_id=user.id,
+            notification_id=notification.id,
+        )
 
 
-# ── Domain exceptions (mapped to HTTP in ``app.main``) ─────────────────────
+# ── Domain exceptions (mapped to HTTP in app.main) ───────────────────────────
 
 
 class NotificationNotFoundError(Exception):
@@ -81,7 +72,7 @@ class NotificationValidationError(Exception):
     """Input failed validation (bad type, missing fields, etc.)."""
 
 
-# ── Service ────────────────────────────────────────────────────────────────
+# ── Service ──────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -102,7 +93,7 @@ class NotificationService:
         self.db = db
         self.transport = transport or InAppTransport()
 
-    # ── List / count ──────────────────────────────────────────────────────
+    # ── List / count ────────────────────────────────────────────────────────
 
     async def list(
         self,
@@ -114,12 +105,28 @@ class NotificationService:
         page_size = max(1, min(page_size, MAX_PAGE_SIZE))
         page = max(1, page)
 
-        base = select(Notification).where(Notification.user_id == user_id)
-        total = (await self.db.scalar(select(func.count()).select_from(base.subquery()))) or 0
+        visible = or_(
+            Notification.scheduled_at.is_(None),
+            Notification.sent_at.is_not(None),
+        )
+
+        base = select(Notification).where(
+            Notification.user_id == user_id,
+            visible,
+        )
+
+        total = (
+            await self.db.scalar(
+                select(func.count()).select_from(base.subquery())
+            )
+        ) or 0
+
         unread = (
             await self.db.scalar(
                 select(func.count()).where(
-                    Notification.user_id == user_id, Notification.read_at.is_(None)
+                    Notification.user_id == user_id,
+                    Notification.read_at.is_(None),
+                    visible,
                 )
             )
         ) or 0
@@ -143,36 +150,56 @@ class NotificationService:
         return (
             await self.db.scalar(
                 select(func.count()).where(
-                    Notification.user_id == user_id, Notification.read_at.is_(None)
+                    Notification.user_id == user_id,
+                    Notification.read_at.is_(None),
+                    or_(
+                        Notification.scheduled_at.is_(None),
+                        Notification.sent_at.is_not(None),
+                    ),
                 )
             )
         ) or 0
 
-    # ── Mark read ─────────────────────────────────────────────────────────
+    # ── Mark read ───────────────────────────────────────────────────────────
 
-    async def mark_read(self, user_id: int, notification_id: int) -> Notification:
-        """Mark one notification as read. 404 if not owned by the user."""
+    async def mark_read(
+        self,
+        user_id: int,
+        notification_id: int,
+    ) -> Notification:
+        """Mark one visible notification as read. 404 if not owned."""
         notif = await self._get_owned(notification_id, user_id)
+
         if notif.read_at is None:
             notif.read_at = datetime.now(UTC)
             await self.db.commit()
+
         return notif
 
     async def mark_all_read(self, user_id: int) -> int:
-        """Mark all unread notifications as read. Returns the number updated."""
+        """Mark all visible unread notifications as read. Returns updated count."""
         now = datetime.now(UTC)
+
         result = await self.db.execute(
             select(Notification).where(
-                Notification.user_id == user_id, Notification.read_at.is_(None)
+                Notification.user_id == user_id,
+                Notification.read_at.is_(None),
+                or_(
+                    Notification.scheduled_at.is_(None),
+                    Notification.sent_at.is_not(None),
+                ),
             )
         )
+
         unread = result.scalars().all()
-        for n in unread:
-            n.read_at = now
+
+        for notification in unread:
+            notification.read_at = now
+
         await self.db.commit()
         return len(unread)
 
-    # ── Creation (called by domain services, not HTTP) ────────────────────
+    # ── Creation (called by domain services, not HTTP) ─────────────────────
 
     async def create(
         self,
@@ -183,97 +210,173 @@ class NotificationService:
         message: str,
         payload: dict | None = None,
         scheduled_at: datetime | None = None,
+        idempotency_key: str | None = None,
     ) -> Notification:
         """Enqueue a notification for a user.
 
         Validation:
-        - ``type`` must be a valid ``NotificationType`` key (validated at the
-          boundary in the API; this method accepts the enum or the raw string).
-        - ``title`` and ``message`` non-empty.
-        - ``payload`` serializable dict (default empty).
-        - ``scheduled_at`` optional; if set, ``sent_at`` will be set by the
-          future scheduler after dispatch.
+        - type must be a valid NotificationType.
+        - title and message must be non-empty.
+        - payload must be serializable; defaults to an empty dict.
+        - scheduled_at is optional; sent_at is set after delivery.
         """
         if isinstance(type, str):
             try:
                 type_enum = NotificationType(type)
             except ValueError as exc:
+                allowed_types = [notification_type.value for notification_type in NotificationType]
                 raise NotificationValidationError(
-                    f"Invalid notification type: {type}. "
-                    f"Allowed: {[t.value for t in NotificationType]}"
+                    f"Invalid notification type: {type}. Allowed: {allowed_types}"
                 ) from exc
         else:
             type_enum = type
 
         if not title or not title.strip():
             raise NotificationValidationError("title must not be empty")
+
         if not message or not message.strip():
             raise NotificationValidationError("message must not be empty")
 
-        notif = Notification(
+        if idempotency_key is not None:
+            existing = await self.db.scalar(
+                select(Notification).where(
+                    Notification.idempotency_key == idempotency_key
+                )
+            )
+
+            if existing is not None:
+                return existing
+
+        notification = Notification(
             user_id=user_id,
             type=type_enum,
             title=title.strip(),
             message=message.strip(),
             payload=payload or {},
             scheduled_at=scheduled_at,
+            idempotency_key=idempotency_key,
         )
-        self.db.add(notif)
+
+        self.db.add(notification)
         await self.db.flush()
 
-        # Fire-and-forget in-app transport (no-op today, real provider later).
-        # ``send`` may be called again by the scheduler when ``scheduled_at`` fires.
-        user = await self.db.get(User, user_id)
-        if user:
-            await self.transport.send(user, notif)
-        await self.db.commit()
+        try:
+            # Scheduled notifications stay hidden and undelivered until
+            # the scheduler claims them after their scheduled time.
+            if scheduled_at is None:
+                user = await self.db.get(User, user_id)
+
+                if user:
+                    await self.transport.send(user, notification)
+
+            await self.db.commit()
+
+        except IntegrityError:
+            await self.db.rollback()
+
+            if idempotency_key is None:
+                raise
+
+            existing = await self.db.scalar(
+                select(Notification).where(
+                    Notification.idempotency_key == idempotency_key
+                )
+            )
+
+            if existing is None:
+                raise
+
+            return existing
 
         logger.info(
             "notification_created",
             user_id=user_id,
-            notification_id=notif.id,
+            notification_id=notification.id,
             type=type_enum.value,
             scheduled=scheduled_at.isoformat() if scheduled_at else None,
         )
-        return notif
 
-    # ── Scheduling seam (future Celery beat consumer) ─────────────────────
+        return notification
+
+    # ── Scheduled delivery (consumed by Celery Beat) ──────────────────────
 
     async def dispatch_scheduled(self, limit: int = 100) -> int:
-        """Dispatch notifications whose ``scheduled_at`` has passed.
+        """Dispatch notifications whose scheduled_at has passed.
 
-        This is the seam a Celery beat task will call periodically (e.g. every
-        minute). It finds notifications with ``scheduled_at <= now() AND
-        sent_at IS NULL``, sends them via the transport, and sets ``sent_at``.
-        Returns the number dispatched.
+        Finds notifications where scheduled_at <= now and sent_at is NULL,
+        sends them via the transport, and sets sent_at after successful
+        delivery. Returns the number dispatched.
 
-        ``limit`` protects against runaway batches if the scheduler falls behind.
+        Row-level locks prevent concurrent workers from claiming the same
+        rows on databases that support SKIP LOCKED.
         """
         now = datetime.now(UTC)
-        result = await self.db.execute(
-            select(Notification)
-            .where(Notification.scheduled_at <= now, Notification.sent_at.is_(None))
-            .limit(limit)
-        )
-        scheduled = result.scalars().all()
-
         dispatched = 0
-        for notif in scheduled:
-            user = await self.db.get(User, notif.user_id)
-            if user:
-                await self.transport.send(user, notif)
-            notif.sent_at = now
+
+        while dispatched < limit:
+            result = await self.db.execute(
+                select(Notification)
+                .where(
+                    Notification.scheduled_at <= now,
+                    Notification.sent_at.is_(None),
+                )
+                .order_by(Notification.scheduled_at, Notification.id)
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+
+            notification = result.scalar_one_or_none()
+
+            if notification is None:
+                break
+
+            user = await self.db.get(User, notification.user_id)
+
+            if user is None:
+                await self.db.rollback()
+                break
+
+            try:
+                await self.transport.send(user, notification)
+                notification.sent_at = now
+                await self.db.commit()
+
+            except Exception:
+                await self.db.rollback()
+                raise
+
             dispatched += 1
 
         if dispatched:
-            await self.db.commit()
-            logger.info("scheduled_notifications_dispatched", count=dispatched)
+            logger.info(
+                "scheduled_notifications_dispatched",
+                count=dispatched,
+            )
+
         return dispatched
 
-    # ── Internal helpers ──────────────────────────────────────────────────
+    # ── Internal helpers ────────────────────────────────────────────────────
 
-    async def _get_owned(self, notification_id: int, user_id: int) -> Notification:
-        notif = await self.db.get(Notification, notification_id)
-        if notif is None or notif.user_id != user_id:
-            raise NotificationNotFoundError(f"Notification {notification_id} not found.")
-        return notif
+    async def _get_owned(
+        self,
+        notification_id: int,
+        user_id: int,
+    ) -> Notification:
+        """Fetch a visible notification belonging to the specified user."""
+        notification = await self.db.scalar(
+            select(Notification).where(
+                Notification.id == notification_id,
+                Notification.user_id == user_id,
+                or_(
+                    Notification.scheduled_at.is_(None),
+                    Notification.sent_at.is_not(None),
+                ),
+            )
+        )
+
+        if notification is None:
+            raise NotificationNotFoundError(
+                f"Notification {notification_id} not found."
+            )
+
+        return notification

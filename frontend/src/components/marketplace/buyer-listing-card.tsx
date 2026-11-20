@@ -1,4 +1,5 @@
 import { ArrowRight, MapPin, Store } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -17,6 +18,8 @@ import type { CropListing } from "@/types/marketplace";
 export function BuyerListingCard({ listing }: { listing: CropListing }) {
   const { t, i18n } = useTranslation();
   const unitLabel = t(`marketplace.units.${listing.unit}`);
+  const imageUrl = listing.images?.[0];
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-lg border bg-card transition-shadow hover:shadow-md">
@@ -26,15 +29,20 @@ export function BuyerListingCard({ listing }: { listing: CropListing }) {
         aria-label={t("marketplaceBuy.card.viewDetails")}
       >
         <div className="aspect-square w-full overflow-hidden bg-muted">
-          {listing.images?.[0] ? (
+          {imageUrl && failedImageUrl !== imageUrl ? (
             <img
-              src={listing.images[0]}
+              src={imageUrl}
               alt={listing.crop_name}
               loading="lazy"
               className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+              onError={() => setFailedImageUrl(imageUrl)}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <div
+              role="img"
+              aria-label={listing.crop_name}
+              className="flex h-full w-full items-center justify-center text-muted-foreground"
+            >
               <Store className="size-10" aria-hidden />
             </div>
           )}

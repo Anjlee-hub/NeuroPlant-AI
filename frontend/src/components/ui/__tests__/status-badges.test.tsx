@@ -16,6 +16,7 @@ describe("status badge variant helpers", () => {
     expect(confidenceVariant(0.85)).toBe("success"); // high boundary inclusive
     expect(confidenceVariant(0.7)).toBe("secondary");
     expect(confidenceVariant(0.6)).toBe("secondary"); // medium boundary inclusive
+    expect(confidenceVariant(null)).toBe("destructive");
     expect(confidenceVariant(0.4)).toBe("destructive");
   });
 

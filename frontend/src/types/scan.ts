@@ -16,7 +16,7 @@ export interface ScanMediaItem {
 
 export interface ScanRanking {
   disease_name: string;
-  confidence: number;
+  confidence: number | null;
   disease_id: number | null;
   crop_id: number | null;
 }
@@ -32,7 +32,7 @@ export interface Scan {
   part_type: ScanPartType | null;
   disease_id: number | null;
   disease_name: string;
-  confidence: number;
+  confidence: number | null;
   severity: ScanSeverity | null;
   stage: string | null;
   provider: string;
@@ -90,7 +90,7 @@ export interface CropOption {
 
 // ── Explainability (GET /scans/{id}/explain) ─────────────────────────────
 
-export type ConfidenceLevel = "high" | "medium" | "low";
+export type ConfidenceLevel = "high" | "medium" | "low" | "unavailable";
 
 export interface ExplainDisease {
   id: number | null;
@@ -102,7 +102,7 @@ export interface ExplainDisease {
 }
 
 export interface ExplainConfidence {
-  top: number;
+  top: number | null;
   level: ConfidenceLevel;
   advice: string;
 }

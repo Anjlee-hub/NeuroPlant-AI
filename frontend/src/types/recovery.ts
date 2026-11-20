@@ -26,7 +26,7 @@ export interface RecoveryScan {
   part_type: ScanPartType | null;
   severity: ScanSeverity | null;
   stage: string | null;
-  confidence: number;
+  confidence: number | null;
   provider: string;
   model_version: string | null;
   created_at: string;

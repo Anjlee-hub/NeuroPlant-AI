@@ -376,7 +376,7 @@ async def test_listing_detail_includes_farmer(client):
 
 
 async def test_non_seller_cannot_register_shop(client):
-    roles = (("919000000010", "farmer"), ("919000000011", "customer"), ("919000000012", "expert"))
+    roles = (("919000000011", "customer"), ("919000000012", "expert"))
     for phone, role in roles:
         headers = await _register(client, phone, role=role)
         resp = await client.post(
@@ -385,6 +385,35 @@ async def test_non_seller_cannot_register_shop(client):
             headers=headers,
         )
         assert resp.status_code == 403, role
+
+
+async def test_farmer_can_initialize_shop_and_manage_products(client):
+    headers = await _register(client, "919000000019", role="farmer")
+
+    missing_shop = await client.get("/api/v1/marketplace/shop/me", headers=headers)
+    assert missing_shop.status_code == 404
+    assert (await client.get("/api/v1/marketplace/shop/products", headers=headers)).json() == []
+    stats = await client.get("/api/v1/marketplace/shop/products/stats", headers=headers)
+    assert stats.status_code == 200
+    assert stats.json()["total"] == 0
+
+    registered = await client.post(
+        "/api/v1/marketplace/shop/register",
+        json={"shop_name": "Farmer's Shop"},
+        headers=headers,
+    )
+    assert registered.status_code == 200, registered.text
+    product = await client.post(
+        "/api/v1/marketplace/shop/products",
+        json=_product(name="Farmer's Neem Oil"),
+        headers=headers,
+    )
+    assert product.status_code == 201, product.text
+
+    loaded = await client.get("/api/v1/marketplace/shop/me", headers=headers)
+    assert loaded.status_code == 200
+    assert loaded.json()["shop_name"] == "Farmer's Shop"
+    assert [item["name"] for item in loaded.json()["products"]] == ["Farmer's Neem Oil"]
 
 
 async def test_seller_register_shop(client):
@@ -622,6 +651,44 @@ async def test_listing_image_upload(client):
     assert len(urls) == 1
     assert urls[0].startswith("/media/")
     assert urls[0].endswith(".png")
+
+
+async def test_uploaded_listing_image_persists_and_is_served(client):
+    headers = await _register(client, "919000000048")
+    import base64
+
+    png = base64.b64decode(PNG_1X1)
+    upload = await client.post(
+        "/api/v1/marketplace/crops/images",
+        files=[("files", ("tomato.png", png, "image/png"))],
+        headers=headers,
+    )
+    assert upload.status_code == 200, upload.text
+    urls = upload.json()["urls"]
+
+    created = await _make_listing(client, headers, images=urls)
+    assert created["images"] == urls
+
+    browse = await client.get("/api/v1/marketplace/crops", headers=headers)
+    assert browse.status_code == 200
+    browsed = next(
+        item for item in browse.json()["items"] if item["id"] == created["id"]
+    )
+    assert browsed["images"] == urls
+
+    mine = await client.get("/api/v1/marketplace/crops/mine", headers=headers)
+    assert mine.status_code == 200
+    assert mine.json()[0]["images"] == urls
+
+    detail = await client.get(
+        f"/api/v1/marketplace/crops/{created['id']}", headers=headers
+    )
+    assert detail.status_code == 200
+    assert detail.json()["images"] == urls
+
+    media = await client.get(urls[0])
+    assert media.status_code == 200
+    assert media.content == png
 
 
 async def test_listing_image_upload_multiple(client):

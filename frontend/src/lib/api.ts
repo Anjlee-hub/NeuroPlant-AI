@@ -1,4 +1,14 @@
 import type {
+  CommunityPost,
+  CommunityVoteResult,
+  CreatePostInput,
+  CommunityComment,
+  CreateCommentInput,
+  Expert,
+  Consultation,
+  CreateConsultationInput,
+} from "@/types/community";
+import type {
   MfaChallengeResponse,
   MfaCodesResponse,
   MfaSetupResponse,
@@ -41,6 +51,13 @@ import type {
   ReviewUpdateInput,
 } from "@/types/trust";
 import type { SoilRecommendation } from "@/types/soil";
+import type {
+  EligibilityCheck,
+  EligibilityCheckInput,
+  GovernmentScheme,
+  GovernmentSchemePage,
+  SchemeFilters,
+} from "@/types/scheme";
 import type {
   CropOption,
   Scan,
@@ -90,6 +107,16 @@ export interface ScanUploadInput {
   deviceId?: string;
 }
 
+export interface CurrentWeather {
+  coordinates: { lat: number; lng: number };
+  temperature_c: number;
+  humidity_percent: number;
+  rainfall_mm: number;
+  wind_speed_ms: number;
+  provider: string;
+  is_fallback: boolean;
+}
+
 type CartResponse = {
   items: {
     id: number;
@@ -129,11 +156,13 @@ const REFRESH_KEY = "neuroplant.refresh";
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -240,11 +269,12 @@ async function request<T>(
       const newToken = await refreshAccessToken();
       if (newToken) return request<T>(path, options, true);
     }
-    const error = body?.error as { message?: string } | undefined;
+    const error = body?.error as { code?: string; message?: string } | undefined;
     const detail = typeof body?.detail === "string" ? body.detail : undefined;
     throw new ApiError(
       res.status,
       error?.message ?? detail ?? `Request failed (${res.status})`,
+      error?.code ?? null,
     );
   }
 
@@ -304,6 +334,10 @@ export const api = {
   getScan: (scanId: number) => request<Scan>(`/scans/${scanId}`, { auth: true }),
   getScanExplain: (scanId: number) =>
     request<ScanExplain>(`/scans/${scanId}/explain`, { auth: true }),
+  getCurrentWeather: (lat: number, lng: number) =>
+    request<CurrentWeather>(`/weather/current?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`, {
+      auth: true,
+    }),
   /** Treatment care plan for a scan's predicted disease (M3 T2). */
   getScanRecommendations: (scanId: number) =>
     request<DiseaseRecommendation>(`/scans/${scanId}/recommendations`, { auth: true }),
@@ -363,6 +397,37 @@ export const api = {
   /** Remove a task from the schedule. */
   deleteCalendarTask: (taskId: number) =>
     request<void>(`/calendar/tasks/${taskId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+  // ── Government Schemes (M7) ─────────────────────────────────────────
+  listGovernmentSchemes: (filters: SchemeFilters = {}) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") params.set(key, String(value));
+    }
+    const query = params.size ? `?${params.toString()}` : "";
+    return request<GovernmentSchemePage>(`/schemes${query}`, { auth: true });
+  },
+  getGovernmentScheme: (schemeId: number) =>
+    request<GovernmentScheme>(`/schemes/${schemeId}`, { auth: true }),
+  checkSchemeEligibility: (schemeId: number, payload: EligibilityCheckInput) =>
+    request<EligibilityCheck>(`/schemes/${schemeId}/eligibility`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+  listSavedGovernmentSchemes: () =>
+    request<GovernmentScheme[]>("/schemes/saved", { auth: true }),
+  getSavedGovernmentSchemeStatus: (schemeId: number) =>
+    request<{ saved: boolean }>(`/schemes/saved/status/${schemeId}`, { auth: true }),
+  saveGovernmentScheme: (schemeId: number) =>
+    request<{ saved: boolean }>(`/schemes/saved/${schemeId}`, {
+      method: "POST",
+      auth: true,
+    }),
+  removeSavedGovernmentScheme: (schemeId: number) =>
+    request<{ saved: boolean }>(`/schemes/saved/${schemeId}`, {
       method: "DELETE",
       auth: true,
     }),
@@ -639,4 +704,105 @@ export const api = {
   /** Delete one of the caller's own reviews. */
   deleteReview: (reviewId: number) =>
     request<void>(`/marketplace/reviews/${reviewId}`, { method: "DELETE", auth: true }),
+  // Farmer Community
+  listCommunityPosts: () =>
+    request<CommunityPost[]>("/community/posts", { auth: true }),
+
+  uploadCommunityPostImage: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<{ image_url: string }>("/community/posts/image", {
+      method: "POST",
+      body: fd,
+      auth: true,
+    });
+  },
+
+  createCommunityPost: (payload: CreatePostInput) =>
+    request<CommunityPost>("/community/posts", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+
+  updateCommunityPost: (postId: number, payload: Partial<CreatePostInput>) =>
+    request<CommunityPost>(`/community/posts/${postId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+
+  deleteCommunityPost: (postId: number) =>
+    request<void>(`/community/posts/${postId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  listPostComments: (postId: number) =>
+    request<CommunityComment[]>(`/community/posts/${postId}/comments`, {
+      auth: true,
+    }),
+
+  addPostComment: (postId: number, payload: CreateCommentInput) =>
+    request<CommunityComment>(`/community/posts/${postId}/comments`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+
+  updatePostComment: (postId: number, commentId: number, content: string) =>
+    request<CommunityComment>(`/community/posts/${postId}/comments/${commentId}`, {
+      method: "PATCH",
+      body: { content },
+      auth: true,
+    }),
+
+  deletePostComment: (postId: number, commentId: number) =>
+    request<void>(`/community/posts/${postId}/comments/${commentId}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  voteForPost: (postId: number) =>
+    request<CommunityVoteResult>(`/community/posts/${postId}/vote`, {
+      method: "POST",
+      auth: true,
+    }),
+  listSavedCommunityPosts: () =>
+    request<CommunityPost[]>("/community/saved", { auth: true }),
+  saveCommunityPost: (postId: number) =>
+    request<{ saved: boolean }>(`/community/posts/${postId}/save`, {
+      method: "POST",
+      auth: true,
+    }),
+  unsaveCommunityPost: (postId: number) =>
+    request<{ saved: boolean }>(`/community/posts/${postId}/save`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  // Expert Ecosystem
+  listExperts: () =>
+    request<Expert[]>("/experts/", { auth: true }),
+
+  // Consultations
+  listConsultations: () =>
+    request<Consultation[]>("/consultations/", { auth: true }),
+
+  requestConsultation: (payload: CreateConsultationInput) =>
+    request<Consultation>("/consultations/", {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+
+  updateConsultation: (
+    consultationId: number,
+    payload: { status?: string; expert_response?: string },
+  ) =>
+    request<Consultation>(`/consultations/${consultationId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
 };

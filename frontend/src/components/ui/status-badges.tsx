@@ -16,8 +16,9 @@ const CONFIDENCE_MEDIUM = 0.6;
 
 /** Confidence band -> badge color (mirrors the backend bands). */
 export function confidenceVariant(
-  confidence: number,
+  confidence: number | null,
 ): "success" | "secondary" | "destructive" {
+  if (confidence === null || !Number.isFinite(confidence)) return "destructive";
   if (confidence >= CONFIDENCE_HIGH) return "success";
   if (confidence >= CONFIDENCE_MEDIUM) return "secondary";
   return "destructive";
@@ -54,14 +55,16 @@ export function ConfidenceBadge({
   hint,
   className,
 }: {
-  value: number;
+  value: number | null;
   /** Tooltip text describing what the badge measures. */
   hint?: string;
   className?: string;
 }) {
+  const { t } = useTranslation();
+  const confidence = typeof value === "number" && Number.isFinite(value) ? value : null;
   return (
-    <Badge variant={confidenceVariant(value)} title={hint} className={className}>
-      {formatPercent(value)}
+    <Badge variant={confidenceVariant(confidence)} title={hint} className={className}>
+      {confidence === null ? t("scanHistory.needsReview") : formatPercent(confidence)}
     </Badge>
   );
 }

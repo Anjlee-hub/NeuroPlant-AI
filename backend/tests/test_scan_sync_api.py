@@ -73,7 +73,7 @@ async def test_sync_success_batch(client, db):
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["total"] == 2
-    assert body["created"] == 2
+    assert body["created"] == 2, body
     assert body["replayed"] == 0
     assert body["failed"] == 0
     assert len(body["results"]) == 2
@@ -83,7 +83,7 @@ async def test_sync_success_batch(client, db):
         scan = result["scan"]
         assert scan["id"]
         assert scan["disease_name"]
-        assert scan["confidence"] == 0.6  # rule-baseline marker
+        assert scan["confidence"] is None  # rule baseline has no probability output
         assert scan["provider"] == "baseline"
         assert scan["model_version"]
         assert scan["sync_status"] == "synced"
@@ -185,13 +185,8 @@ async def test_sync_mixed_batch_statuses(client, db):
 # ── Ownership ────────────────────────────────────────────────────────────
 
 
-async def test_sync_cross_user_duplicate_rejected(client, db):
-    """Ownership guard: B can never reuse or see A's ``client_scan_id``.
-
-    Idempotency replay is scoped to the owner, so B never receives A's row; the
-    global unique constraint on ``client_scan_id`` turns B's attempt into a
-    per-item ``duplicate_client_scan_id`` failure instead.
-    """
+async def test_sync_client_scan_id_conflicts_across_users(client, db):
+    """A globally unique key replays for its owner and conflicts for another user."""
     await seed_catalog(db)
     headers_a = await _auth_headers(client, "+919000000105")
     headers_b = await _auth_headers(client, "+919000000106")
@@ -208,12 +203,19 @@ async def test_sync_cross_user_duplicate_rejected(client, db):
     assert resp_b.status_code == 200, resp_b.text
     body = resp_b.json()
     assert body["created"] == 0
-    assert body["replayed"] == 0  # never an implicit replay of A's scan
+    assert body["replayed"] == 0
     assert body["failed"] == 1
     result = body["results"][0]
     assert result["status"] == "failed"
     assert result["scan"] is None
     assert result["error"]["code"] == "duplicate_client_scan_id"
+
+    replay_a = await client.post(
+        "/api/v1/scans/sync", json=[_item(client_scan_id)], headers=headers_a
+    )
+    assert replay_a.json()["results"][0]["status"] == "replayed"
+    scan_a_id = replay_a.json()["results"][0]["scan"]["id"]
+    assert scan_a_id == resp_a.json()["results"][0]["scan"]["id"]
 
 
 # ── Downstream failures ──────────────────────────────────────────────────

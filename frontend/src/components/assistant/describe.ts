@@ -13,8 +13,8 @@ import type { RecoveryScan, RecoveryTracker, RiskLevel } from "@/types/recovery"
 import type { ScanExplain } from "@/types/scan";
 import type { SoilRecommendation } from "@/types/soil";
 
-function percent(value: number): string {
-  return `${Math.round(value * 100)}%`;
+function percent(value: number | null): string {
+  return value === null ? "unavailable" : `${Math.round(value * 100)}%`;
 }
 
 function dateOf(iso: string): string {
